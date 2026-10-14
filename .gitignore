@@ -6,6 +6,8 @@ git_commit.ps1
 git_setup.ps1
 make_icons.ps1
 install_mingit.ps1
+check_github.ps1
+copy_icons.ps1
 
 # Android build outputs
 android/.gradle/

@@ -21,18 +21,23 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Build APK with Gradle Wrapper
+      - name: Setup Android SDK Environment & Licenses
         run: |
+          echo "ANDROID_HOME: $ANDROID_HOME"
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+      - name: Download Gradle 8.5 & Build APK
+        run: |
+          wget -q https://services.gradle.org/distributions/gradle-8.5-bin.zip
+          unzip -q gradle-8.5-bin.zip
+          export PATH=$PWD/gradle-8.5/bin:$PATH
+          gradle --version
           cd android
-          gradle wrapper --gradle-version 8.5
-          chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
+          gradle assembleDebug --stacktrace --no-daemon
 
-      - name: Rename APK
+      - name: Prepare APK Output
         run: |
+          ls -la android/app/build/outputs/apk/debug/
           cp android/app/build/outputs/apk/debug/app-debug.apk ./LeadPulse.apk
 
       - name: Upload APK Build Artifact
@@ -47,19 +52,21 @@ jobs:
         with:
           tag_name: v1.0.0
           name: "LeadPulse Android App v1.0.0"
+          draft: false
+          prerelease: false
           body: |
             ## 📱 LeadPulse - Standalone Android APK
 
             Download `LeadPulse.apk` below and install it directly on your Android phone.
 
-            ### Features:
+            ### What's Inside:
             - **Visiting Card Scanner**: Live camera scanning and gallery photo processing.
-            - **AI Extraction & Background Enrichment**: Google Gemini Multimodal Vision extracts contact details and synthesizes LinkedIn profiles, past work history, and company background.
-            - **Model Discovery**: Dynamically select from all available Gemini models (`gemini-2.0-flash`, `gemini-1.5-flash`, `gemini-1.5-pro`) with self-healing auto-fallbacks.
+            - **AI Extraction & Background Enrichment**: Google Gemini Multimodal Vision extracts contact details and synthesizes LinkedIn profiles, career history, and company background.
+            - **Model Selection & Auto-Fallbacks**: Dynamically list and select from all authorized Gemini models (`gemini-2.0-flash`, `gemini-1.5-flash`, `gemini-1.5-pro`) with self-healing fallbacks.
             - **Follow-up Action Items**: Track per-contact and global action items with priority tags.
-            - **Event-Wise Organization**: Assign leads to specific conferences, trade shows, and expos.
+            - **Event-Wise Organization**: Filter and organize leads event-wise.
             - **1-Tap Android Contacts Sync**: Export directly to phone contact book via `.vcf` (vCard 3.0).
-            - **Offline Standalone**: Bundled assets inside the APK run without any laptop or web server.
+            - **100% Offline Standalone**: Bundled assets inside the APK run without any laptop or web server.
           files: |
             ./LeadPulse.apk
         env:
