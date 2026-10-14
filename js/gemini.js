@@ -1,8 +1,10 @@
 /**
- * LeadPulse Gemini AI Service
- * Powered by Google Gemini 1.5/2.0/2.5 Multimodal Flash & Pro Models
- * Performs Visiting Card OCR + Contact Extraction + LinkedIn & Past Work Enrichment
- * Includes Dynamic Model Discovery, Selection & Self-Healing Model Fallbacks.
+ * LeadPulse - Gemini Multimodal Vision & Career Enrichment Service
+ * Connects to Google Generative Language API (v1beta) to perform OCR
+ * on visiting cards, discover models dynamically, and synthesize
+ * structured past organization history for enterprise matching.
+ * 
+ * STRICT POLICY: Zero dummy profiles. Only genuine AI extraction or clean manual entry.
  */
 
 class GeminiService {
@@ -11,51 +13,52 @@ class GeminiService {
   }
 
   /**
-   * Fetches real list of available models supported by the user's specific API key
-   * Filters for models that support multimodal generateContent
+   * Dynamically query all available Gemini models for the user's API key
+   * Filters for models supporting multimodal generateContent (vision).
    */
-  async fetchAvailableModels(customApiKey = null) {
-    const apiKey = customApiKey || window.storageService.getGeminiApiKey();
-    if (!apiKey) {
-      throw new Error('Please enter a Google Gemini API Key first.');
-    }
+  async fetchAvailableModels(apiKey) {
+    if (!apiKey) return [];
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`;
     const response = await fetch(url);
 
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
-      const msg = err.error ? err.error.message : `HTTP ${response.status}`;
-      throw new Error(`Failed to fetch models from Google: ${msg}`);
+      throw new Error(err.error ? err.error.message : `Failed to list models: HTTP ${response.status}`);
     }
 
     const data = await response.json();
-    const rawModels = data.models || [];
+    if (!data.models || !Array.isArray(data.models)) {
+      return [];
+    }
 
-    // Filter models supporting generateContent and vision
-    const contentModels = rawModels.filter(m => {
+    const visionCapable = data.models.filter(m => {
       const methods = m.supportedGenerationMethods || [];
-      return methods.includes('generateContent') && !m.name.includes('embedding') && !m.name.includes('aqa');
+      return methods.includes('generateContent') && !m.name.includes('embedding');
     });
 
-    // Format clean model objects
-    const formatted = contentModels.map(m => {
+    const formatted = visionCapable.map(m => {
       const cleanId = m.name.replace(/^models\//, '');
-      const isFlash = cleanId.includes('flash');
-      const isPro = cleanId.includes('pro');
       return {
         id: cleanId,
-        name: `${m.displayName || cleanId} [${cleanId}]`,
+        displayName: m.displayName || cleanId,
         description: m.description || '',
-        isRecommended: isFlash
+        isFlash: cleanId.includes('flash'),
+        isPro: cleanId.includes('pro')
       };
     });
 
-    // Sort: flash models first, then pro, then others
     formatted.sort((a, b) => {
-      if (a.isRecommended && !b.isRecommended) return -1;
-      if (!a.isRecommended && b.isRecommended) return 1;
-      return a.id.localeCompare(b.id);
+      const score = (m) => {
+        if (m.id === 'gemini-2.0-flash') return 100;
+        if (m.id === 'gemini-1.5-flash') return 90;
+        if (m.id === 'gemini-1.5-flash-latest') return 85;
+        if (m.id === 'gemini-1.5-pro') return 80;
+        if (m.isFlash) return 70;
+        if (m.isPro) return 60;
+        return 10;
+      };
+      return score(b) - score(a);
     });
 
     if (formatted.length > 0) {
@@ -67,7 +70,7 @@ class GeminiService {
 
   /**
    * Main scan & enrich function
-   * @param {string} imageBase64 - Raw base64 data url (data:image/jpeg;base64,...)
+   * @param {string} imageBase64 - Raw base64 data url
    * @param {string} [customApiKey] - Optional API key
    * @param {string} [customModel] - Optional specific model ID
    */
@@ -75,8 +78,8 @@ class GeminiService {
     const apiKey = customApiKey || window.storageService.getGeminiApiKey();
 
     if (!apiKey) {
-      console.warn('No Gemini API key found. Using intelligent demo simulation fallback.');
-      return this.simulateCardExtraction(imageBase64);
+      console.warn('No Gemini API key found. Providing clean manual review template.');
+      return this.createCleanManualTemplate(imageBase64, 'Please set your Gemini API key in Settings for automated AI card reading and background intelligence.');
     }
 
     const preferredModel = customModel || window.storageService.getSelectedModel() || 'gemini-1.5-flash';
@@ -88,7 +91,6 @@ class GeminiService {
       'gemini-1.5-pro',
       'gemini-2.5-flash'
     ];
-    // Remove duplicates
     const modelQueue = [...new Set(fallbackCandidates)];
 
     let lastError = null;
@@ -98,29 +100,28 @@ class GeminiService {
         console.log(`Attempting visiting card OCR with model: ${modelId}`);
         const result = await this.callGeminiVisionAPI(imageBase64, apiKey, modelId);
         
-        // If we succeeded with a fallback model different from saved, update setting
         if (modelId !== preferredModel) {
           console.log(`Auto-switched preferred model to working model: ${modelId}`);
           window.storageService.setSelectedModel(modelId);
           if (window.app && window.app.showToast) {
-            window.app.showToast(`Auto-switched to active model: ${modelId}`, 'info');
+            window.app.showToast(`Active model: ${modelId}`, 'info');
           }
         }
         return result;
       } catch (error) {
         lastError = error;
         console.warn(`Model ${modelId} failed: ${error.message}. Checking next candidate...`);
-        // If the error was NOT a 404 / model not found (e.g. invalid API key or quota exceeded), don't keep cycling all models
         if (error.message.includes('API_KEY_INVALID') || error.message.includes('RESOURCE_EXHAUSTED')) {
           break;
         }
       }
     }
 
-    console.error('All Gemini API models failed, falling back to simulated analysis:', lastError);
-    const simulated = await this.simulateCardExtraction(imageBase64);
-    simulated._warning = `Live API note: ${lastError ? lastError.message : 'Model unavailable'}. Loaded offline intelligence mode. (Go to Settings to select a verified model).`;
-    return simulated;
+    console.error('All Gemini API models failed:', lastError);
+    return this.createCleanManualTemplate(
+      imageBase64, 
+      `AI Service Note: ${lastError ? lastError.message : 'Model temporarily unavailable'}. Card image attached for manual review.`
+    );
   }
 
   /**
@@ -130,7 +131,6 @@ class GeminiService {
     const cleanModel = modelId.replace(/^models\//, '');
     const endpoint = `${this.baseEndpoint}/${cleanModel}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
-    // Extract raw base64 data and mimeType
     const matches = imageBase64.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/);
     let mimeType = 'image/jpeg';
     let rawBase64 = imageBase64;
@@ -140,41 +140,56 @@ class GeminiService {
       rawBase64 = matches[2];
     }
 
-    const customPromptInstructions = window.storageService.getCustomPrompt();
+    const customPromptInstructions = window.storageService.getCustomPromptInstructions();
 
     const prompt = `
-You are an executive sales intelligence agent and business card OCR expert.
-Thoroughly examine the provided visiting/business card image.
-Extract all contact details and generate comprehensive professional background enrichment.
+You are an elite executive sales intelligence assistant and OCR engine for business cards.
+Examine this visiting/business card image with extreme precision.
 
-Return strictly a valid JSON object with EXACTLY this structure (no markdown fences, no extra text):
+Extract all printed contact details and synthesize accurate professional enrichment.
+Crucially, extract or infer any PAST ORGANIZATIONS, PREVIOUS EMPLOYERS, or ALUMNI TIES (e.g., Ex-Google, Ex-Infosys, Ex-Oracle, BITS Pilani Alumni, IIT Alumni) mentioned on the card or inferred from their executive seniority.
+
+Return strictly a valid JSON object matching EXACTLY this schema (no markdown formatting, no codeblock markers):
 {
   "name": "Full Name",
   "honorific": "Mr./Ms./Dr./Prof. or empty",
   "title": "Designation / Role",
-  "company": "Company Name",
-  "industry": "Industry Sector (e.g., Enterprise SaaS, FinTech, Industrial Automation)",
+  "company": "Current Company / Organization Name",
+  "industry": "Industry Sector (e.g., Enterprise SaaS, FinTech, Industrial IoT, HealthTech)",
   "email": "Email address",
   "phone": "Direct phone number with country code",
   "whatsapp": "WhatsApp number (digits with +)",
   "website": "Company website URL",
   "address": "Office or headquarters address",
   "linkedinUrl": "LinkedIn profile or company search URL (e.g. https://www.linkedin.com/in/firstname-lastname)",
-  "pastWorkSummary": "A detailed 2-4 sentence executive summary of this person's likely past career, achievements, and leadership scale.",
-  "companyOverview": "A concise 2-3 sentence overview of this company's business model, solutions, and enterprise value proposition.",
+  
+  "pastWorkSummary": "A concise 2-3 sentence executive summary of this person's professional career background, past employers, and operational scope.",
+  
+  "pastOrganizations": [
+    {
+      "companyName": "Former Organization Name (e.g., Oracle, Infosys, Cisco, TCS, Google, Microsoft, Accenture)",
+      "role": "Former Role (e.g. Senior Director, Lead Architect, Project Manager)",
+      "duration": "e.g. 2018-2022 or Estimated",
+      "notes": "Brief notes on their domain or department"
+    }
+  ],
+  "pastCompaniesList": ["Former Company 1", "Former Company 2"],
+  "alumniInstitutions": ["University / College name if known"],
+
+  "companyOverview": "A concise 2-sentence overview of this company's business model and value proposition.",
   "salesIcebreakers": [
-    "Conversational icebreaker 1 tailored for a sales meeting",
-    "Conversational icebreaker 2 tailored to their industry"
+    "Relevant conversational icebreaker 1 tailored for a sales meeting",
+    "Relevant conversational icebreaker 2 tailored to their industry"
   ],
   "suggestedActionItems": [
-    "Suggested follow-up action item 1 (e.g., Send enterprise product overview deck)",
-    "Suggested follow-up action item 2 (e.g., Book 30-min discovery call)"
+    "Follow-up action item 1 (e.g., Send enterprise capability deck)",
+    "Follow-up action item 2 (e.g., Schedule discovery call)"
   ],
   "decisionStatus": "Decision Maker / Influencer / Evaluator",
   "leadScore": "Hot / Warm / Nurture"
 }
 
-${customPromptInstructions ? `Additional user instructions: ${customPromptInstructions}` : ''}
+${customPromptInstructions ? `Additional User Instructions: ${customPromptInstructions}` : ''}
 `;
 
     const requestBody = {
@@ -192,10 +207,10 @@ ${customPromptInstructions ? `Additional user instructions: ${customPromptInstru
         }
       ],
       generationConfig: {
-        temperature: 0.2,
+        temperature: 0.15,
         topK: 32,
         topP: 0.95,
-        maxOutputTokens: 1500
+        maxOutputTokens: 1800
       }
     };
 
@@ -224,7 +239,7 @@ ${customPromptInstructions ? `Additional user instructions: ${customPromptInstru
   }
 
   /**
-   * Sanitizes and parses Gemini output (handling markdown codeblocks)
+   * Sanitizes and parses Gemini output
    */
   parseGeminiJsonResponse(text) {
     let cleanJson = text;
@@ -236,6 +251,11 @@ ${customPromptInstructions ? `Additional user instructions: ${customPromptInstru
 
     try {
       const parsed = JSON.parse(cleanJson);
+      if (!Array.isArray(parsed.pastOrganizations)) parsed.pastOrganizations = [];
+      if (!Array.isArray(parsed.pastCompaniesList)) {
+        parsed.pastCompaniesList = parsed.pastOrganizations.map(o => o.companyName).filter(Boolean);
+      }
+      if (!Array.isArray(parsed.alumniInstitutions)) parsed.alumniInstitutions = [];
       if (!Array.isArray(parsed.salesIcebreakers)) parsed.salesIcebreakers = [];
       if (!Array.isArray(parsed.suggestedActionItems)) parsed.suggestedActionItems = [];
       return parsed;
@@ -245,9 +265,6 @@ ${customPromptInstructions ? `Additional user instructions: ${customPromptInstru
     }
   }
 
-  /**
-   * Regex fallback if LLM returned non-JSON prose
-   */
   fallbackRegexExtraction(text) {
     const extract = (pattern) => {
       const m = text.match(pattern);
@@ -255,144 +272,69 @@ ${customPromptInstructions ? `Additional user instructions: ${customPromptInstru
     };
 
     return {
-      name: extract(/"name":\s*"([^"]+)"/) || 'Extracted Lead',
+      name: extract(/"name":\s*"([^"]+)"/) || '',
       honorific: extract(/"honorific":\s*"([^"]+)"/),
-      title: extract(/"title":\s*"([^"]+)"/) || 'Executive',
-      company: extract(/"company":\s*"([^"]+)"/) || 'Enterprise Partner',
-      industry: extract(/"industry":\s*"([^"]+)"/) || 'Technology',
+      title: extract(/"title":\s*"([^"]+)"/) || '',
+      company: extract(/"company":\s*"([^"]+)"/) || '',
+      industry: extract(/"industry":\s*"([^"]+)"/) || '',
       email: extract(/"email":\s*"([^"]+)"/),
       phone: extract(/"phone":\s*"([^"]+)"/),
       whatsapp: extract(/"whatsapp":\s*"([^"]+)"/),
       website: extract(/"website":\s*"([^"]+)"/),
       address: extract(/"address":\s*"([^"]+)"/),
       linkedinUrl: extract(/"linkedinUrl":\s*"([^"]+)"/),
-      pastWorkSummary: extract(/"pastWorkSummary":\s*"([^"]+)"/) || 'Senior executive with extensive domain background.',
-      companyOverview: extract(/"companyOverview":\s*"([^"]+)"/) || 'Enterprise solution provider.',
+      pastWorkSummary: extract(/"pastWorkSummary":\s*"([^"]+)"/) || '',
+      pastOrganizations: [],
+      pastCompaniesList: [],
+      alumniInstitutions: [],
+      companyOverview: extract(/"companyOverview":\s*"([^"]+)"/) || '',
       salesIcebreakers: [
-        'Ask about their primary infrastructure priorities for the coming fiscal quarter.',
-        'Explore how our mobile offline workflows can accelerate their field operations.'
+        'Discuss current infrastructure goals for the upcoming quarter.',
+        'Explore how streamlined field workflows can improve their operational turnaround.'
       ],
       suggestedActionItems: [
-        'Send introductory email with solution brief',
-        'Connect on LinkedIn with customized message'
-      ]
+        'Send introductory follow-up email with company deck',
+        'Connect on LinkedIn with tailored note'
+      ],
+      decisionStatus: 'Evaluator',
+      leadScore: 'Warm'
     };
   }
 
   /**
-   * High-fidelity realistic simulation fallback when offline or no API key
+   * Generates a clean empty template for manual review when no API key or offline.
+   * GUARANTEE: NEVER injects dummy names, dummy phones, or fake companies.
    */
-  async simulateCardExtraction(imageBase64) {
-    await new Promise(r => setTimeout(r, 900));
-
-    const sampleProfiles = [
-      {
-        name: 'Vikramaditya Sharma',
-        honorific: 'Mr.',
-        title: 'Vice President of Engineering',
-        company: 'Nexora Cloud Systems',
-        industry: 'Cloud Infrastructure & AI',
-        email: 'vikram.sharma@nexoracloud.io',
-        phone: '+91 98201 45872',
-        whatsapp: '+919820145872',
-        website: 'https://nexoracloud.io',
-        address: 'Cyber City, Tower B, Gurugram, India',
-        linkedinUrl: 'https://www.linkedin.com/in/vikramaditya-sharma-cloud',
-        pastWorkSummary: '14+ years spearheading hybrid cloud scalability and containerized architectures. Previously Principal Architect at Infosys FinTech Labs and Senior Lead at Cisco Systems. Led high-throughput API gateway processing 50M+ requests/day.',
-        companyOverview: 'Nexora builds enterprise-grade multi-cloud observability and zero-trust orchestration for Fortune 500 banks.',
-        salesIcebreakers: [
-          'Ask about their recent migration to Kubernetes 1.31 and latency milestones.',
-          'Discuss how our solution reduces cloud egress spend during peak database queries.'
-        ],
-        suggestedActionItems: [
-          'Share custom Enterprise security whitepaper',
-          'Book 30-min discovery demo with Solutions Architect'
-        ],
-        decisionStatus: 'Decision Maker',
-        leadScore: 'Hot'
-      },
-      {
-        name: 'Dr. Ananya Deshmukh',
-        honorific: 'Dr.',
-        title: 'Chief Product Officer',
-        company: 'AuraHealth Intelligence',
-        industry: 'HealthTech & MedTech AI',
-        email: 'ananya.d@aurahealth.ai',
-        phone: '+91 91673 89210',
-        whatsapp: '+919167389210',
-        website: 'https://aurahealth.ai',
-        address: 'Indiranagar 100ft Road, Bengaluru, India',
-        linkedinUrl: 'https://www.linkedin.com/in/ananya-deshmukh-healthtech',
-        pastWorkSummary: 'Former Head of AI Product at GE Healthcare South Asia. Holds a Ph.D. in Biomedical Informatics from Stanford. Led the FDA-cleared triage algorithm for cardiac imaging deployed across 120+ diagnostic hospitals.',
-        companyOverview: 'AuraHealth provides clinical workflow copilots that automate patient discharge summaries and clinician EHR documentation with HIPAA & GDPR compliance.',
-        salesIcebreakers: [
-          'Compliment her keynote speech on reducing physician burnout using ambient voice AI.',
-          'Explore potential pilot integration with our offline-capable mobile workflow platform.'
-        ],
-        suggestedActionItems: [
-          'Send draft mutual Non-Disclosure Agreement (NDA)',
-          'Follow-up regarding hospital pilot cohort size'
-        ],
-        decisionStatus: 'Decision Maker',
-        leadScore: 'Hot'
-      },
-      {
-        name: 'Rajiv Menon',
-        honorific: 'Mr.',
-        title: 'Chief Operating Officer',
-        company: 'RoboGrid Industrial IoT',
-        industry: 'Industrial Automation & Robotics',
-        email: 'rmenon@robogrid.de',
-        phone: '+49 152 9847120',
-        whatsapp: '+491529847120',
-        website: 'https://robogrid.de',
-        address: 'Siemensdamm 50, 13629 Berlin, Germany',
-        linkedinUrl: 'https://www.linkedin.com/in/rajiv-menon-robogrid',
-        pastWorkSummary: '18 years leading manufacturing operational excellence and Industry 4.0 sensor telemetry. Formerly VP of Supply Chain at Bosch Industrial Germany. Oversaw 8 gigafactory deployments across EU and Asia.',
-        companyOverview: 'RoboGrid manufactures ruggedized edge sensors and predictive maintenance AI modules for heavy machinery and automotive assembly lines.',
-        salesIcebreakers: [
-          'Mention our ultra-low latency sync architecture for industrial factory floors.',
-          'Inquire about their field maintenance teams and how mobile-first workflow software can eliminate paper field audits.'
-        ],
-        suggestedActionItems: [
-          'Send field-service mobile app case study',
-          'Follow up regarding their Q1 RFP for field automation software'
-        ],
-        decisionStatus: 'Decision Maker',
-        leadScore: 'Warm'
-      },
-      {
-        name: 'Marcus Vance',
-        honorific: 'Mr.',
-        title: 'Managing Director, APAC Growth',
-        company: 'Synthetix Global Consulting',
-        industry: 'Digital Transformation & Enterprise Advisory',
-        email: 'm.vance@synthetixglobal.com',
-        phone: '+65 8291 4032',
-        whatsapp: '+6582914032',
-        website: 'https://synthetixglobal.com',
-        address: 'Marina Bay Financial Centre Tower 2, Singapore',
-        linkedinUrl: 'https://www.linkedin.com/in/marcus-vance-synthetix',
-        pastWorkSummary: 'Over 20 years guiding Global 2000 digital supply chain modernization and ERP cloud transformations across Singapore, Tokyo, Sydney, and Mumbai. Former Partner at Accenture Strategy.',
-        companyOverview: 'Synthetix provides high-impact advisory on AI adoption, omni-channel customer operations, and agile organization design.',
-        salesIcebreakers: [
-          'Mention our enterprise rollout speed and SOC2 / ISO compliance credentials.',
-          'Ask about APAC corporate client demand for mobile CRM field execution tools.'
-        ],
-        suggestedActionItems: [
-          'Send partner enablement deck and commission structure',
-          'Set up follow-up lunch meeting during next regional trade summit'
-        ],
-        decisionStatus: 'Influencer',
-        leadScore: 'Hot'
-      }
-    ];
-
-    const index = Math.floor(Math.random() * sampleProfiles.length);
-    const chosen = JSON.parse(JSON.stringify(sampleProfiles[index]));
-    chosen._isSimulated = true;
-    return chosen;
+  createCleanManualTemplate(imageBase64, warningMessage = '') {
+    return {
+      name: '',
+      honorific: '',
+      title: '',
+      company: '',
+      industry: '',
+      email: '',
+      phone: '',
+      whatsapp: '',
+      website: '',
+      address: '',
+      linkedinUrl: '',
+      pastWorkSummary: '',
+      pastOrganizations: [],
+      pastCompaniesList: [],
+      alumniInstitutions: [],
+      companyOverview: '',
+      salesIcebreakers: [],
+      suggestedActionItems: [
+        'Send follow-up email with product overview deck',
+        'Schedule discovery meeting'
+      ],
+      decisionStatus: 'Evaluator',
+      leadScore: 'Warm',
+      _warning: warningMessage,
+      _isManual: true
+    };
   }
 }
 
+// Global Singleton Initialization
 window.geminiService = new GeminiService();

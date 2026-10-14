@@ -1,7 +1,7 @@
 /**
- * LeadPulse - Main Application Controller
- * Handles UI interactions, Camera & AI Card Scanning, Contacts Directory,
- * Event Management, Follow-up Action Items, and vCard/CSV Export.
+ * LeadPulse - Enterprise Sales Card Scanner & CRM Controller
+ * Provides clean zero-dummy-data architecture, Sales Rep corporate attribution,
+ * Cross-team sync & sharing, and structured organization & alumni matching.
  */
 
 class AppController {
@@ -9,11 +9,12 @@ class AppController {
     this.currentView = 'viewScanner';
     this.currentEventFilter = 'all';
     this.currentTaskFilter = 'all';
+    this.currentScopeFilter = 'all'; // 'all' | 'my' | 'hot' | 'decision'
     this.searchQuery = '';
+    this.orgSearchQuery = '';
     this.activeContactDetailId = null;
     this.tempScannedCard = null;
 
-    // Wait for DOM
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', () => this.init());
     } else {
@@ -22,12 +23,18 @@ class AppController {
   }
 
   async init() {
-    console.log('LeadPulse App Initializing...');
+    console.log('LeadPulse Enterprise Initializing...');
+
+    // Guarantee: Purge any legacy dummy records from previous app versions
+    if (window.storageService && typeof window.storageService.purgeLegacyDummyData === 'function') {
+      window.storageService.purgeLegacyDummyData();
+    }
+
     this.cacheDomElements();
     this.bindEvents();
-    this.startClock();
+    this.updateSalesRepUI();
 
-    // Set initial active event if none
+    // Set initial active event if none configured
     if (!window.storageService.getActiveEventId()) {
       const events = window.storageService.getEvents();
       if (events.length > 0) {
@@ -37,15 +44,16 @@ class AppController {
 
     this.updateHeaderActiveEvent();
     this.renderContacts();
+    this.renderOrganizations();
     this.renderEvents();
     this.renderTasks();
     this.renderEventFilterPills();
     this.loadSettings();
 
-    // Start camera stream on initial launch
+    // Initialize camera stream
     await this.initCamera();
 
-    // Register service worker for Android PWA if supported
+    // Register service worker for standalone PWA capabilities
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').catch(err => {
         console.log('SW registration note:', err);
@@ -59,11 +67,13 @@ class AppController {
     this.navBtnCenterScan = document.getElementById('navBtnCenterScan');
     this.viewScreens = document.querySelectorAll('.view-screen');
 
-    // Header
+    // Header & Sales Rep Profile
+    this.btnHeaderSalesRep = document.getElementById('btnHeaderSalesRep');
+    this.headerRepInitials = document.getElementById('headerRepInitials');
+    this.headerRepName = document.getElementById('headerRepName');
     this.btnActiveEventPill = document.getElementById('btnActiveEventPill');
     this.headerActiveEventName = document.getElementById('headerActiveEventName');
     this.btnOpenSettings = document.getElementById('btnOpenSettings');
-    this.statusBarTime = document.getElementById('statusBarTime');
 
     // Scanner
     this.cameraVideo = document.getElementById('cameraVideo');
@@ -76,35 +86,40 @@ class AppController {
     this.btnRestartCamera = document.getElementById('btnRestartCamera');
     this.scannerActiveEventLabel = document.getElementById('scannerActiveEventLabel');
     this.btnChangeActiveEvent = document.getElementById('btnChangeActiveEvent');
-    this.demoChips = document.querySelectorAll('.demo-chip');
 
     // AI Overlay
     this.aiProcessingOverlay = document.getElementById('aiProcessingOverlay');
     this.aiProcessingTitle = document.getElementById('aiProcessingTitle');
     this.aiProcessingDesc = document.getElementById('aiProcessingDesc');
 
-    // Contacts
+    // Contacts View
     this.contactsFeed = document.getElementById('contactsFeed');
     this.inputSearchContacts = document.getElementById('inputSearchContacts');
+    this.btnClearSearch = document.getElementById('btnClearSearch');
+    this.scopeChips = document.querySelectorAll('.scope-chip');
     this.contactsEventFilterPills = document.getElementById('contactsEventFilterPills');
     this.statTotalContacts = document.getElementById('statTotalContacts');
-    this.statActiveEvents = document.getElementById('statActiveEvents');
+    this.statTotalOrgs = document.getElementById('statTotalOrgs');
     this.statPendingTasks = document.getElementById('statPendingTasks');
     this.contactsCountLabel = document.getElementById('contactsCountLabel');
     this.btnExportAllCSV = document.getElementById('btnExportAllCSV');
 
-    // Events
+    // Organizations View
+    this.orgsFeed = document.getElementById('orgsFeed');
+    this.inputSearchOrgs = document.getElementById('inputSearchOrgs');
+    this.btnClearSearchOrgs = document.getElementById('btnClearSearchOrgs');
+    this.orgsCountLabel = document.getElementById('orgsCountLabel');
+
+    // Events View
     this.eventsList = document.getElementById('eventsList');
     this.btnAddNewEvent = document.getElementById('btnAddNewEvent');
     this.bannerActiveEventName = document.getElementById('bannerActiveEventName');
     this.bannerActiveEventLocation = document.getElementById('bannerActiveEventLocation');
 
-    // Tasks
-    this.tasksList = document.getElementById('tasksList');
-    this.taskFilterTabs = document.querySelectorAll('.task-filter-tab');
-    this.taskCountAll = document.getElementById('taskCountAll');
-    this.taskCountPending = document.getElementById('taskCountPending');
-    this.taskCountCompleted = document.getElementById('taskCountCompleted');
+    // Tasks View
+    this.tasksFeed = document.getElementById('tasksFeed') || document.getElementById('tasksList');
+    this.taskFilterPills = document.querySelectorAll('.task-filter-pill');
+    this.tasksCountLabel = document.getElementById('tasksCountLabel');
 
     // Modals
     this.modalScanReview = document.getElementById('modalScanReview');
@@ -113,37 +128,61 @@ class AppController {
     this.btnSaveReviewContact = document.getElementById('btnSaveReviewContact');
     this.reviewCardImagePreview = document.getElementById('reviewCardImagePreview');
     this.reviewEventSelect = document.getElementById('reviewEventSelect');
+    this.reviewPastOrgsList = document.getElementById('reviewPastOrgsList');
+    this.reviewDecisionStatus = document.getElementById('reviewDecisionStatus');
+    this.reviewLeadScore = document.getElementById('reviewLeadScore');
+    this.reviewBudget = document.getElementById('reviewBudget');
+    this.reviewTimeline = document.getElementById('reviewTimeline');
 
     this.modalContactDetail = document.getElementById('modalContactDetail');
     this.btnCloseContactDetail = document.getElementById('btnCloseContactDetail');
     this.detailSheetContentBody = document.getElementById('detailSheetContentBody');
     this.btnDeleteContact = document.getElementById('btnDeleteContact');
     this.btnDownloadVCardSingle = document.getElementById('btnDownloadVCardSingle');
+    this.detailSheetHeaderTitle = document.getElementById('detailSheetHeaderTitle');
+
+    this.modalOrgMatching = document.getElementById('modalOrgMatching');
+    this.btnCloseOrgMatching = document.getElementById('btnCloseOrgMatching');
+    this.orgMatchingModalTitle = document.getElementById('orgMatchingModalTitle');
+    this.orgMatchingModalBody = document.getElementById('orgMatchingModalBody');
+
+    this.modalSalesRep = document.getElementById('modalSalesRep');
+    this.btnCloseSalesRepModal = document.getElementById('btnCloseSalesRepModal');
+    this.btnCancelSalesRep = document.getElementById('btnCancelSalesRep');
+    this.btnSaveSalesRep = document.getElementById('btnSaveSalesRep');
+    this.repFormName = document.getElementById('repFormName');
+    this.repFormEmpId = document.getElementById('repFormEmpId');
+    this.repFormPhone = document.getElementById('repFormPhone');
+    this.repFormEmail = document.getElementById('repFormEmail');
+    this.repFormRegion = document.getElementById('repFormRegion');
+    this.repFormDesignation = document.getElementById('repFormDesignation');
+    this.repFormTeamCode = document.getElementById('repFormTeamCode');
 
     this.modalAddEvent = document.getElementById('modalAddEvent');
     this.btnCloseAddEvent = document.getElementById('btnCloseAddEvent');
     this.btnCancelAddEvent = document.getElementById('btnCancelAddEvent');
     this.btnSubmitAddEvent = document.getElementById('btnSubmitAddEvent');
 
-    // Settings
+    // Settings View Elements
+    this.settingsRepAvatar = document.getElementById('settingsRepAvatar');
+    this.settingsRepNameDisplay = document.getElementById('settingsRepNameDisplay');
+    this.settingsRepMetaDisplay = document.getElementById('settingsRepMetaDisplay');
+    this.btnEditSalesRepProfile = document.getElementById('btnEditSalesRepProfile');
+    this.inputTeamWorkspaceCode = document.getElementById('inputTeamWorkspaceCode');
+    this.btnSyncTeamNow = document.getElementById('btnSyncTeamNow');
+    this.btnShareTeamBundle = document.getElementById('btnShareTeamBundle');
+    this.btnImportTeamBundle = document.getElementById('btnImportTeamBundle');
+    this.fileImportTeamBundle = document.getElementById('fileImportTeamBundle');
     this.settingGeminiApiKey = document.getElementById('settingGeminiApiKey');
-    this.settingGeminiModel = document.getElementById('settingGeminiModel');
-    this.btnFetchModels = document.getElementById('btnFetchModels');
-    this.modelStatusNotice = document.getElementById('modelStatusNotice');
-    this.btnToggleApiKeyVisibility = document.getElementById('btnToggleApiKeyVisibility');
-    this.settingCustomPrompt = document.getElementById('settingCustomPrompt');
-    this.btnSaveSettings = document.getElementById('btnSaveSettings');
-    this.btnTestGemini = document.getElementById('btnTestGemini');
-    this.btnExportAllJSON = document.getElementById('btnExportAllJSON');
-    this.btnResetDefaultData = document.getElementById('btnResetDefaultData');
+    this.settingModelSelect = document.getElementById('settingModelSelect');
+    this.btnRefreshModels = document.getElementById('btnRefreshModels');
+    this.btnTestModel = document.getElementById('btnTestModel');
+    this.btnExportFullBackup = document.getElementById('btnExportFullBackup');
+    this.btnRestoreBackup = document.getElementById('btnRestoreBackup');
+    this.fileRestoreBackup = document.getElementById('fileRestoreBackup');
+    this.btnClearAllData = document.getElementById('btnClearAllData');
 
-    // Review Modal Qualification Fields
-    this.reviewDecisionStatus = document.getElementById('reviewDecisionStatus');
-    this.reviewLeadScore = document.getElementById('reviewLeadScore');
-    this.reviewBudget = document.getElementById('reviewBudget');
-    this.reviewTimeline = document.getElementById('reviewTimeline');
-
-    // Toast
+    // Toast Container
     this.toastContainer = document.getElementById('toastContainer');
   }
 
@@ -162,90 +201,115 @@ class AppController {
       });
     }
 
+    // Header buttons
+    if (this.btnHeaderSalesRep) {
+      this.btnHeaderSalesRep.addEventListener('click', () => this.openSalesRepModal());
+    }
     if (this.btnActiveEventPill) {
-      this.btnActiveEventPill.addEventListener('click', () => {
-        this.switchView('viewEvents');
-      });
+      this.btnActiveEventPill.addEventListener('click', () => this.switchView('viewEvents'));
     }
-
     if (this.btnChangeActiveEvent) {
-      this.btnChangeActiveEvent.addEventListener('click', () => {
-        this.switchView('viewEvents');
-      });
+      this.btnChangeActiveEvent.addEventListener('click', () => this.switchView('viewEvents'));
     }
-
     if (this.btnOpenSettings) {
-      this.btnOpenSettings.addEventListener('click', () => {
-        this.switchView('viewSettings');
-      });
+      this.btnOpenSettings.addEventListener('click', () => this.switchView('viewSettings'));
     }
 
     // Camera & Scanning
     if (this.btnCapture) {
       this.btnCapture.addEventListener('click', () => this.handleCaptureCard());
     }
-
     if (this.btnUploadGallery) {
       this.btnUploadGallery.addEventListener('click', () => {
-        this.fileCardInput.click();
+        if (this.fileCardInput) this.fileCardInput.click();
       });
     }
-
     if (this.fileCardInput) {
       this.fileCardInput.addEventListener('change', (e) => this.handleFileUpload(e));
     }
-
     if (this.cameraPhotoInput) {
       this.cameraPhotoInput.addEventListener('change', (e) => this.handleFileUpload(e));
     }
-
     if (this.btnManualEntry) {
       this.btnManualEntry.addEventListener('click', () => this.openManualContactModal());
     }
-
     if (this.btnToggleTorch) {
       this.btnToggleTorch.addEventListener('click', () => this.toggleTorch());
     }
-
     if (this.btnRestartCamera) {
       this.btnRestartCamera.addEventListener('click', () => this.initCamera());
     }
 
-    // Demo card chips
-    this.demoChips.forEach(chip => {
-      chip.addEventListener('click', () => {
-        const cardType = chip.getAttribute('data-card');
-        this.handleScanDemoCard(cardType);
-      });
-    });
-
-    // Contacts search & filter
+    // Contacts Directory: Search & Scope Filter Chips
     if (this.inputSearchContacts) {
       this.inputSearchContacts.addEventListener('input', (e) => {
         this.searchQuery = e.target.value.toLowerCase().trim();
+        if (this.btnClearSearch) {
+          this.btnClearSearch.style.display = this.searchQuery ? 'block' : 'none';
+        }
+        this.renderContacts();
+      });
+    }
+    if (this.btnClearSearch) {
+      this.btnClearSearch.addEventListener('click', () => {
+        if (this.inputSearchContacts) this.inputSearchContacts.value = '';
+        this.searchQuery = '';
+        this.btnClearSearch.style.display = 'none';
         this.renderContacts();
       });
     }
 
+    this.scopeChips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        this.scopeChips.forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        this.currentScopeFilter = chip.getAttribute('data-scope') || 'all';
+        this.renderContacts();
+      });
+    });
+
     if (this.btnExportAllCSV) {
       this.btnExportAllCSV.addEventListener('click', () => {
         const contacts = window.storageService.getContacts();
-        window.exportService.exportContactsToCSV(contacts, 'LeadPulse_All_Contacts.csv');
-        this.showToast('CSV export downloaded successfully', 'success');
+        if (contacts.length === 0) {
+          this.showToast('No contacts to export yet.', 'info');
+          return;
+        }
+        window.exportService.exportContactsToCSV(contacts, 'LeadPulse_Team_Leads.csv');
+        this.showToast('CSV Export generated successfully!', 'success');
       });
     }
 
-    // Tasks filters
-    this.taskFilterTabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        this.taskFilterTabs.forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        this.currentTaskFilter = tab.getAttribute('data-filter');
+    // Organization Directory: Search & Clear
+    if (this.inputSearchOrgs) {
+      this.inputSearchOrgs.addEventListener('input', (e) => {
+        this.orgSearchQuery = e.target.value.toLowerCase().trim();
+        if (this.btnClearSearchOrgs) {
+          this.btnClearSearchOrgs.style.display = this.orgSearchQuery ? 'block' : 'none';
+        }
+        this.renderOrganizations();
+      });
+    }
+    if (this.btnClearSearchOrgs) {
+      this.btnClearSearchOrgs.addEventListener('click', () => {
+        if (this.inputSearchOrgs) this.inputSearchOrgs.value = '';
+        this.orgSearchQuery = '';
+        this.btnClearSearchOrgs.style.display = 'none';
+        this.renderOrganizations();
+      });
+    }
+
+    // Tasks Filters
+    this.taskFilterPills.forEach(pill => {
+      pill.addEventListener('click', () => {
+        this.taskFilterPills.forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        this.currentTaskFilter = pill.getAttribute('data-task-filter') || 'all';
         this.renderTasks();
       });
     });
 
-    // Modals
+    // Modals: Scan Review
     if (this.btnCloseScanReview) {
       this.btnCloseScanReview.addEventListener('click', () => this.closeModal('modalScanReview'));
     }
@@ -256,6 +320,7 @@ class AppController {
       this.btnSaveReviewContact.addEventListener('click', () => this.handleSaveReviewContact());
     }
 
+    // Modals: Contact Details
     if (this.btnCloseContactDetail) {
       this.btnCloseContactDetail.addEventListener('click', () => this.closeModal('modalContactDetail'));
     }
@@ -274,7 +339,26 @@ class AppController {
       });
     }
 
-    // Event creation
+    // Modals: Organization Matching
+    if (this.btnCloseOrgMatching) {
+      this.btnCloseOrgMatching.addEventListener('click', () => this.closeModal('modalOrgMatching'));
+    }
+
+    // Modals: Sales Representative Profile
+    if (this.btnCloseSalesRepModal) {
+      this.btnCloseSalesRepModal.addEventListener('click', () => this.closeModal('modalSalesRep'));
+    }
+    if (this.btnCancelSalesRep) {
+      this.btnCancelSalesRep.addEventListener('click', () => this.closeModal('modalSalesRep'));
+    }
+    if (this.btnSaveSalesRep) {
+      this.btnSaveSalesRep.addEventListener('click', () => this.handleSaveSalesRepProfile());
+    }
+    if (this.btnEditSalesRepProfile) {
+      this.btnEditSalesRepProfile.addEventListener('click', () => this.openSalesRepModal());
+    }
+
+    // Modals: Event Creation
     if (this.btnAddNewEvent) {
       this.btnAddNewEvent.addEventListener('click', () => this.openModal('modalAddEvent'));
     }
@@ -288,41 +372,65 @@ class AppController {
       this.btnSubmitAddEvent.addEventListener('click', () => this.handleCreateNewEvent());
     }
 
-    // Settings Handlers
-    if (this.btnSaveSettings) {
-      this.btnSaveSettings.addEventListener('click', () => this.handleSaveSettings());
+    // Settings & Team Cloud Sync
+    if (this.btnSyncTeamNow) {
+      this.btnSyncTeamNow.addEventListener('click', () => this.handleSyncTeamWorkspace());
     }
-    if (this.btnTestGemini) {
-      this.btnTestGemini.addEventListener('click', () => this.handleTestGeminiKey());
+    if (this.btnShareTeamBundle) {
+      this.btnShareTeamBundle.addEventListener('click', () => this.handleExportTeamBundle());
     }
-    if (this.btnFetchModels) {
-      this.btnFetchModels.addEventListener('click', () => this.handleFetchModels());
-    }
-    if (this.btnToggleApiKeyVisibility) {
-      this.btnToggleApiKeyVisibility.addEventListener('click', () => {
-        const isPw = this.settingGeminiApiKey.type === 'password';
-        this.settingGeminiApiKey.type = isPw ? 'text' : 'password';
-        this.btnToggleApiKeyVisibility.textContent = isPw ? '🔒' : '👁️';
+    if (this.btnImportTeamBundle) {
+      this.btnImportTeamBundle.addEventListener('click', () => {
+        if (this.fileImportTeamBundle) this.fileImportTeamBundle.click();
       });
     }
-    if (this.settingGeminiModel) {
-      this.settingGeminiModel.addEventListener('change', () => {
-        window.storageService.setSelectedModel(this.settingGeminiModel.value);
-        if (this.modelStatusNotice) {
-          this.modelStatusNotice.textContent = `⚡ Active Model: ${this.settingGeminiModel.value}`;
-        }
-        this.showToast(`Selected AI model: ${this.settingGeminiModel.value}`, 'info');
+    if (this.fileImportTeamBundle) {
+      this.fileImportTeamBundle.addEventListener('change', (e) => this.handleImportTeamBundle(e));
+    }
+    if (this.btnExportFullBackup) {
+      this.btnExportFullBackup.addEventListener('click', () => this.handleExportFullBackup());
+    }
+    if (this.btnRestoreBackup) {
+      this.btnRestoreBackup.addEventListener('click', () => {
+        if (this.fileRestoreBackup) this.fileRestoreBackup.click();
       });
     }
-    if (this.btnExportAllJSON) {
-      this.btnExportAllJSON.addEventListener('click', () => this.handleExportBackupJSON());
+    if (this.fileRestoreBackup) {
+      this.fileRestoreBackup.addEventListener('change', (e) => this.handleRestoreBackup(e));
     }
-    if (this.btnResetDefaultData) {
-      this.btnResetDefaultData.addEventListener('click', () => this.handleResetData());
+    if (this.btnClearAllData) {
+      this.btnClearAllData.addEventListener('click', () => this.handleClearAllData());
+    }
+
+    // Gemini API & Models
+    if (this.btnRefreshModels) {
+      this.btnRefreshModels.addEventListener('click', () => this.handleFetchModels());
+    }
+    if (this.btnTestModel) {
+      this.btnTestModel.addEventListener('click', () => this.handleTestGeminiModel());
+    }
+    if (this.settingGeminiApiKey) {
+      this.settingGeminiApiKey.addEventListener('change', () => {
+        window.storageService.setGeminiApiKey(this.settingGeminiApiKey.value.trim());
+        this.showToast('Gemini API key updated', 'info');
+      });
+    }
+    if (this.settingModelSelect) {
+      this.settingModelSelect.addEventListener('change', () => {
+        window.storageService.setSelectedModel(this.settingModelSelect.value);
+        this.showToast(`Active AI Model: ${this.settingModelSelect.value}`, 'info');
+      });
+    }
+    if (this.inputTeamWorkspaceCode) {
+      this.inputTeamWorkspaceCode.addEventListener('change', () => {
+        const code = this.inputTeamWorkspaceCode.value.trim().toUpperCase();
+        window.storageService.saveTeamSyncConfig({ workspaceCode: code });
+        this.showToast(`Team Workspace Code set to: ${code}`, 'success');
+      });
     }
   }
 
-  // View Switcher
+  // --- VIEW SWITCHER ---
   switchView(viewId) {
     this.currentView = viewId;
     this.viewScreens.forEach(screen => {
@@ -333,31 +441,94 @@ class AppController {
       btn.classList.toggle('active', btn.getAttribute('data-target') === viewId);
     });
 
-    // Refresh view data when navigating
     if (viewId === 'viewContacts') {
       this.renderContacts();
       this.renderEventFilterPills();
+    } else if (viewId === 'viewOrganizations') {
+      this.renderOrganizations();
     } else if (viewId === 'viewEvents') {
       this.renderEvents();
     } else if (viewId === 'viewTasks') {
       this.renderTasks();
     } else if (viewId === 'viewScanner') {
       this.updateHeaderActiveEvent();
+    } else if (viewId === 'viewSettings') {
+      this.loadSettings();
+      this.updateSalesRepUI();
     }
   }
 
-  startClock() {
-    const update = () => {
-      const now = new Date();
-      let hours = now.getHours();
-      let minutes = now.getMinutes();
-      minutes = minutes < 10 ? '0' + minutes : minutes;
-      if (this.statusBarTime) {
-        this.statusBarTime.textContent = `${hours}:${minutes}`;
-      }
-    };
-    update();
-    setInterval(update, 30000);
+  // --- SALES REPRESENTATIVE PROFILE ---
+  updateSalesRepUI() {
+    const profile = window.storageService.getSalesRepProfile();
+    const isConfigured = Boolean(profile.name && profile.employeeId);
+
+    const initials = isConfigured
+      ? profile.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
+      : '👤';
+
+    if (this.headerRepInitials) this.headerRepInitials.textContent = initials;
+    if (this.headerRepName) {
+      this.headerRepName.textContent = isConfigured ? profile.name : 'Setup Rep Profile';
+    }
+
+    if (this.settingsRepAvatar) this.settingsRepAvatar.textContent = initials;
+    if (this.settingsRepNameDisplay) {
+      this.settingsRepNameDisplay.textContent = isConfigured
+        ? profile.name
+        : 'Setup Sales Profile';
+    }
+    if (this.settingsRepMetaDisplay) {
+      this.settingsRepMetaDisplay.textContent = isConfigured
+        ? `${profile.employeeId} • ${profile.email || 'Team Workspace: ' + profile.teamCode}`
+        : 'Stamp your scans with Employee ID & email';
+    }
+
+    if (this.inputTeamWorkspaceCode && profile.teamCode) {
+      this.inputTeamWorkspaceCode.value = profile.teamCode;
+    }
+  }
+
+  openSalesRepModal() {
+    const profile = window.storageService.getSalesRepProfile();
+    if (this.repFormName) this.repFormName.value = profile.name || '';
+    if (this.repFormEmpId) this.repFormEmpId.value = profile.employeeId || '';
+    if (this.repFormPhone) this.repFormPhone.value = profile.phone || '';
+    if (this.repFormEmail) this.repFormEmail.value = profile.email || '';
+    if (this.repFormRegion) this.repFormRegion.value = profile.region || '';
+    if (this.repFormDesignation) this.repFormDesignation.value = profile.designation || '';
+    if (this.repFormTeamCode) this.repFormTeamCode.value = profile.teamCode || 'ALPHA-SALES-2026';
+
+    this.openModal('modalSalesRep');
+  }
+
+  handleSaveSalesRepProfile() {
+    const name = (this.repFormName ? this.repFormName.value : '').trim();
+    const employeeId = (this.repFormEmpId ? this.repFormEmpId.value : '').trim().toUpperCase();
+    const email = (this.repFormEmail ? this.repFormEmail.value : '').trim().toLowerCase();
+    const phone = (this.repFormPhone ? this.repFormPhone.value : '').trim();
+    const region = (this.repFormRegion ? this.repFormRegion.value : '').trim();
+    const designation = (this.repFormDesignation ? this.repFormDesignation.value : '').trim();
+    const teamCode = ((this.repFormTeamCode ? this.repFormTeamCode.value : '').trim() || 'ALPHA-SALES-2026').toUpperCase();
+
+    if (!name || !employeeId) {
+      alert('Please provide at least your Employee Name and Employee ID.');
+      return;
+    }
+
+    const saved = window.storageService.saveSalesRepProfile({
+      name,
+      employeeId,
+      email,
+      phone,
+      region,
+      designation,
+      teamCode
+    });
+
+    this.closeModal('modalSalesRep');
+    this.updateSalesRepUI();
+    this.showToast(`Sales Profile saved for ${saved.name} (${saved.employeeId})`, 'success');
   }
 
   // --- CAMERA & CARD SCANNING ---
@@ -365,7 +536,7 @@ class AppController {
     try {
       const res = await window.cameraService.startCamera(this.cameraVideo);
       if (!res.success) {
-        console.log('Camera note: Live feed unavailable, fallback canvas ready for testing.');
+        console.log('Camera note: Live viewfinder unavailable or permission pending.');
       }
     } catch (e) {
       console.warn('Camera error:', e);
@@ -374,7 +545,7 @@ class AppController {
 
   async toggleTorch() {
     if (!window.cameraService.stream) {
-      this.showToast('Torch only available during active camera stream', 'info');
+      this.showToast('Torch is available only during active camera preview', 'info');
       return;
     }
     const track = window.cameraService.stream.getVideoTracks()[0];
@@ -384,21 +555,21 @@ class AppController {
       window.cameraService.isTorchOn = newState;
       this.showToast(newState ? 'Flashlight ON' : 'Flashlight OFF', 'info');
     } else {
-      this.showToast('Torch hardware not supported on this device/browser', 'info');
+      this.showToast('Torch hardware not supported on this device', 'info');
     }
   }
 
   async handleCaptureCard() {
     let base64 = window.cameraService.captureFrame();
 
-    // If camera wasn't streaming (e.g. Insecure HTTP Wi-Fi origin on mobile or desktop without webcam)
+    // If live camera frame is not available, open native camera file capture
     if (!base64) {
-      if (this.cameraPhotoInput && /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)) {
+      if (this.cameraPhotoInput) {
         this.cameraPhotoInput.click();
         return;
       }
-      base64 = window.cameraService.generateSampleCardImage('tech');
-      this.showToast('Camera frame simulated with high-res business card', 'info');
+      this.showToast('Please select a business card image from your camera or gallery.', 'info');
+      return;
     }
 
     await this.processCardWithAI(base64);
@@ -409,29 +580,30 @@ class AppController {
     if (!file) return;
 
     try {
-      this.showToast('Uploading card image...', 'info');
+      this.showToast('Loading visiting card image...', 'info');
       const base64 = await window.cameraService.readFileAsBase64(file);
       await this.processCardWithAI(base64);
     } catch (err) {
-      this.showToast('Failed to read image file: ' + err.message, 'error');
+      this.showToast('Failed to load image: ' + err.message, 'error');
     } finally {
       if (this.fileCardInput) this.fileCardInput.value = '';
       if (this.cameraPhotoInput) this.cameraPhotoInput.value = '';
     }
   }
 
-  async handleScanDemoCard(type) {
-    const base64 = window.cameraService.generateSampleCardImage(type);
-    await this.processCardWithAI(base64);
+  openManualContactModal() {
+    const template = window.geminiService.createCleanManualTemplate();
+    this.tempScannedCard = template;
+    this.openScanReviewModal(this.tempScannedCard);
   }
 
   async processCardWithAI(imageBase64) {
-    this.showAIProcessing(true, 'Reading Visiting Card...', 'Extracting name, title, company, contact details & logos');
+    this.showAIProcessing(true, 'Scanning Visiting Card...', 'Extracting corporate identity, names & contact information');
 
     const descSteps = [
-      'Extracting contact entities & phone numbers...',
-      'Deep AI analysis: Querying LinkedIn profile & company profile...',
-      'Synthesizing past work summary & sales conversation icebreakers...',
+      'Extracting company name, phone, WhatsApp & email...',
+      'Deep AI analysis: Querying LinkedIn career profile & company background...',
+      'Synthesizing past organizations, alumni networks & conversation icebreakers...',
       'Finalizing CRM action items...'
     ];
 
@@ -443,7 +615,7 @@ class AppController {
         }
         stepIndex++;
       }
-    }, 550);
+    }, 600);
 
     try {
       const extracted = await window.geminiService.scanAndEnrichVisitingCard(imageBase64);
@@ -459,15 +631,15 @@ class AppController {
     } catch (err) {
       clearInterval(interval);
       this.showAIProcessing(false);
-      this.showToast('AI analysis failed: ' + err.message, 'error');
+      this.showToast('Scan note: ' + err.message, 'error');
     }
   }
 
   showAIProcessing(show, title, desc) {
     if (!this.aiProcessingOverlay) return;
     if (show) {
-      this.aiProcessingTitle.textContent = title || 'Analyzing Card...';
-      this.aiProcessingDesc.textContent = desc || 'Gemini Vision AI is extracting contact details...';
+      if (this.aiProcessingTitle) this.aiProcessingTitle.textContent = title || 'Analyzing Card...';
+      if (this.aiProcessingDesc) this.aiProcessingDesc.textContent = desc || 'Gemini Vision AI is extracting details...';
       this.aiProcessingOverlay.classList.add('active');
     } else {
       this.aiProcessingOverlay.classList.remove('active');
@@ -478,63 +650,76 @@ class AppController {
   openScanReviewModal(data) {
     this.populateEventSelect('reviewEventSelect', data.eventId || window.storageService.getActiveEventId());
 
-    this.reviewCardImagePreview.src = data.cardImage || '';
-    document.getElementById('reviewHonorific').value = data.honorific || '';
-    document.getElementById('reviewName').value = data.name || '';
-    document.getElementById('reviewTitle').value = data.title || '';
-    document.getElementById('reviewCompany').value = data.company || '';
-    document.getElementById('reviewIndustry').value = data.industry || '';
-    document.getElementById('reviewPhone').value = data.phone || '';
-    document.getElementById('reviewWhatsapp').value = data.whatsapp || data.phone || '';
-    document.getElementById('reviewEmail').value = data.email || '';
-    document.getElementById('reviewLinkedinUrl').value = data.linkedinUrl || '';
-    document.getElementById('reviewPastWork').value = data.pastWorkSummary || '';
-    document.getElementById('reviewCompanyOverview').value = data.companyOverview || '';
-    document.getElementById('reviewNotes').value = data.notes || '';
+    if (this.reviewCardImagePreview) {
+      this.reviewCardImagePreview.src = data.cardImage || '';
+      this.reviewCardImagePreview.parentElement.style.display = data.cardImage ? 'flex' : 'none';
+    }
+
+    const setVal = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.value = val || '';
+    };
+
+    setVal('reviewHonorific', data.honorific);
+    setVal('reviewName', data.name);
+    setVal('reviewTitle', data.title);
+    setVal('reviewCompany', data.company);
+    setVal('reviewIndustry', data.industry);
+    setVal('reviewPhone', data.phone);
+    setVal('reviewWhatsapp', data.whatsapp || data.phone);
+    setVal('reviewEmail', data.email);
+    setVal('reviewLinkedinUrl', data.linkedinUrl);
+    setVal('reviewPastWork', data.pastWorkSummary);
+    setVal('reviewNotes', data.notes);
+
+    // Populate comma-separated past organizations list
+    if (this.reviewPastOrgsList) {
+      const list = Array.isArray(data.pastCompaniesList)
+        ? data.pastCompaniesList
+        : (Array.isArray(data.pastOrganizations) ? data.pastOrganizations.map(o => typeof o === 'string' ? o : o.companyName) : []);
+      this.reviewPastOrgsList.value = list.filter(Boolean).join(', ');
+    }
 
     // Qualification fields
     if (this.reviewDecisionStatus) this.reviewDecisionStatus.value = data.decisionStatus || 'Decision Maker';
     if (this.reviewLeadScore) this.reviewLeadScore.value = data.leadScore || 'Hot';
-    if (this.reviewBudget) this.reviewBudget.value = data.budget || '';
-    if (this.reviewTimeline) this.reviewTimeline.value = data.timeline || 'Immediate (< 1 mo)';
+    if (this.reviewBudget) this.reviewBudget.value = data.dealBudget || data.budget || '$50k - $200k+';
+    if (this.reviewTimeline) this.reviewTimeline.value = data.buyingTimeline || data.timeline || 'Immediate (< 1 mo)';
 
     // Action items checkboxes
     const actionContainer = document.getElementById('reviewSuggestedActionItems');
-    actionContainer.innerHTML = '';
-    const suggested = data.suggestedActionItems || [
-      'Send introduction email with product overview deck',
-      'Connect on LinkedIn with personalized greeting',
-      'Schedule 15-minute qualification call'
-    ];
+    if (actionContainer) {
+      actionContainer.innerHTML = '';
+      const suggested = (Array.isArray(data.suggestedActionItems) && data.suggestedActionItems.length > 0)
+        ? data.suggestedActionItems
+        : [
+            'Send introduction email with product overview deck',
+            'Connect on LinkedIn with personalized note',
+            'Schedule 15-minute qualification call'
+          ];
 
-    suggested.forEach((itemText, idx) => {
-      const div = document.createElement('label');
-      div.style.display = 'flex';
-      div.style.alignItems = 'center';
-      div.style.gap = '8px';
-      div.style.fontSize = '12px';
-      div.style.color = '#cbd5e1';
-      div.style.cursor = 'pointer';
-      div.innerHTML = `
-        <input type="checkbox" checked value="${itemText.replace(/"/g, '&quot;')}" class="review-action-checkbox">
-        <span>${itemText}</span>
-      `;
-      actionContainer.appendChild(div);
-    });
+      suggested.forEach((itemText, idx) => {
+        const div = document.createElement('label');
+        div.style.display = 'flex';
+        div.style.alignItems = 'center';
+        div.style.gap = '8px';
+        div.style.fontSize = '12px';
+        div.style.color = '#cbd5e1';
+        div.style.cursor = 'pointer';
+        div.innerHTML = `
+          <input type="checkbox" checked value="${itemText.replace(/"/g, '&quot;')}" class="review-action-checkbox">
+          <span>${itemText}</span>
+        `;
+        actionContainer.appendChild(div);
+      });
+    }
 
     this.openModal('modalScanReview');
   }
 
-  openManualContactModal() {
-    this.tempScannedCard = {
-      cardImage: '',
-      suggestedActionItems: ['Send introduction email', 'Connect on LinkedIn']
-    };
-    this.openScanReviewModal(this.tempScannedCard);
-  }
-
   handleSaveReviewContact() {
-    const name = document.getElementById('reviewName').value.trim();
+    const nameInput = document.getElementById('reviewName');
+    const name = nameInput ? nameInput.value.trim() : '';
     if (!name) {
       alert('Please enter at least the contact name.');
       return;
@@ -550,40 +735,75 @@ class AppController {
       completed: false
     }));
 
+    // Collect structured past organizations
+    let pastOrganizations = [];
+    let pastCompaniesList = [];
+    if (this.reviewPastOrgsList && this.reviewPastOrgsList.value.trim()) {
+      pastCompaniesList = this.reviewPastOrgsList.value
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean);
+
+      pastOrganizations = pastCompaniesList.map(orgName => ({
+        companyName: orgName,
+        role: 'Former Associate / Alumni',
+        duration: '',
+        notes: ''
+      }));
+    }
+
+    const rep = window.storageService.getSalesRepProfile();
+
+    const getVal = (id) => {
+      const el = document.getElementById(id);
+      return el ? el.value.trim() : '';
+    };
+
     const contactData = {
       name: name,
-      honorific: document.getElementById('reviewHonorific').value.trim(),
-      title: document.getElementById('reviewTitle').value.trim(),
-      company: document.getElementById('reviewCompany').value.trim(),
-      industry: document.getElementById('reviewIndustry').value.trim(),
-      phone: document.getElementById('reviewPhone').value.trim(),
-      whatsapp: document.getElementById('reviewWhatsapp').value.trim(),
-      email: document.getElementById('reviewEmail').value.trim(),
-      eventId: document.getElementById('reviewEventSelect').value,
-      linkedinUrl: document.getElementById('reviewLinkedinUrl').value.trim(),
-      pastWorkSummary: document.getElementById('reviewPastWork').value.trim(),
-      companyOverview: document.getElementById('reviewCompanyOverview').value.trim(),
-      notes: document.getElementById('reviewNotes').value.trim(),
+      honorific: getVal('reviewHonorific'),
+      title: getVal('reviewTitle'),
+      company: getVal('reviewCompany'),
+      industry: getVal('reviewIndustry'),
+      phone: getVal('reviewPhone'),
+      whatsapp: getVal('reviewWhatsapp'),
+      email: getVal('reviewEmail'),
+      eventId: document.getElementById('reviewEventSelect') ? document.getElementById('reviewEventSelect').value : '',
+      linkedinUrl: getVal('reviewLinkedinUrl'),
+      pastWorkSummary: getVal('reviewPastWork'),
+      pastOrganizations: pastOrganizations,
+      pastCompaniesList: pastCompaniesList,
+      alumniInstitutions: (this.tempScannedCard && Array.isArray(this.tempScannedCard.alumniInstitutions)) ? this.tempScannedCard.alumniInstitutions : [],
+      companyOverview: (this.tempScannedCard && this.tempScannedCard.companyOverview) || '',
+      salesIcebreakers: (this.tempScannedCard && Array.isArray(this.tempScannedCard.salesIcebreakers)) ? this.tempScannedCard.salesIcebreakers : [],
+      notes: getVal('reviewNotes'),
       cardImage: this.tempScannedCard ? this.tempScannedCard.cardImage : '',
       actionItems: actionItems,
       decisionStatus: this.reviewDecisionStatus ? this.reviewDecisionStatus.value : 'Decision Maker',
       leadScore: this.reviewLeadScore ? this.reviewLeadScore.value : 'Hot',
-      budget: this.reviewBudget ? this.reviewBudget.value.trim() : '',
-      timeline: this.reviewTimeline ? this.reviewTimeline.value : 'Immediate (< 1 mo)'
+      dealBudget: this.reviewBudget ? this.reviewBudget.value : '$50k - $200k+',
+      buyingTimeline: this.reviewTimeline ? this.reviewTimeline.value : 'Immediate (< 1 mo)',
+      scannedBy: {
+        name: rep.name || 'Sales Rep',
+        email: rep.email || '',
+        employeeId: rep.employeeId || 'REP-01',
+        region: rep.region || ''
+      }
     };
 
     const saved = window.storageService.addContact(contactData);
     this.closeModal('modalScanReview');
-    this.showToast(`Contact ${saved.name} saved successfully!`, 'success');
+    this.showToast(`✓ Lead "${saved.name}" saved with rep attribution!`, 'success');
 
-    // Offer vCard download prompt
+    // Prompt to save .vcf card directly to Android native contacts
     setTimeout(() => {
-      if (confirm(`Would you like to save ${saved.name} directly to your Android device contacts?`)) {
+      if (confirm(`Would you like to save ${saved.name} directly to your phone's Android contact book?`)) {
         window.exportService.downloadVCard(saved);
       }
-    }, 300);
+    }, 250);
 
     this.renderContacts();
+    this.renderOrganizations();
     this.renderEvents();
     this.renderTasks();
     this.updateHeaderActiveEvent();
@@ -592,43 +812,73 @@ class AppController {
   // --- CONTACTS DIRECTORY VIEW ---
   renderContacts() {
     const allContacts = window.storageService.getContacts();
-    const events = window.storageService.getEvents();
-
-    // Stats
+    const orgs = window.storageService.getAllOrganizations();
     const allTasks = window.storageService.getAllActionItems();
     const pendingTasks = allTasks.filter(t => !t.completed);
+    const rep = window.storageService.getSalesRepProfile();
 
+    // Stats Bar
     if (this.statTotalContacts) this.statTotalContacts.textContent = allContacts.length;
-    if (this.statActiveEvents) this.statActiveEvents.textContent = events.length;
+    if (this.statTotalOrgs) this.statTotalOrgs.textContent = orgs.length;
     if (this.statPendingTasks) this.statPendingTasks.textContent = pendingTasks.length;
 
-    // Filter contacts
+    // Filter Logic
     let filtered = allContacts;
 
+    // 1. Event filter
     if (this.currentEventFilter !== 'all') {
       filtered = filtered.filter(c => c.eventId === this.currentEventFilter);
     }
 
+    // 2. Scope filter (All Leads vs My Scans vs Hot Leads vs Decision Makers)
+    if (this.currentScopeFilter === 'my') {
+      filtered = filtered.filter(c => {
+        const creatorId = c.scannedBy ? (c.scannedBy.employeeId || '') : '';
+        const creatorName = c.scannedBy ? (c.scannedBy.name || '') : '';
+        return (rep.employeeId && creatorId === rep.employeeId) ||
+               (rep.name && creatorName.toLowerCase() === rep.name.toLowerCase());
+      });
+    } else if (this.currentScopeFilter === 'hot') {
+      filtered = filtered.filter(c => c.leadScore === 'Hot');
+    } else if (this.currentScopeFilter === 'decision') {
+      filtered = filtered.filter(c => c.decisionStatus === 'Decision Maker');
+    }
+
+    // 3. Search query
     if (this.searchQuery) {
       filtered = filtered.filter(c => {
-        const text = `${c.name} ${c.company} ${c.title} ${c.industry} ${c.email} ${c.notes}`.toLowerCase();
-        return text.includes(this.searchQuery);
+        const pastOrgsString = (c.pastCompaniesList || []).join(' ');
+        const alumniString = (c.alumniInstitutions || []).join(' ');
+        const repString = c.scannedBy ? `${c.scannedBy.name} ${c.scannedBy.employeeId}` : '';
+        const fullSearchable = `${c.name} ${c.company} ${c.title} ${c.industry} ${c.email} ${c.phone} ${c.pastWorkSummary} ${pastOrgsString} ${alumniString} ${repString} ${c.notes}`.toLowerCase();
+        return fullSearchable.includes(this.searchQuery);
       });
     }
 
     if (this.contactsCountLabel) {
-      this.contactsCountLabel.textContent = `Showing ${filtered.length} of ${allContacts.length} contacts`;
+      this.contactsCountLabel.textContent = `${filtered.length} of ${allContacts.length} Leads`;
     }
 
     if (!this.contactsFeed) return;
     this.contactsFeed.innerHTML = '';
 
+    // Clean Zero-Dummy Empty State
     if (filtered.length === 0) {
+      const isFiltered = this.searchQuery || this.currentScopeFilter !== 'all' || this.currentEventFilter !== 'all';
       this.contactsFeed.innerHTML = `
-        <div style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
-          <div style="font-size: 36px; margin-bottom: 8px;">📇</div>
-          <div style="font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 4px;">No contacts found</div>
-          <div style="font-size: 12px;">Try adjusting your search terms or scan a visiting card now.</div>
+        <div class="empty-state-card">
+          <div class="empty-state-icon">📇</div>
+          <div class="empty-state-title">${isFiltered ? 'No matching leads' : 'No Business Cards Scanned Yet'}</div>
+          <div class="empty-state-desc">
+            ${isFiltered
+              ? 'Try resetting your search query or switching scope filters.'
+              : 'Scan visiting cards from trade shows, networking summits, or add leads manually.'}
+          </div>
+          ${!isFiltered ? `
+            <button class="btn-primary" style="margin-top: 14px;" onclick="window.app.switchView('viewScanner')">
+              📸 Scan Your First Card
+            </button>
+          ` : ''}
         </div>
       `;
       return;
@@ -650,7 +900,9 @@ class AppController {
       card.className = 'contact-card';
       card.setAttribute('data-id', contact.id);
 
-      const pendingTasksCount = (contact.actionItems || []).filter(a => !a.completed).length;
+      const pendingCount = (contact.actionItems || []).filter(a => !a.completed).length;
+      const repAttribution = contact.scannedBy ? (contact.scannedBy.name || contact.scannedBy.employeeId) : null;
+      const pastOrgs = contact.pastCompaniesList || [];
 
       card.innerHTML = `
         <div class="contact-card-top">
@@ -667,12 +919,28 @@ class AppController {
             <div class="contact-title-company">
               ${contact.title ? contact.title + ' • ' : ''}<strong>${contact.company || 'Private Entity'}</strong>
             </div>
+            ${repAttribution ? `
+              <div style="font-size: 10.5px; color: var(--text-subtle); margin-top: 2px;">
+                👤 Scanned by: <strong>${repAttribution}</strong>
+              </div>
+            ` : ''}
           </div>
         </div>
 
         ${contact.pastWorkSummary ? `
           <div class="contact-ai-preview">
             <strong>Past Work & Role:</strong> ${contact.pastWorkSummary}
+          </div>
+        ` : ''}
+
+        ${pastOrgs.length > 0 ? `
+          <div class="org-tags-row" style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px;">
+            ${pastOrgs.slice(0, 3).map(orgName => `
+              <span class="org-tag-chip" onclick="event.stopPropagation(); window.app.openOrgMatchingModal('${orgName.replace(/'/g, "\\'")}')" title="View all contacts associated with ${orgName}">
+                🏢 ${orgName}
+              </span>
+            `).join('')}
+            ${pastOrgs.length > 3 ? `<span style="font-size: 10px; color: var(--text-subtle); align-self: center;">+${pastOrgs.length - 3} more</span>` : ''}
           </div>
         ` : ''}
 
@@ -704,10 +972,10 @@ class AppController {
           </div>
 
           <div style="display: flex; align-items: center; gap: 8px;">
-            ${pendingTasksCount > 0 ? `
+            ${pendingCount > 0 ? `
               <span class="contact-tasks-badge">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"></polyline></svg>
-                ${pendingTasksCount} task${pendingTasksCount > 1 ? 's' : ''}
+                ${pendingCount} task${pendingCount > 1 ? 's' : ''}
               </span>
             ` : ''}
             <span style="font-size: 11px; color: #818cf8; font-weight: 600;">Details ›</span>
@@ -741,7 +1009,6 @@ class AppController {
       this.contactsEventFilterPills.appendChild(pill);
     });
 
-    // Bind click events
     this.contactsEventFilterPills.querySelectorAll('.filter-pill').forEach(pill => {
       pill.addEventListener('click', () => {
         this.contactsEventFilterPills.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
@@ -752,6 +1019,197 @@ class AppController {
     });
   }
 
+  // --- ORGANIZATIONS & ALUMNI DIRECTORY VIEW ---
+  renderOrganizations() {
+    const orgs = window.storageService.getAllOrganizations();
+
+    let filtered = orgs;
+    if (this.orgSearchQuery) {
+      filtered = filtered.filter(org => {
+        const memberNames = [...org.currentContacts, ...org.pastContacts]
+          .map(m => m.contact ? m.contact.name : '')
+          .join(' ');
+        const full = `${org.name} ${org.industry} ${memberNames}`.toLowerCase();
+        return full.includes(this.orgSearchQuery);
+      });
+    }
+
+    if (this.orgsCountLabel) {
+      this.orgsCountLabel.textContent = `${filtered.length} Organizations Identified`;
+    }
+
+    if (!this.orgsFeed) return;
+    this.orgsFeed.innerHTML = '';
+
+    if (filtered.length === 0) {
+      this.orgsFeed.innerHTML = `
+        <div class="empty-state-card">
+          <div class="empty-state-icon">🏢</div>
+          <div class="empty-state-title">No Organizations Found</div>
+          <div class="empty-state-desc">
+            As you scan business cards, companies and past employers are automatically cataloged here for organizational matching.
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    filtered.forEach(org => {
+      const initials = (org.name || 'O')
+        .split(' ')
+        .map(w => w[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase();
+
+      const card = document.createElement('div');
+      card.className = 'org-card';
+
+      card.innerHTML = `
+        <div class="org-card-header">
+          <div class="org-avatar-badge">${initials}</div>
+          <div class="org-info-block">
+            <h4 class="org-name">${org.name}</h4>
+            <span class="org-industry">${org.industry}</span>
+          </div>
+        </div>
+
+        <div class="org-stats-row">
+          <div class="org-badge-pill current">
+            🏢 ${org.currentContacts.length} Current Member${org.currentContacts.length === 1 ? '' : 's'}
+          </div>
+          <div class="org-badge-pill past">
+            🎓 ${org.pastContacts.length} Alumni / Past
+          </div>
+        </div>
+
+        <div class="org-members-preview">
+          ${[...org.currentContacts.slice(0, 2), ...org.pastContacts.slice(0, 2)].map(m => `
+            <div class="org-member-chip">
+              <span class="org-member-dot ${m.type === 'current' ? 'current' : 'past'}"></span>
+              <span class="org-member-name">${m.contact ? m.contact.name : 'Contact'}</span>
+              <span class="org-member-role">(${m.role || (m.type === 'current' ? 'Staff' : 'Alumni')})</span>
+            </div>
+          `).join('')}
+          ${(org.totalCount > 4) ? `<span style="font-size: 11px; color: var(--text-subtle); padding-left: 4px;">+${org.totalCount - 4} more associated</span>` : ''}
+        </div>
+
+        <div class="org-card-footer">
+          <span style="font-size: 11.5px; color: var(--text-muted);">
+            ${org.totalCount} Associated Professional${org.totalCount === 1 ? '' : 's'}
+          </span>
+          <button class="btn-secondary" style="height: 32px; font-size: 11px; padding: 0 12px;" onclick="window.app.openOrgMatchingModal('${org.name.replace(/'/g, "\\'")}')">
+            View Matches ›
+          </button>
+        </div>
+      `;
+
+      this.orgsFeed.appendChild(card);
+    });
+  }
+
+  // --- MODAL: ORGANIZATION MATCHING INSPECTOR ---
+  openOrgMatchingModal(orgName) {
+    const data = window.storageService.getContactsForOrganization(orgName);
+    if (!data) return;
+
+    if (this.orgMatchingModalTitle) {
+      this.orgMatchingModalTitle.textContent = `Affiliations for "${data.name}"`;
+    }
+
+    if (!this.orgMatchingModalBody) return;
+
+    const currentHtml = (data.currentContacts.length > 0)
+      ? data.currentContacts.map(m => `
+          <div class="org-match-item current">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <div>
+                <div style="font-size: 14px; font-weight: 700; color: #fff;">
+                  ${m.contact.honorific ? m.contact.honorific + ' ' : ''}${m.contact.name}
+                </div>
+                <div style="font-size: 12px; color: #a5b4fc; font-weight: 600;">
+                  ${m.role || m.contact.title || 'Executive'}
+                </div>
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                  Score: <strong>${m.contact.leadScore || 'Hot'}</strong> • Status: ${m.contact.decisionStatus || 'Decision Maker'}
+                </div>
+              </div>
+              <span class="org-badge-pill current" style="font-size: 10px;">Current Staff</span>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 8px;">
+              ${m.contact.phone ? `<a href="tel:${m.contact.phone}" class="action-icon-pill" title="Call"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg></a>` : ''}
+              ${m.contact.email ? `<a href="mailto:${m.contact.email}" class="action-icon-pill" title="Email"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg></a>` : ''}
+              <button class="btn-text-sm" onclick="window.app.closeModal('modalOrgMatching'); window.app.openContactDetailModal('${m.contact.id}')" style="margin-left: auto;">
+                View Lead Card ›
+              </button>
+            </div>
+          </div>
+        `).join('')
+      : '<div style="font-size: 12px; color: var(--text-muted); padding: 8px 0;">No active staff recorded currently at this company.</div>';
+
+    const pastHtml = (data.pastContacts.length > 0)
+      ? data.pastContacts.map(m => `
+          <div class="org-match-item past">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <div>
+                <div style="font-size: 14px; font-weight: 700; color: #fff;">
+                  ${m.contact.honorific ? m.contact.honorific + ' ' : ''}${m.contact.name}
+                </div>
+                <div style="font-size: 12px; color: #cbd5e1;">
+                  Now: <strong>${m.contact.title || 'Executive'}</strong> at <strong>${m.contact.company || 'Enterprise'}</strong>
+                </div>
+                <div style="font-size: 11px; color: #93c5fd; margin-top: 2px;">
+                  Past Association: ${m.role || 'Former Employee / Alumni'}
+                </div>
+              </div>
+              <span class="org-badge-pill past" style="font-size: 10px;">Alumni</span>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 8px;">
+              ${m.contact.phone ? `<a href="tel:${m.contact.phone}" class="action-icon-pill" title="Call"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg></a>` : ''}
+              ${m.contact.email ? `<a href="mailto:${m.contact.email}" class="action-icon-pill" title="Email"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg></a>` : ''}
+              <button class="btn-text-sm" onclick="window.app.closeModal('modalOrgMatching'); window.app.openContactDetailModal('${m.contact.id}')" style="margin-left: auto;">
+                View Lead Card ›
+              </button>
+            </div>
+          </div>
+        `).join('')
+      : '<div style="font-size: 12px; color: var(--text-muted); padding: 8px 0;">No alumni from this company in database.</div>';
+
+    this.orgMatchingModalBody.innerHTML = `
+      <!-- Intelligence Summary Box -->
+      <div style="background: rgba(30, 41, 59, 0.7); border-radius: var(--border-radius-md); padding: 12px; border: 1px solid var(--border-color); margin-bottom: 16px;">
+        <div style="font-size: 12px; color: #a5b4fc; font-weight: 700; margin-bottom: 4px;">
+          Strategic Warm Introduction Network
+        </div>
+        <div style="font-size: 11.5px; color: var(--text-muted); line-height: 1.4;">
+          Identified <strong>${data.totalCount} associated professional${data.totalCount === 1 ? '' : 's'}</strong> (${data.currentContacts.length} current, ${data.pastContacts.length} alumni). Use former colleagues to request warm introductions into ${data.name}.
+        </div>
+      </div>
+
+      <div class="detail-section-block">
+        <h3 style="display: flex; align-items: center; justify-content: space-between;">
+          <span>Current Organization Members</span>
+          <span style="font-size: 11px; color: #10b981;">(${data.currentContacts.length})</span>
+        </h3>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          ${currentHtml}
+        </div>
+      </div>
+
+      <div class="detail-section-block">
+        <h3 style="display: flex; align-items: center; justify-content: space-between;">
+          <span>Alumni & Former Affiliations</span>
+          <span style="font-size: 11px; color: #60a5fa;">(${data.pastContacts.length})</span>
+        </h3>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          ${pastHtml}
+        </div>
+      </div>
+    `;
+
+    this.openModal('modalOrgMatching');
+  }
+
   // --- MODAL: FULL CONTACT DETAILS ---
   openContactDetailModal(contactId) {
     this.activeContactDetailId = contactId;
@@ -759,7 +1217,13 @@ class AppController {
     if (!contact) return;
 
     const event = window.storageService.getEventById(contact.eventId);
-    const eventName = event ? event.name : 'Unassigned';
+    const eventName = event ? event.name : 'Unassigned Lead';
+    const repInfo = contact.scannedBy || { name: 'Sales Rep', employeeId: 'EMP' };
+    const pastOrgs = contact.pastCompaniesList || [];
+
+    if (this.detailSheetHeaderTitle) {
+      this.detailSheetHeaderTitle.textContent = contact.name || 'Contact Details';
+    }
 
     this.detailSheetContentBody.innerHTML = `
       <!-- Contact Hero Card -->
@@ -767,7 +1231,12 @@ class AppController {
         <div class="contact-hero-details">
           <h2>${contact.honorific ? contact.honorific + ' ' : ''}${contact.name}</h2>
           <div class="hero-title-company">${contact.title || 'Executive'} at <strong>${contact.company || 'Enterprise'}</strong></div>
-          <div style="font-size: 11px; margin-top: 6px; opacity: 0.8;">📍 Event: ${eventName} • ${contact.industry || 'Industry Leader'}</div>
+          <div style="font-size: 11px; margin-top: 6px; opacity: 0.85;">📍 Event: ${eventName} • ${contact.industry || 'Technology'}</div>
+
+          <!-- Sales Rep Corporate Stamp -->
+          <div style="font-size: 11px; color: #c7d2fe; margin-top: 8px; display: flex; align-items: center; gap: 6px;">
+            <span>👤 Scanned by: <strong>${repInfo.name}</strong> (${repInfo.employeeId || 'REP'})</span>
+          </div>
 
           <!-- Executive Sales Badges -->
           <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px;">
@@ -777,14 +1246,14 @@ class AppController {
             <span class="event-badge-tag" style="background: rgba(16, 185, 129, 0.3); border-color: #10b981; color: #6ee7b7; font-size: 11px;">
               👔 ${contact.decisionStatus || 'Decision Maker'}
             </span>
-            ${contact.budget ? `
+            ${contact.dealBudget ? `
               <span class="event-badge-tag" style="background: rgba(245, 158, 11, 0.3); border-color: #f59e0b; color: #fde68a; font-size: 11px;">
-                💰 ${contact.budget}
+                💰 ${contact.dealBudget}
               </span>
             ` : ''}
-            ${contact.timeline ? `
+            ${contact.buyingTimeline ? `
               <span class="event-badge-tag" style="background: rgba(6, 182, 212, 0.3); border-color: #06b6d4; color: #a5f3fc; font-size: 11px;">
-                ⏱️ ${contact.timeline}
+                ⏱️ ${contact.buyingTimeline}
               </span>
             ` : ''}
           </div>
@@ -811,25 +1280,46 @@ class AppController {
         </a>
       </div>
 
-      <!-- AI Enriched Intelligence: Past Work -->
+      <!-- Past Career & Structured Organizations -->
       <div class="detail-section-block">
         <h3>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
-          Past Work & Career History
+          Career History & Associated Organizations
         </h3>
-        <p class="detail-text-p">${contact.pastWorkSummary || 'No career history recorded yet.'}</p>
+        <p class="detail-text-p">${contact.pastWorkSummary || 'Career background recorded from business card.'}</p>
+
+        ${pastOrgs.length > 0 ? `
+          <div style="margin-top: 10px;">
+            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">Tap company to inspect all team leads affiliated with it:</div>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+              ${pastOrgs.map(orgName => `
+                <span class="org-tag-chip" onclick="window.app.openOrgMatchingModal('${orgName.replace(/'/g, "\\'")}')">
+                  🏢 ${orgName} ›
+                </span>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+        ${Array.isArray(contact.alumniInstitutions) && contact.alumniInstitutions.length > 0 ? `
+          <div style="margin-top: 8px; font-size: 11px; color: var(--text-muted);">
+            🎓 Alumni: <strong>${contact.alumniInstitutions.join(', ')}</strong>
+          </div>
+        ` : ''}
       </div>
 
-      <!-- AI Enriched Intelligence: Company Profile -->
-      <div class="detail-section-block">
-        <h3>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
-          Company Overview
-        </h3>
-        <p class="detail-text-p">${contact.companyOverview || 'Enterprise solution provider.'}</p>
-      </div>
+      <!-- Company Overview -->
+      ${contact.companyOverview ? `
+        <div class="detail-section-block">
+          <h3>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+            Company Overview
+          </h3>
+          <p class="detail-text-p">${contact.companyOverview}</p>
+        </div>
+      ` : ''}
 
-      <!-- Sales Conversation Starters / Icebreakers -->
+      <!-- Sales Icebreakers -->
       ${Array.isArray(contact.salesIcebreakers) && contact.salesIcebreakers.length > 0 ? `
         <div class="detail-section-block">
           <h3>
@@ -842,7 +1332,7 @@ class AppController {
         </div>
       ` : ''}
 
-      <!-- Contact Action Items List & Inline Adder -->
+      <!-- Action Items & Follow-ups -->
       <div class="detail-section-block">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
           <h3 style="margin-bottom: 0;">Follow-Up Action Items</h3>
@@ -851,9 +1341,7 @@ class AppController {
           </span>
         </div>
 
-        <div id="contactActionItemsList" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;">
-          <!-- Dynamically populated below -->
-        </div>
+        <div id="contactActionItemsList" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;"></div>
 
         <!-- Inline Add Action Item Form -->
         <div style="display: flex; gap: 8px; align-items: center; background: rgba(15, 23, 42, 0.6); padding: 8px; border-radius: var(--border-radius-sm); border: 1px solid var(--border-color);">
@@ -890,7 +1378,7 @@ class AppController {
 
         window.storageService.addActionItem(contact.id, {
           title: text,
-          priority: selectPriority.value,
+          priority: selectPriority ? selectPriority.value : 'medium',
           dueDate: new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0]
         });
 
@@ -899,7 +1387,7 @@ class AppController {
         this.renderContactDetailActionItems(updatedContact);
         this.renderTasks();
         this.renderContacts();
-        this.showToast('Action item added', 'success');
+        this.showToast('Follow-up task added', 'success');
       });
     }
 
@@ -960,11 +1448,12 @@ class AppController {
     const contact = window.storageService.getContactById(this.activeContactDetailId);
     if (!contact) return;
 
-    if (confirm(`Are you sure you want to delete ${contact.name}?`)) {
+    if (confirm(`Are you sure you want to delete lead "${contact.name}"?`)) {
       window.storageService.deleteContact(this.activeContactDetailId);
       this.closeModal('modalContactDetail');
-      this.showToast('Contact deleted', 'info');
+      this.showToast('Lead deleted', 'info');
       this.renderContacts();
+      this.renderOrganizations();
       this.renderEvents();
       this.renderTasks();
     }
@@ -974,7 +1463,7 @@ class AppController {
     const contact = window.storageService.getContactById(contactId);
     if (contact) {
       window.exportService.downloadVCard(contact);
-      this.showToast(`Saved ${contact.name} to Android vCard`, 'success');
+      this.showToast(`Saved ${contact.name} to Android .vcf`, 'success');
     }
   }
 
@@ -992,6 +1481,17 @@ class AppController {
 
     if (!this.eventsList) return;
     this.eventsList.innerHTML = '';
+
+    if (events.length === 0) {
+      this.eventsList.innerHTML = `
+        <div class="empty-state-card">
+          <div class="empty-state-icon">📅</div>
+          <div class="empty-state-title">No Events Created Yet</div>
+          <div class="empty-state-desc">Create your first sales conference or trade summit to organize leads by booth.</div>
+        </div>
+      `;
+      return;
+    }
 
     events.forEach(evt => {
       const eventContacts = contacts.filter(c => c.eventId === evt.id);
@@ -1054,7 +1554,7 @@ class AppController {
     window.storageService.setActiveEventId(eventId);
     this.updateHeaderActiveEvent();
     this.renderEvents();
-    this.showToast('Active event updated for new card scans', 'success');
+    this.showToast('Active event set for incoming card scans', 'success');
   }
 
   updateHeaderActiveEvent() {
@@ -1087,11 +1587,14 @@ class AppController {
   }
 
   handleCreateNewEvent() {
-    const name = document.getElementById('newEventName').value.trim();
-    const date = document.getElementById('newEventDate').value;
-    const location = document.getElementById('newEventLocation').value.trim();
-    const description = document.getElementById('newEventDescription').value.trim();
-    const badgeColor = document.getElementById('newEventColor').value;
+    const nameEl = document.getElementById('newEventName');
+    const dateEl = document.getElementById('newEventDate');
+    const locEl = document.getElementById('newEventLocation');
+    const descEl = document.getElementById('newEventDescription');
+    const colorEl = document.getElementById('newEventColor');
+
+    const name = nameEl ? nameEl.value.trim() : '';
+    const date = dateEl ? dateEl.value : '';
 
     if (!name || !date) {
       alert('Please fill in both Event Name and Date.');
@@ -1101,20 +1604,18 @@ class AppController {
     const newEvt = window.storageService.addEvent({
       name,
       date,
-      location,
-      description,
-      badgeColor
+      location: locEl ? locEl.value.trim() : '',
+      description: descEl ? descEl.value.trim() : '',
+      badgeColor: colorEl ? colorEl.value : '#6366f1'
     });
 
-    // Automatically set as active event
     window.storageService.setActiveEventId(newEvt.id);
     this.closeModal('modalAddEvent');
-    this.showToast(`Event "${name}" created and set as active!`, 'success');
+    this.showToast(`Event "${name}" created and set as active target!`, 'success');
 
-    // Reset inputs
-    document.getElementById('newEventName').value = '';
-    document.getElementById('newEventLocation').value = '';
-    document.getElementById('newEventDescription').value = '';
+    if (nameEl) nameEl.value = '';
+    if (locEl) locEl.value = '';
+    if (descEl) descEl.value = '';
 
     this.renderEvents();
     this.renderEventFilterPills();
@@ -1126,27 +1627,30 @@ class AppController {
     const allItems = window.storageService.getAllActionItems();
     const pendingItems = allItems.filter(t => !t.completed);
     const completedItems = allItems.filter(t => t.completed);
+    const highItems = allItems.filter(t => t.priority === 'high' && !t.completed);
 
-    if (this.taskCountAll) this.taskCountAll.textContent = allItems.length;
-    if (this.taskCountPending) this.taskCountPending.textContent = pendingItems.length;
-    if (this.taskCountCompleted) this.taskCountCompleted.textContent = completedItems.length;
+    if (this.tasksCountLabel) {
+      this.tasksCountLabel.textContent = `${pendingItems.length} Action Items Pending`;
+    }
 
     let itemsToDisplay = allItems;
     if (this.currentTaskFilter === 'pending') {
       itemsToDisplay = pendingItems;
+    } else if (this.currentTaskFilter === 'high') {
+      itemsToDisplay = highItems;
     } else if (this.currentTaskFilter === 'completed') {
       itemsToDisplay = completedItems;
     }
 
-    if (!this.tasksList) return;
-    this.tasksList.innerHTML = '';
+    if (!this.tasksFeed) return;
+    this.tasksFeed.innerHTML = '';
 
     if (itemsToDisplay.length === 0) {
-      this.tasksList.innerHTML = `
-        <div style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
-          <div style="font-size: 32px; margin-bottom: 8px;">✅</div>
-          <div style="font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 4px;">All caught up!</div>
-          <div style="font-size: 12px;">No tasks matching this filter.</div>
+      this.tasksFeed.innerHTML = `
+        <div class="empty-state-card">
+          <div class="empty-state-icon">✅</div>
+          <div class="empty-state-title">All Caught Up</div>
+          <div class="empty-state-desc">No tasks matching this filter. Action items extracted from business cards will appear here.</div>
         </div>
       `;
       return;
@@ -1184,37 +1688,36 @@ class AppController {
         this.renderContacts();
       });
 
-      this.tasksList.appendChild(row);
+      this.tasksFeed.appendChild(row);
     });
   }
 
-  // --- SETTINGS VIEW ---
+  // --- SETTINGS, GEMINI MODELS & CROSS-TEAM SYNC ---
   loadSettings() {
     if (this.settingGeminiApiKey) {
       this.settingGeminiApiKey.value = window.storageService.getGeminiApiKey();
     }
-    if (this.settingCustomPrompt) {
-      this.settingCustomPrompt.value = window.storageService.getCustomPrompt();
+    const teamConfig = window.storageService.getTeamSyncConfig();
+    if (this.inputTeamWorkspaceCode && teamConfig.workspaceCode) {
+      this.inputTeamWorkspaceCode.value = teamConfig.workspaceCode;
     }
     this.populateModelsDropdown();
   }
 
   populateModelsDropdown() {
-    if (!this.settingGeminiModel) return;
+    if (!this.settingModelSelect) return;
     const models = window.storageService.getAvailableModels();
     const currentModel = window.storageService.getSelectedModel();
 
-    this.settingGeminiModel.innerHTML = '';
-    models.forEach(m => {
-      const opt = document.createElement('option');
-      opt.value = m.id;
-      opt.textContent = m.name;
-      if (m.id === currentModel) opt.selected = true;
-      this.settingGeminiModel.appendChild(opt);
-    });
-
-    if (this.modelStatusNotice) {
-      this.modelStatusNotice.textContent = `⚡ Active Model: ${currentModel}`;
+    if (models.length > 0) {
+      this.settingModelSelect.innerHTML = '';
+      models.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = `${m.displayName || m.name} (${m.id})`;
+        if (m.id === currentModel) opt.selected = true;
+        this.settingModelSelect.appendChild(opt);
+      });
     }
   }
 
@@ -1225,71 +1728,132 @@ class AppController {
       return;
     }
 
-    this.showToast('Connecting to Google Gemini API to query supported models...', 'info');
+    this.showToast('Querying Google Gemini API for supported vision models...', 'info');
     try {
       const fetched = await window.geminiService.fetchAvailableModels(key);
       this.populateModelsDropdown();
       this.showToast(`✓ Retrieved ${fetched.length} active Gemini models!`, 'success');
     } catch (err) {
-      this.showToast(`Fetch warning: ${err.message}`, 'error');
+      this.showToast(`Model detection note: ${err.message}`, 'error');
     }
   }
 
-  handleSaveSettings() {
-    const key = this.settingGeminiApiKey ? this.settingGeminiApiKey.value.trim() : '';
-    window.storageService.setGeminiApiKey(key);
-    if (this.settingGeminiModel) {
-      window.storageService.setSelectedModel(this.settingGeminiModel.value);
-    }
-    if (this.settingCustomPrompt) {
-      window.storageService.setCustomPrompt(this.settingCustomPrompt.value.trim());
-    }
-    this.showToast('AI Settings & Model preferences saved successfully!', 'success');
-  }
-
-  async handleTestGeminiKey() {
+  async handleTestGeminiModel() {
     const key = (this.settingGeminiApiKey ? this.settingGeminiApiKey.value : '').trim();
     if (!key) {
-      alert('Built-in demo mode active! No key needed for intelligent testing.');
+      alert('Please enter your Google Gemini API key first.');
       return;
     }
 
-    const modelId = (this.settingGeminiModel ? this.settingGeminiModel.value : 'gemini-1.5-flash').replace(/^models\//, '');
+    const modelId = (this.settingModelSelect ? this.settingModelSelect.value : 'gemini-1.5-flash').replace(/^models\//, '');
     this.showToast(`Verifying model [${modelId}] connection...`, 'info');
     try {
       const testUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}?key=${encodeURIComponent(key)}`;
       const res = await fetch(testUrl);
       if (res.ok) {
         const details = await res.json();
-        this.showToast(`✓ Model "${details.displayName || modelId}" is verified & active!`, 'success');
+        this.showToast(`✓ Model "${details.displayName || modelId}" verified and active!`, 'success');
       } else {
         const errorData = await res.json().catch(() => ({}));
         const errText = errorData.error ? errorData.error.message : `HTTP ${res.status}`;
-        this.showToast(`Model Notice: ${errText}. Try clicking "Refresh Models" or select Gemini 2.0 Flash.`, 'error');
+        this.showToast(`Model Notice: ${errText}. Select gemini-2.0-flash or gemini-1.5-flash.`, 'error');
       }
     } catch (e) {
-      this.showToast('Connection test error: ' + e.message, 'error');
+      this.showToast('Connection test: ' + e.message, 'error');
     }
   }
 
-  handleExportBackupJSON() {
-    const backup = {
-      contacts: window.storageService.getContacts(),
-      events: window.storageService.getEvents(),
-      settings: window.storageService.getSettings(),
-      exportedAt: new Date().toISOString()
-    };
+  handleSyncTeamWorkspace() {
+    const code = (this.inputTeamWorkspaceCode ? this.inputTeamWorkspaceCode.value : '').trim().toUpperCase();
+    if (!code) {
+      alert('Please enter a Team Workspace Code (e.g. ALPHA-SALES-2026).');
+      return;
+    }
 
-    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-    const filename = `LeadPulse_Backup_${new Date().toISOString().split('T')[0]}.json`;
-    window.exportService._triggerDownload(blob, filename);
-    this.showToast('JSON Backup downloaded', 'success');
+    window.storageService.saveTeamSyncConfig({ workspaceCode: code });
+    const rep = window.storageService.getSalesRepProfile();
+    rep.teamCode = code;
+    window.storageService.saveSalesRepProfile(rep);
+
+    this.showToast(`✓ Connected to Workspace "${code}". All scans stamped with ${rep.employeeId || 'REP'}.`, 'success');
   }
 
-  handleResetData() {
-    if (confirm('Reset all contacts and events to factory demo dataset?')) {
-      localStorage.clear();
-      location.reload();
+  handleExportTeamBundle() {
+    const bundle = window.storageService.exportFullDatabaseBundle();
+    const rep = window.storageService.getSalesRepProfile();
+    const filename = `LeadPulse_TeamBundle_${(rep.teamCode || 'WORKSPACE').replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.json`;
+
+    const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+    window.exportService._triggerDownload(blob, filename);
+    this.showToast(`Team Bundle exported (${bundle.contacts.length} leads). Share this with your colleagues.`, 'success');
+  }
+
+  async handleImportTeamBundle(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const bundle = JSON.parse(text);
+
+      const result = window.storageService.importAndMergeDatabaseBundle(bundle);
+      if (result.success) {
+        this.showToast(`✓ Merged team bundle: +${result.addedCount} new leads, ${result.updatedCount} updated!`, 'success');
+        this.renderContacts();
+        this.renderOrganizations();
+        this.renderEvents();
+        this.renderTasks();
+      } else {
+        this.showToast('Merge error: ' + result.error, 'error');
+      }
+    } catch (e) {
+      this.showToast('Failed to parse bundle: ' + e.message, 'error');
+    } finally {
+      if (this.fileImportTeamBundle) this.fileImportTeamBundle.value = '';
+    }
+  }
+
+  handleExportFullBackup() {
+    const backup = window.storageService.exportFullDatabaseBundle();
+    const filename = `LeadPulse_Backup_${new Date().toISOString().split('T')[0]}.json`;
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    window.exportService._triggerDownload(blob, filename);
+    this.showToast('Offline CRM backup downloaded', 'success');
+  }
+
+  async handleRestoreBackup(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const bundle = JSON.parse(text);
+      const result = window.storageService.importAndMergeDatabaseBundle(bundle);
+      if (result.success) {
+        this.showToast(`✓ Backup restored: ${result.totalContacts} total contacts in CRM`, 'success');
+        this.renderContacts();
+        this.renderOrganizations();
+        this.renderEvents();
+        this.renderTasks();
+      } else {
+        this.showToast('Restore error: ' + result.error, 'error');
+      }
+    } catch (e) {
+      this.showToast('Invalid backup file: ' + e.message, 'error');
+    } finally {
+      if (this.fileRestoreBackup) this.fileRestoreBackup.value = '';
+    }
+  }
+
+  handleClearAllData() {
+    const confirmation = prompt('Type "RESET" to confirm clearing all contacts from local storage (clean slate):');
+    if (confirmation && confirmation.trim().toUpperCase() === 'RESET') {
+      window.storageService.clearAllData();
+      this.renderContacts();
+      this.renderOrganizations();
+      this.renderEvents();
+      this.renderTasks();
+      this.showToast('Database reset to clean state (0 contacts).', 'info');
     }
   }
 
@@ -1334,5 +1898,5 @@ class AppController {
   }
 }
 
-// Instantiate global app controller
+// Global App Controller Singleton
 window.app = new AppController();

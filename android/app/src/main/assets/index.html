@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>LeadPulse - AI Sales Card Scanner & CRM</title>
-  <meta name="description" content="AI-Powered Visiting Card Scanner and Lead Manager for Field Sales Teams. Instant OCR, LinkedIn & Background Enrichment, Event Tracking, and vCard Export.">
+  <title>LeadPulse - AI Sales Card Scanner & Team CRM</title>
+  <meta name="description" content="AI-Powered Visiting Card Scanner and Lead Manager for Field Sales Teams. Instant OCR, LinkedIn & Background Enrichment, Organization Matching, and Cross-Team Sync.">
   <meta name="theme-color" content="#090d16">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -28,18 +28,7 @@
   <!-- Main Mobile App Shell -->
   <div class="app-container" id="appRoot">
 
-    <!-- Android Status Bar Header (Simulated for native phone preview) -->
-    <header class="android-status-bar">
-      <span id="statusBarTime">10:30</span>
-      <div class="status-bar-icons">
-        <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L12 22l7.03-4.39C20.26 16.07 21 14.12 21 12c0-4.97-4.03-9-9-9z"/></svg>
-        <svg viewBox="0 0 24 24"><path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98C20.93 5.9 16.69 4 12 4zm0 3.32c3.56 0 6.8 1.45 9.17 3.8L12 18.82 2.83 11.12C5.2 8.77 8.44 7.32 12 7.32z"/></svg>
-        <svg viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
-        <span>98%</span>
-      </div>
-    </header>
-
-    <!-- Top App Bar -->
+    <!-- Top App Bar (Clean, uncluttered, professional header) -->
     <header class="app-header">
       <div class="brand-wrapper">
         <div class="app-logo">
@@ -60,12 +49,19 @@
 
       <div class="header-actions">
         <!-- Active Event Pill (Click to switch or manage) -->
-        <div class="active-event-pill" id="btnActiveEventPill" title="Current Active Event for new scans">
+        <div class="active-event-pill" id="btnActiveEventPill" title="Current Target Event for new scans">
           <span class="event-dot"></span>
-          <span class="event-name-text" id="headerActiveEventName">Global Tech Expo</span>
+          <span class="event-name-text" id="headerActiveEventName">General Field Leads</span>
         </div>
 
-        <button class="icon-btn" id="btnOpenSettings" title="AI Settings & Config" aria-label="Settings">
+        <!-- Sales Rep Profile Pill -->
+        <button class="rep-profile-btn" id="btnHeaderSalesRep" title="Sales Representative Profile">
+          <div class="rep-avatar" id="headerRepAvatar">👤</div>
+          <span class="rep-name-short" id="headerRepNameShort">Profile</span>
+        </button>
+
+        <!-- Settings Button -->
+        <button class="icon-btn" id="btnOpenSettings" title="AI Settings & Team Sync" aria-label="Settings">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="3"></circle>
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
@@ -81,7 +77,7 @@
     <main class="app-main" id="mainContent">
 
       <!-- =================================================================
-           VIEW 1: SCANNER SCREEN (Card Camera, Reticle & AI Vision)
+           VIEW 1: SCANNER SCREEN (Card Camera, Viewfinder & OCR Controls)
            ================================================================= -->
       <section class="view-screen active" id="viewScanner">
 
@@ -109,14 +105,14 @@
               <div class="guide-corner-tr"></div>
               <div class="guide-corner-bl"></div>
               <div class="scan-laser-line" id="scanLaser"></div>
-              <div class="scan-prompt-text">Align Visiting Card Inside Frame</div>
+              <div class="scan-prompt-text">Position Visiting Card Inside Frame</div>
             </div>
           </div>
         </div>
 
         <!-- Scanner Shutter & Gallery Controls -->
         <div class="scanner-controls-grid">
-          <button class="btn-secondary-action" id="btnUploadGallery" title="Upload Card Image">
+          <button class="btn-secondary-action" id="btnUploadGallery" title="Upload Card Image from Gallery">
             <div class="icon-circle">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
@@ -129,7 +125,7 @@
           <input type="file" id="fileCardInput" accept="image/*" style="display: none;">
           <input type="file" id="cameraPhotoInput" accept="image/*" capture="environment" style="display: none;">
 
-          <button class="btn-capture" id="btnCapture" title="Capture & AI Scan Card">
+          <button class="btn-capture" id="btnCapture" title="Capture & Scan Card">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="10"></circle>
               <circle cx="12" cy="12" r="3" fill="white"></circle>
@@ -147,131 +143,145 @@
           </button>
         </div>
 
-        <!-- Quick Demo Business Cards Bar (Allows Instant Testing With Realistic High-Res Cards) -->
-        <div class="quick-demo-section">
-          <div class="quick-demo-header">
-            <div class="quick-demo-title">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-              </svg>
-              Test Cards (Instant 1-Click Scan)
-            </div>
-            <span style="font-size: 11px; color: var(--text-muted);">Try AI Extraction</span>
-          </div>
-          <div class="demo-cards-chips">
-            <button class="demo-chip" data-card="tech">
-              <span>💻</span> VP Engineering (Cloud)
-            </button>
-            <button class="demo-chip" data-card="health">
-              <span>🧬</span> CPO (HealthTech AI)
-            </button>
-            <button class="demo-chip" data-card="iot">
-              <span>🏭</span> COO (Smart IoT)
-            </button>
-            <button class="demo-chip" data-card="consulting">
-              <span>🌐</span> Director APAC (Strategy)
-            </button>
-          </div>
-        </div>
-
-        <!-- Event Auto-Tag Indicator Banner -->
-        <div style="background: rgba(99, 102, 241, 0.08); border: 1px dashed rgba(99, 102, 241, 0.25); border-radius: var(--border-radius-md); padding: 12px 14px; display: flex; align-items: center; justify-content: space-between;">
+        <!-- Active Target Event Tag Banner -->
+        <div class="scanner-event-banner">
           <div style="display: flex; align-items: center; gap: 10px;">
-            <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(99, 102, 241, 0.2); display: flex; align-items: center; justify-content: center; color: #818cf8;">
+            <div class="scanner-event-icon">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
             </div>
             <div>
-              <div style="font-size: 12px; font-weight: 700; color: #c7d2fe;">Active Event Tag</div>
-              <div style="font-size: 11px; color: var(--text-muted);" id="scannerActiveEventLabel">Tagging scans to: Global Tech Expo</div>
+              <div style="font-size: 12px; font-weight: 700; color: #c7d2fe;">Target Event Assignment</div>
+              <div style="font-size: 11px; color: var(--text-muted);" id="scannerActiveEventLabel">Tagging incoming scans to: General Field Leads</div>
             </div>
           </div>
-          <button class="btn-secondary" id="btnChangeActiveEvent" style="height: 32px; padding: 0 10px; font-size: 11px;">Change</button>
+          <button class="btn-secondary" id="btnChangeActiveEvent" style="height: 32px; padding: 0 12px; font-size: 11px;">Change</button>
         </div>
 
       </section>
 
       <!-- =================================================================
-           VIEW 2: CONTACTS DIRECTORY (Search, Event Filters, Export)
+           VIEW 2: CONTACTS DIRECTORY (Search, Event & Rep Filters, Export)
            ================================================================= -->
       <section class="view-screen" id="viewContacts">
 
         <!-- Top Statistics Row -->
         <div class="stats-banner-row">
           <div class="stat-card-mini">
-            <div class="stat-val" id="statTotalContacts">0</div>
-            <div class="stat-lbl">Contacts</div>
+            <span class="stat-number" id="statTotalContacts">0</span>
+            <span class="stat-label">Total Leads</span>
           </div>
           <div class="stat-card-mini">
-            <div class="stat-val" id="statActiveEvents" style="color: #06b6d4;">0</div>
-            <div class="stat-lbl">Events</div>
+            <span class="stat-number" id="statTotalOrgs">0</span>
+            <span class="stat-label">Organizations</span>
           </div>
           <div class="stat-card-mini">
-            <div class="stat-val" id="statPendingTasks" style="color: #f59e0b;">0</div>
-            <div class="stat-lbl">Follow-ups</div>
+            <span class="stat-number" id="statPendingTasks">0</span>
+            <span class="stat-label">Action Items</span>
           </div>
         </div>
 
-        <!-- Search & Filter Controls -->
-        <div class="search-filter-container">
-          <div class="search-input-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>
-            <input type="text" id="inputSearchContacts" placeholder="Search by name, company, title, industry...">
-          </div>
+        <!-- Search Bar with multi-attribute matching -->
+        <div class="search-box-wrapper">
+          <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="inputSearchContacts" class="search-input" placeholder="Search name, company, past employers, role...">
+          <button class="clear-search-btn" id="btnClearSearch" style="display: none;">✕</button>
+        </div>
 
-          <!-- Event Filter Horizontal Pills -->
-          <div class="filter-pills-scroll" id="contactsEventFilterPills">
-            <button class="filter-pill active" data-event-id="all">All Events</button>
+        <!-- Quick Scope Filters (All Leads vs My Scans vs Hot Leads) -->
+        <div class="scope-filter-chips">
+          <button class="scope-chip active" data-scope="all">All Team Leads</button>
+          <button class="scope-chip" data-scope="my">My Scans</button>
+          <button class="scope-chip" data-scope="hot">🔥 Hot Leads</button>
+          <button class="scope-chip" data-scope="decision">🎯 Decision Makers</button>
+        </div>
+
+        <!-- Event Filter Horizontal Pills -->
+        <div class="event-filter-scroll-wrapper">
+          <div class="filter-pills-track" id="contactsEventFilterPills">
+            <!-- Dynamically populated -->
           </div>
         </div>
 
-        <!-- Action Bar: Export & Sorting -->
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-          <span style="font-size: 12px; font-weight: 600; color: var(--text-muted);" id="contactsCountLabel">Showing 0 contacts</span>
-          <div style="display: flex; gap: 8px;">
-            <button class="btn-secondary" id="btnExportAllCSV" style="height: 32px; font-size: 11px; padding: 0 10px;">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-              CSV Export
-            </button>
-          </div>
+        <!-- Directory Header & Export Controls -->
+        <div class="section-header-compact">
+          <span class="section-title-sm" id="contactsCountLabel">0 Contacts</span>
+          <button class="btn-action-sm" id="btnExportAllCSV" title="Export to CSV">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Export CSV
+          </button>
         </div>
 
-        <!-- Contact Cards Feed -->
-        <div class="contacts-feed" id="contactsFeed">
-          <!-- Dynamically populated -->
+        <!-- Contacts Cards List Feed -->
+        <div class="contacts-list" id="contactsFeed">
+          <!-- Dynamically populated or clean empty state -->
         </div>
 
       </section>
 
       <!-- =================================================================
-           VIEW 3: EVENTS SCREEN (Event Profiles, Add Event, Event Contacts)
+           VIEW 3: ORGANIZATIONS & ALUMNI DIRECTORY (Structured Matching)
+           ================================================================= -->
+      <section class="view-screen" id="viewOrganizations">
+        
+        <div class="orgs-header-banner">
+          <div class="orgs-header-title">
+            <div class="orgs-header-icon">🏢</div>
+            <div>
+              <h3>Organization Intelligence</h3>
+              <p>Identify who all have worked at or are associated with specific companies</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Organization Search Bar -->
+        <div class="search-box-wrapper" style="margin-top: 12px;">
+          <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="inputSearchOrgs" class="search-input" placeholder="Search organizations, tech giants, alumni firms...">
+          <button class="clear-search-btn" id="btnClearSearchOrgs" style="display: none;">✕</button>
+        </div>
+
+        <div class="section-header-compact">
+          <span class="section-title-sm" id="orgsCountLabel">0 Organizations Identified</span>
+        </div>
+
+        <!-- Organizations Feed List -->
+        <div class="orgs-list" id="orgsFeed">
+          <!-- Dynamically populated with company affiliation cards -->
+        </div>
+
+      </section>
+
+      <!-- =================================================================
+           VIEW 4: EVENTS DIRECTORY (Events & Booth Management)
            ================================================================= -->
       <section class="view-screen" id="viewEvents">
 
-        <div class="event-header-row">
-          <div>
-            <h2 style="font-size: 17px; font-weight: 800; color: #fff;">Event Management</h2>
-            <p style="font-size: 12px; color: var(--text-muted);">Organize sales leads event-wise</p>
+        <!-- Active Target Event Spotlight Card -->
+        <div class="active-target-spotlight-card" id="spotlightActiveEventCard">
+          <div class="spotlight-badge">CURRENT ACTIVE TARGET</div>
+          <h2 id="bannerActiveEventName">General Field Leads</h2>
+          <p id="bannerActiveEventLocation">Field & Client Meetings</p>
+          <div class="spotlight-meta">
+            <span id="bannerActiveEventCount">0 Leads Tagged</span>
+            <span id="bannerActiveEventDate">Today</span>
           </div>
-          <button class="btn-primary" id="btnAddNewEvent" style="height: 36px; padding: 0 14px; font-size: 12px; flex: none;">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </div>
+
+        <div class="section-header-compact">
+          <span class="section-title-sm">All Target Events</span>
+          <button class="btn-action-sm" id="btnAddNewEvent">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             New Event
           </button>
         </div>
 
-        <!-- Active Target Banner -->
-        <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(6, 182, 212, 0.15) 100%); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: var(--border-radius-md); padding: 14px; margin-bottom: 16px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-            <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #818cf8; letter-spacing: 0.5px;">⭐ CURRENT ACTIVE EVENT</span>
-            <span style="font-size: 11px; color: #10b981; font-weight: 700;">● Active for Scanning</span>
-          </div>
-          <div style="font-size: 16px; font-weight: 700; color: #fff;" id="bannerActiveEventName">Global Tech Expo 2026</div>
-          <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;" id="bannerActiveEventLocation">Pragati Maidan, New Delhi</div>
-        </div>
-
-        <!-- Events List Container -->
+        <!-- Events List -->
         <div class="events-list" id="eventsList">
           <!-- Dynamically populated -->
         </div>
@@ -279,128 +289,155 @@
       </section>
 
       <!-- =================================================================
-           VIEW 4: ACTION ITEMS & TASKS (Global Follow-Ups Tracker)
+           VIEW 5: TASKS & FOLLOW-UP ITEMS DASHBOARD
            ================================================================= -->
       <section class="view-screen" id="viewTasks">
 
-        <div style="margin-bottom: 14px;">
-          <h2 style="font-size: 17px; font-weight: 800; color: #fff;">Follow-up Action Items</h2>
-          <p style="font-size: 12px; color: var(--text-muted);">Ensure zero lead drop-offs post meetings</p>
-        </div>
-
-        <!-- Task Filter Tabs -->
         <div class="tasks-filter-bar">
-          <button class="task-filter-tab active" data-filter="all">All Items (<span id="taskCountAll">0</span>)</button>
-          <button class="task-filter-tab" data-filter="pending">Pending (<span id="taskCountPending">0</span>)</button>
-          <button class="task-filter-tab" data-filter="completed">Completed (<span id="taskCountCompleted">0</span>)</button>
+          <button class="task-filter-pill active" data-task-filter="all">All Action Items</button>
+          <button class="task-filter-pill" data-task-filter="pending">Pending</button>
+          <button class="task-filter-pill" data-task-filter="high">⚡ High Priority</button>
+          <button class="task-filter-pill" data-task-filter="completed">Done</button>
         </div>
 
-        <!-- Tasks List Container -->
-        <div class="tasks-list" id="tasksList">
+        <div class="section-header-compact">
+          <span class="section-title-sm" id="tasksCountLabel">0 Tasks Pending</span>
+        </div>
+
+        <div class="tasks-list" id="tasksFeed">
           <!-- Dynamically populated -->
         </div>
 
       </section>
 
       <!-- =================================================================
-           VIEW 5: SETTINGS & CRM CONFIG
+           VIEW 6: SETTINGS, SALES REP PROFILE & TEAM CLOUD SYNC
            ================================================================= -->
       <section class="view-screen" id="viewSettings">
 
-        <div style="margin-bottom: 16px;">
-          <h2 style="font-size: 17px; font-weight: 800; color: #fff;">LeadPulse Configuration</h2>
-          <p style="font-size: 12px; color: var(--text-muted);">AI API Keys, Android PWA setup & Data Management</p>
-        </div>
+        <div class="settings-container">
 
-        <!-- Google Gemini Vision API Settings & Model Selection -->
-        <div class="settings-section-card">
-          <div class="settings-section-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-            Google Gemini Vision AI & Model Selection
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="settingGeminiApiKey">Gemini API Key</label>
-            <div style="display: flex; gap: 8px;">
-              <input type="password" id="settingGeminiApiKey" class="form-control" placeholder="AIzaSy... (Leave blank for built-in demo mode)">
-              <button class="btn-secondary" id="btnToggleApiKeyVisibility" style="height: 42px; padding: 0 12px; font-size: 11px;">👁️</button>
+          <!-- 1. Sales Representative Profile Card -->
+          <div class="settings-card rep-highlight-card">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <div class="rep-avatar-lg" id="settingsRepAvatar">👤</div>
+                <div>
+                  <h3 id="settingsRepNameDisplay" style="font-size: 16px; font-weight: 700; color: #fff;">Sales Representative</h3>
+                  <p id="settingsRepMetaDisplay" style="font-size: 12px; color: var(--text-muted);">EMP-ID & Corporate Email</p>
+                </div>
+              </div>
+              <button class="btn-secondary" id="btnEditSalesRepProfile" style="height: 32px; padding: 0 12px; font-size: 11px;">Edit Profile</button>
             </div>
-            <p style="font-size: 11px; color: var(--text-muted); margin-top: 5px;">
-              💡 <strong>Self-Healing:</strong> Enter your key to run live multimodal card OCR with auto-healing model fallbacks.
-            </p>
+            <div class="rep-attribution-info" id="settingsRepAttributionBanner">
+              All visiting cards scanned on this device are automatically attributed to your Employee ID.
+            </div>
           </div>
 
-          <!-- Dynamic Model Selection Section -->
-          <div class="form-group">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-              <label class="form-label" for="settingGeminiModel" style="margin-bottom: 0;">AI Vision Model</label>
-              <button class="btn-secondary" id="btnFetchModels" style="height: 28px; padding: 0 8px; font-size: 10.5px;">
-                🔄 Refresh Models
+          <!-- 2. Cross-Team Synchronization -->
+          <div class="settings-card">
+            <div class="settings-card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path></svg>
+              Cross-Team Cloud Sync
+            </div>
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 14px;">
+              Collaborate with your sales team. Leads scanned by one salesperson are automatically visible to the rest of the team.
+            </p>
+
+            <div class="form-group">
+              <label class="form-label" for="inputTeamWorkspaceCode">Team Workspace Code</label>
+              <input type="text" id="inputTeamWorkspaceCode" class="form-control" placeholder="e.g. ALPHA-SALES-2026" style="text-transform: uppercase;">
+              <span style="font-size: 10px; color: var(--text-subtle);">All team members using this code share the same synchronized leads pool.</span>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 14px;">
+              <button class="btn-primary" id="btnSyncTeamNow" style="flex: 1;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                Sync With Team Now
               </button>
             </div>
-            <select id="settingGeminiModel" class="form-control">
-              <option value="gemini-1.5-flash">Gemini 1.5 Flash (Recommended - Fast & High Accuracy)</option>
-              <option value="gemini-2.0-flash">Gemini 2.0 Flash (Next-Gen Multimodal - Ultra Fast)</option>
-              <option value="gemini-1.5-pro">Gemini 1.5 Pro (Deep Context Reasoning & Dense Cards)</option>
-              <option value="gemini-2.5-flash">Gemini 2.5 Flash (Latest Release)</option>
-              <option value="gemini-1.5-flash-8b">Gemini 1.5 Flash 8B (High Throughput)</option>
-            </select>
-            <div id="modelStatusNotice" style="font-size: 11px; color: #818cf8; margin-top: 5px;">
-              ⚡ Selected model is active for upcoming business card scans.
+
+            <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-color); display: flex; gap: 10px;">
+              <button class="btn-secondary" id="btnShareTeamBundle" style="flex: 1; font-size: 11px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
+                Export Team Bundle
+              </button>
+              <button class="btn-secondary" id="btnImportTeamBundle" style="flex: 1; font-size: 11px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Merge Team Bundle
+              </button>
+              <input type="file" id="fileImportTeamBundle" accept=".json" style="display: none;">
             </div>
           </div>
 
-          <!-- Customizable Information & Extraction Prompt -->
-          <div class="form-group">
-            <label class="form-label" for="settingCustomPrompt">Custom Sales Intelligence Focus</label>
-            <textarea id="settingCustomPrompt" class="form-control" style="height: 60px;" placeholder="e.g. Also evaluate: Company employee scale, annual cloud budget, decision authority, and buying timeline."></textarea>
-            <p style="font-size: 10.5px; color: var(--text-muted); margin-top: 4px;">
-              Guide Gemini to extract and store specialized intelligence unique to your sales team.
+          <!-- 3. Google Gemini AI Model Selection -->
+          <div class="settings-card">
+            <div class="settings-card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+              Gemini Vision AI Engine
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="settingGeminiApiKey">Gemini API Key</label>
+              <input type="password" id="settingGeminiApiKey" class="form-control" placeholder="AIzaSy...">
+              <span style="font-size: 10px; color: var(--text-subtle);">Used directly from your phone to Google Gemini Vision. Never stored on external servers.</span>
+            </div>
+
+            <div class="form-group">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                <label class="form-label" for="settingModelSelect" style="margin-bottom: 0;">Vision Model</label>
+                <button class="btn-text-sm" id="btnRefreshModels">↻ Detect Models</button>
+              </div>
+              <select id="settingModelSelect" class="form-control">
+                <option value="gemini-2.0-flash">gemini-2.0-flash (Recommended - High Speed & Precision)</option>
+                <option value="gemini-1.5-flash">gemini-1.5-flash (Standard)</option>
+                <option value="gemini-1.5-flash-latest">gemini-1.5-flash-latest</option>
+                <option value="gemini-1.5-pro">gemini-1.5-pro (Deep Reasoning)</option>
+              </select>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+              <button class="btn-secondary" id="btnTestModel" style="flex: 1;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                Verify API Key & Model
+              </button>
+            </div>
+          </div>
+
+          <!-- 4. Data Retention, Backup & Restore -->
+          <div class="settings-card">
+            <div class="settings-card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+              Database Retention & Backup
+            </div>
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
+              Your data is stored locally in secure phone storage and persists across application updates. You can also export offline JSON backups anytime.
             </p>
+
+            <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+              <button class="btn-secondary" id="btnExportFullBackup" style="flex: 1;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Export CRM Backup (.json)
+              </button>
+              <button class="btn-secondary" id="btnRestoreBackup" style="flex: 1;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
+                Restore Backup
+              </button>
+              <input type="file" id="fileRestoreBackup" accept=".json" style="display: none;">
+            </div>
+
+            <div style="border-top: 1px solid rgba(239, 68, 68, 0.2); padding-top: 12px; margin-top: 12px;">
+              <button class="btn-secondary btn-danger" id="btnClearAllData" style="width: 100%;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                Clear All Contacts (Clean Slate)
+              </button>
+            </div>
           </div>
 
-          <div style="display: flex; gap: 8px;">
-            <button class="btn-primary" id="btnSaveSettings" style="height: 38px; font-size: 12px;">Save AI Settings</button>
-            <button class="btn-secondary" id="btnTestGemini" style="height: 38px; font-size: 12px;">Test Selected Model</button>
+          <div style="text-align: center; font-size: 11px; color: var(--text-subtle); padding: 12px 0 24px;">
+            LeadPulse Enterprise v2.0 • Standalone Android Architecture
           </div>
-        </div>
 
-        <!-- Android PWA Installation Guide -->
-        <div class="settings-section-card">
-          <div class="settings-section-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
-            Android Mobile PWA Installation
-          </div>
-          <p style="font-size: 12px; color: #cbd5e1; line-height: 1.5; margin-bottom: 12px;">
-            Sales executives can install this app directly onto Android home screens without Google Play Store:
-          </p>
-          <ol style="padding-left: 20px; font-size: 12px; color: var(--text-muted); line-height: 1.6;">
-            <li>Open this URL in <strong>Google Chrome</strong> on any Android device.</li>
-            <li>Tap the three dots (<strong>⋮</strong>) menu in the top right corner.</li>
-            <li>Tap <strong>"Install app"</strong> or <strong>"Add to Home screen"</strong>.</li>
-            <li>LeadPulse launches in standalone full-screen mode with native camera access!</li>
-          </ol>
-        </div>
-
-        <!-- Database & Backup Management -->
-        <div class="settings-section-card">
-          <div class="settings-section-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
-            Data Backup & Maintenance
-          </div>
-          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
-            All data is saved locally on the Android device via HTML5 Storage.
-          </p>
-          <div style="display: flex; flex-direction: column; gap: 8px;">
-            <button class="btn-secondary" id="btnExportAllJSON">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-              Backup All Leads & Events (JSON)
-            </button>
-            <button class="btn-secondary btn-danger" id="btnResetDefaultData">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
-              Reset to Demo Sample Data
-            </button>
-          </div>
         </div>
 
       </section>
@@ -414,12 +451,12 @@
           <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
         </svg>
       </div>
-      <div class="processing-step-title" id="aiProcessingTitle">Analyzing Visiting Card...</div>
-      <div class="processing-step-desc" id="aiProcessingDesc">Gemini Multimodal AI is extracting contact details and researching LinkedIn & career background.</div>
+      <div class="processing-step-title" id="aiProcessingTitle">Scanning Visiting Card...</div>
+      <div class="processing-step-desc" id="aiProcessingDesc">Gemini Vision AI is extracting identity details and researching past organizations & career background.</div>
     </div>
 
     <!-- =================================================================
-         BOTTOM NAVIGATION BAR (Android 5-Tab Material Bar)
+         BOTTOM NAVIGATION BAR (5 Clean Tabs)
          ================================================================= -->
     <nav class="bottom-nav-bar" id="bottomNavBar">
       <button class="nav-item-btn active" data-target="viewScanner" id="navBtnScanner">
@@ -437,7 +474,7 @@
           <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
           <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
         </svg>
-        <span>Contacts</span>
+        <span>Leads</span>
       </button>
 
       <button class="nav-item-btn nav-center-scan" id="navBtnCenterScan" title="Scan Visiting Card">
@@ -450,6 +487,20 @@
         <span>Scan</span>
       </button>
 
+      <button class="nav-item-btn" data-target="viewOrganizations" id="navBtnOrgs">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 21h18"></path>
+          <path d="M9 8h1"></path>
+          <path d="M9 12h1"></path>
+          <path d="M9 16h1"></path>
+          <path d="M14 8h1"></path>
+          <path d="M14 12h1"></path>
+          <path d="M14 16h1"></path>
+          <path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"></path>
+        </svg>
+        <span>Orgs</span>
+      </button>
+
       <button class="nav-item-btn" data-target="viewEvents" id="navBtnEvents">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
@@ -458,14 +509,6 @@
           <line x1="3" y1="10" x2="21" y2="10"></line>
         </svg>
         <span>Events</span>
-      </button>
-
-      <button class="nav-item-btn" data-target="viewTasks" id="navBtnTasks">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="9 11 12 14 22 4"></polyline>
-          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-        </svg>
-        <span>Tasks</span>
       </button>
     </nav>
 
@@ -488,7 +531,7 @@
             <img id="reviewCardImagePreview" src="" alt="Scanned Card" style="max-width: 100%; max-height: 150px; object-fit: contain;">
           </div>
 
-          <!-- Basic Contact Form Fields -->
+          <!-- Basic Contact Identity -->
           <div class="detail-section-block">
             <h3>Contact Identity</h3>
             <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 10px; margin-bottom: 10px;">
@@ -556,38 +599,35 @@
 
             <div class="form-group">
               <label class="form-label">Past Work & Professional Summary</label>
-              <textarea id="reviewPastWork" class="form-control" placeholder="Previous roles, company scale, background..."></textarea>
+              <textarea id="reviewPastWork" class="form-control" placeholder="Executive career path, achievements..."></textarea>
             </div>
 
+            <!-- Structured Past Organizations for Matching -->
             <div class="form-group">
-              <label class="form-label">Company Overview</label>
-              <textarea id="reviewCompanyOverview" class="form-control" placeholder="What the company does, business model..."></textarea>
+              <label class="form-label">Past Organizations / Employers (Comma Separated)</label>
+              <input type="text" id="reviewPastOrgsList" class="form-control" placeholder="e.g. Google, Oracle, Infosys, Cisco">
+              <span style="font-size: 10px; color: var(--text-subtle);">Used for cross-lead organization matching and alumni discovery.</span>
             </div>
           </div>
 
-          <!-- Executive Sales Qualification Block -->
-          <div class="detail-section-block" style="border-left: 3px solid #10b981;">
-            <h3>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-              Sales Qualification & Deal Intelligence
-            </h3>
-
+          <!-- Sales Qualification Metrics -->
+          <div class="detail-section-block">
+            <h3>Sales Qualification Intelligence</h3>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
               <div>
-                <label class="form-label">Authority / Role</label>
+                <label class="form-label">Decision Role</label>
                 <select id="reviewDecisionStatus" class="form-control">
-                  <option value="Decision Maker">Decision Maker (C-Level / VP)</option>
-                  <option value="Influencer">Key Influencer / Director</option>
-                  <option value="Technical Evaluator">Technical Evaluator / Lead</option>
-                  <option value="Budget Approver">Budget Approver</option>
-                  <option value="Procurement">Procurement</option>
+                  <option value="Decision Maker">Decision Maker (C-Level/VP)</option>
+                  <option value="Influencer">Influencer / Director</option>
+                  <option value="Evaluator">Technical Evaluator</option>
+                  <option value="Procurement">Procurement / Legal</option>
                 </select>
               </div>
               <div>
-                <label class="form-label">Lead Priority</label>
+                <label class="form-label">Lead Score</label>
                 <select id="reviewLeadScore" class="form-control">
-                  <option value="Hot">🔥 Hot (High Urgency)</option>
-                  <option value="Warm">⚡ Warm (This Quarter)</option>
+                  <option value="Hot">🔥 Hot (Immediate Demo)</option>
+                  <option value="Warm">⚡ Warm (Good Fit)</option>
                   <option value="Nurture">🌱 Nurture (Long Term)</option>
                 </select>
               </div>
@@ -595,8 +635,13 @@
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
               <div>
-                <label class="form-label">Est. Deal Budget</label>
-                <input type="text" id="reviewBudget" class="form-control" placeholder="e.g. $50K+ or ₹25 Lakh">
+                <label class="form-label">Estimated Deal Budget</label>
+                <select id="reviewBudget" class="form-control">
+                  <option value="$50k - $200k+">$50,000 - $200,000+</option>
+                  <option value="$20k - $50k">$20,000 - $50,000</option>
+                  <option value="$5k - $20k">$5,000 - $20,000</option>
+                  <option value="Undisclosed">Undisclosed / TBD</option>
+                </select>
               </div>
               <div>
                 <label class="form-label">Buying Timeline</label>
@@ -615,13 +660,13 @@
             <h3>Meeting Notes & Immediate Actions</h3>
             <div class="form-group">
               <label class="form-label">Meeting Notes</label>
-              <textarea id="reviewNotes" class="form-control" placeholder="Discussion points from the booth..."></textarea>
+              <textarea id="reviewNotes" class="form-control" placeholder="Discussion points from the meeting..."></textarea>
             </div>
 
             <div>
-              <label class="form-label">Suggested Follow-Up Action Items</label>
+              <label class="form-label">Follow-Up Action Items</label>
               <div id="reviewSuggestedActionItems" style="display: flex; flex-direction: column; gap: 6px;">
-                <!-- Populated with checkboxes -->
+                <!-- Populated dynamically -->
               </div>
             </div>
           </div>
@@ -652,7 +697,7 @@
         </div>
         <div class="sheet-footer">
           <button class="btn-secondary btn-danger" id="btnDeleteContact">Delete</button>
-          <button class="btn-secondary" id="btnDownloadVCardSingle">
+          <button class="btn-primary" id="btnDownloadVCardSingle">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
             Save to Contacts (.vcf)
           </button>
@@ -661,7 +706,84 @@
     </div>
 
     <!-- =================================================================
-         MODAL 3: CREATE NEW EVENT MODAL
+         MODAL 3: ORGANIZATION MATCHING & AFFILIATIONS INSPECTOR
+         ================================================================= -->
+    <div class="modal-overlay" id="modalOrgMatching">
+      <div class="bottom-sheet-content">
+        <div class="sheet-handle-bar"></div>
+        <div class="sheet-header">
+          <div class="sheet-title" id="orgMatchingModalTitle">Organization Matches</div>
+          <button class="icon-btn" id="btnCloseOrgMatching" style="width: 32px; height: 32px;">✕</button>
+        </div>
+        <div class="sheet-body" id="orgMatchingModalBody">
+          <!-- Dynamically populated with current & alumni contacts -->
+        </div>
+      </div>
+    </div>
+
+    <!-- =================================================================
+         MODAL 4: SALES REPRESENTATIVE PROFILE
+         ================================================================= -->
+    <div class="modal-overlay" id="modalSalesRep">
+      <div class="bottom-sheet-content">
+        <div class="sheet-handle-bar"></div>
+        <div class="sheet-header">
+          <div class="sheet-title">Sales Representative Profile</div>
+          <button class="icon-btn" id="btnCloseSalesRepModal" style="width: 32px; height: 32px;">✕</button>
+        </div>
+        <div class="sheet-body">
+          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 14px;">
+            Set your corporate sales identity. Every business card you scan is stamped with your Employee ID and synced with your team.
+          </p>
+
+          <div class="form-group">
+            <label class="form-label" for="repFormName">Employee Full Name *</label>
+            <input type="text" id="repFormName" class="form-control" placeholder="e.g. Rahul Sharma" required>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+            <div>
+              <label class="form-label" for="repFormEmpId">Employee ID *</label>
+              <input type="text" id="repFormEmpId" class="form-control" placeholder="e.g. EMP-1042" style="text-transform: uppercase;" required>
+            </div>
+            <div>
+              <label class="form-label" for="repFormPhone">Phone Number</label>
+              <input type="tel" id="repFormPhone" class="form-control" placeholder="+91 ...">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="repFormEmail">Corporate Email *</label>
+            <input type="email" id="repFormEmail" class="form-control" placeholder="name@company.com" required>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+            <div>
+              <label class="form-label" for="repFormRegion">Sales Territory / Region</label>
+              <input type="text" id="repFormRegion" class="form-control" placeholder="e.g. North India / Enterprise">
+            </div>
+            <div>
+              <label class="form-label" for="repFormDesignation">Designation</label>
+              <input type="text" id="repFormDesignation" class="form-control" placeholder="e.g. Senior Account Exec">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="repFormTeamCode">Team Workspace Code *</label>
+            <input type="text" id="repFormTeamCode" class="form-control" placeholder="e.g. ALPHA-SALES-2026" style="text-transform: uppercase;" required>
+            <span style="font-size: 10px; color: var(--text-subtle);">Connects your device to your team's shared lead database.</span>
+          </div>
+
+        </div>
+        <div class="sheet-footer">
+          <button class="btn-secondary" id="btnCancelSalesRep">Cancel</button>
+          <button class="btn-primary" id="btnSaveSalesRep">Save Profile</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- =================================================================
+         MODAL 5: CREATE NEW EVENT MODAL
          ================================================================= -->
     <div class="modal-overlay" id="modalAddEvent">
       <div class="bottom-sheet-content">
@@ -707,7 +829,7 @@
 
   </div>
 
-  <!-- Application Logic Scripts (Loaded in proper dependency order) -->
+  <!-- Application Logic Scripts -->
   <script src="./js/storage.js"></script>
   <script src="./js/gemini.js"></script>
   <script src="./js/camera.js"></script>

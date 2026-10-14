@@ -79,23 +79,24 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/heads/main')
         with:
-          tag_name: v1.0.0
-          name: "LeadPulse Android App v1.0.0"
+          tag_name: v2.0.0
+          name: "LeadPulse Enterprise Android App v2.0.0"
           draft: false
           prerelease: false
           body: |
-            ## 📱 LeadPulse - Standalone Android APK
+            ## 📱 LeadPulse Enterprise v2.0.0 - Standalone Android APK
 
             Download `LeadPulse.apk` below and install it directly on your Android phone.
 
-            ### What's Inside:
-            - **Visiting Card Scanner**: Live camera scanning and gallery photo processing.
-            - **AI Extraction & Background Enrichment**: Google Gemini Multimodal Vision extracts contact details and synthesizes LinkedIn profiles, career history, and company background.
-            - **Model Selection & Auto-Fallbacks**: Dynamically list and select from all authorized Gemini models (`gemini-2.0-flash`, `gemini-1.5-flash`, `gemini-1.5-pro`) with self-healing fallbacks.
-            - **Follow-up Action Items**: Track per-contact and global action items with priority tags.
-            - **Event-Wise Organization**: Filter and organize leads event-wise.
-            - **1-Tap Android Contacts Sync**: Export directly to phone contact book via `.vcf` (vCard 3.0).
-            - **100% Offline Standalone**: Bundled assets inside the APK run without any laptop or web server.
+            ### What's New in v2.0.0:
+            - **Zero Dummy Data Guarantee**: Clean slate architecture with automatic legacy mock data purger.
+            - **Data Retention & Integrity**: Local leads and task database safely persist across all APK updates without data loss.
+            - **Distraction-Free Professional UI**: Removed fake phone status bar chrome; ultra-clean, modern UI designed for sales professionals.
+            - **Sales Representative Profile**: Capture Employee Name, Corporate Email, Employee ID, and Sales Region. Every scan is stamped with creator attribution.
+            - **Organization Intelligence & Alumni Discovery**: Aggregate past work and employers across all leads. Discover which contacts have worked at specific organizations for warm introductions.
+            - **Cross-Team Collaboration & Offline Sharing**: Share lead bundles with teammates using shared Workspace Codes or 1-tap JSON database import/export.
+            - **Google Gemini Multimodal Vision AI**: Real-time business card entity extraction, career synthesis, and icebreakers.
+            - **1-Tap Android Contacts (.vcf)**: Export directly to native Android contacts.
           files: |
             ./LeadPulse.apk
         env:

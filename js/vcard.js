@@ -60,9 +60,16 @@ class ExportService {
       'Website',
       'Address',
       'Event Name',
+      'Past Organizations / Employers',
+      'Alumni Institutions',
       'LinkedIn Profile',
       'Past Work Summary',
-      'Company Overview',
+      'Lead Score',
+      'Decision Status',
+      'Deal Budget',
+      'Buying Timeline',
+      'Scanned By Rep Name',
+      'Scanned By Employee ID',
       'Pending Action Items Count',
       'Created Date'
     ];
@@ -71,6 +78,9 @@ class ExportService {
       const event = window.storageService ? window.storageService.getEventById(c.eventId) : null;
       const eventName = event ? event.name : 'Unassigned';
       const pendingTasks = (c.actionItems || []).filter(a => !a.completed).length;
+      const pastOrgs = (c.pastCompaniesList || []).join('; ');
+      const alumni = (c.alumniInstitutions || []).join('; ');
+      const rep = c.scannedBy || {};
 
       return [
         c.id,
@@ -85,9 +95,16 @@ class ExportService {
         c.website || '',
         c.address || '',
         eventName,
+        pastOrgs,
+        alumni,
         c.linkedinUrl || '',
         c.pastWorkSummary || '',
-        c.companyOverview || '',
+        c.leadScore || 'Hot',
+        c.decisionStatus || 'Decision Maker',
+        c.dealBudget || '',
+        c.buyingTimeline || '',
+        rep.name || '',
+        rep.employeeId || '',
         pendingTasks,
         c.createdAt || ''
       ].map(val => `"${String(val || '').replace(/"/g, '""')}"`);
