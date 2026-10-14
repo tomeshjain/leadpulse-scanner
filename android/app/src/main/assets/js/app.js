@@ -66,6 +66,9 @@ class FlowAppController {
     this.statusPillText = document.getElementById('statusPillText');
     this.liveLatencyPill = document.getElementById('liveLatencyPill');
     this.wpmLiveCounter = document.getElementById('wpmLiveCounter');
+    this.btnDemoPhrase = document.getElementById('btnDemoPhrase');
+    this.btnOpenKeyboardSettings = document.getElementById('btnOpenKeyboardSettings');
+    this.btnLaunchFloatingOverlay = document.getElementById('btnLaunchFloatingOverlay');
 
     // Transcripts & Output Card
     this.liveInterimContainer = document.getElementById('liveInterimContainer');
@@ -151,6 +154,19 @@ class FlowAppController {
     // Main Mic Action Trigger
     if (this.btnMainMic) {
       this.btnMainMic.addEventListener('click', () => this.toggleListening());
+    }
+
+    // Quick Sample Speech Demo Test
+    if (this.btnDemoPhrase) {
+      this.btnDemoPhrase.addEventListener('click', () => this.runDemoTest());
+    }
+
+    // Android System Integration Buttons
+    if (this.btnOpenKeyboardSettings) {
+      this.btnOpenKeyboardSettings.addEventListener('click', () => this.openAndroidKeyboardSettings());
+    }
+    if (this.btnLaunchFloatingOverlay) {
+      this.btnLaunchFloatingOverlay.addEventListener('click', () => this.launchAndroidFloatingOverlay());
     }
 
     // Keyboard Spacebar Shortcut for Desktop & Companion
@@ -517,34 +533,63 @@ class FlowAppController {
     if (!this.waveCanvas) return;
     const canvas = this.waveCanvas;
     const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-    // Resize canvas for sharp rendering
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = (rect.width || 320) * dpr;
-    canvas.height = (rect.height || 80) * dpr;
-    ctx.scale(dpr, dpr);
+    try {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      const w = Math.max(280, rect.width || 320);
+      const h = Math.max(60, rect.height || 80);
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      ctx.scale(dpr, dpr);
 
-    // Initial idle state wave
-    this.drawIdleWave(ctx, rect.width || 320, rect.height || 80);
+      // Initial idle state wave
+      this.drawIdleWave(ctx, w, h);
+    } catch (e) {
+      console.warn('Wave canvas init warning:', e);
+    }
+  }
+
+  drawRoundedRect(ctx, x, y, width, height, radius) {
+    if (typeof ctx.roundRect === 'function') {
+      ctx.beginPath();
+      ctx.roundRect(x, y, width, height, radius);
+      return;
+    }
+    // Universal fallback for Android WebView / older browsers
+    const r = Math.min(radius, width / 2, height / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + width - r, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+    ctx.lineTo(x + width, y + height - r);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+    ctx.lineTo(x + r, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
   }
 
   handleAudioWaveform(normalizedVolume, freqArray) {
     if (!this.waveCanvas) return;
     const canvas = this.waveCanvas;
     const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
     const width = canvas.width / (window.devicePixelRatio || 1);
     const height = canvas.height / (window.devicePixelRatio || 1);
 
     ctx.clearRect(0, 0, width, height);
 
     const bars = 36;
-    const barWidth = width / bars - 2;
+    const barWidth = Math.max(2, width / bars - 2);
     const centerY = height / 2;
 
     for (let i = 0; i < bars; i++) {
       const freqIdx = Math.floor((i / bars) * (freqArray ? freqArray.length : 128));
-      const val = freqArray ? freqArray[freqIdx] / 255 : normalizedVolume;
+      const val = freqArray ? freqArray[freqIdx] / 255 : (normalizedVolume || 0.25);
       const barHeight = Math.max(4, val * (height * 0.85));
 
       const x = i * (barWidth + 2);
@@ -556,8 +601,7 @@ class FlowAppController {
       gradient.addColorStop(1, '#06b6d4');
 
       ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.roundRect(x, y, barWidth, barHeight, 4);
+      this.drawRoundedRect(ctx, x, y, barWidth, barHeight, 4);
       ctx.fill();
     }
   }
@@ -565,7 +609,7 @@ class FlowAppController {
   drawIdleWave(ctx, width, height) {
     ctx.clearRect(0, 0, width, height);
     const bars = 36;
-    const barWidth = width / bars - 2;
+    const barWidth = Math.max(2, width / bars - 2);
     const centerY = height / 2;
 
     ctx.fillStyle = 'rgba(99, 102, 241, 0.25)';
@@ -573,8 +617,7 @@ class FlowAppController {
       const h = 4 + Math.sin(i * 0.4) * 2;
       const x = i * (barWidth + 2);
       const y = centerY - h / 2;
-      ctx.beginPath();
-      ctx.roundRect(x, y, barWidth, h, 2);
+      this.drawRoundedRect(ctx, x, y, barWidth, h, 2);
       ctx.fill();
     }
   }
@@ -582,6 +625,16 @@ class FlowAppController {
   // --- ACTIONS: CLIPBOARD, SHARE, SPEECH ---
   async copyToClipboard(text, notify = true) {
     if (!text) return;
+
+    // Use native Android clipboard if inside APK
+    if (window.AndroidNative && typeof window.AndroidNative.copyToClipboard === 'function') {
+      try {
+        window.AndroidNative.copyToClipboard(text);
+        if (notify) this.showToast('📋 Copied to clipboard!', 'success');
+        return;
+      } catch (e) {}
+    }
+
     try {
       await navigator.clipboard.writeText(text);
       if (notify) this.showToast('📋 Copied polished text to clipboard!', 'success');
@@ -634,6 +687,13 @@ class FlowAppController {
 
   // --- FLOATING HUD OVERLAY ---
   toggleFloatingHud(forceState) {
+    if (window.AndroidNative && typeof window.AndroidNative.startFloatingOverlay === 'function') {
+      try {
+        window.AndroidNative.startFloatingOverlay();
+        return;
+      } catch (e) {}
+    }
+
     if (!this.floatingHud) return;
     const newState = forceState !== undefined ? forceState : !this.floatingHud.classList.contains('active');
     this.floatingHud.classList.toggle('active', newState);
@@ -641,6 +701,53 @@ class FlowAppController {
     if (newState) {
       this.showToast('Floating Flow HUD active! Position anywhere on screen.', 'info');
     }
+  }
+
+  // --- NATIVE ANDROID SYSTEM HELPERS ---
+  openAndroidKeyboardSettings() {
+    if (window.AndroidNative && typeof window.AndroidNative.openKeyboardSettings === 'function') {
+      window.AndroidNative.openKeyboardSettings();
+    } else {
+      this.showToast('Open Android Settings > System > Languages > On-screen Keyboard to enable Wispr Flow', 'info');
+    }
+  }
+
+  launchAndroidFloatingOverlay() {
+    if (window.AndroidNative && typeof window.AndroidNative.startFloatingOverlay === 'function') {
+      window.AndroidNative.startFloatingOverlay();
+    } else {
+      this.toggleFloatingHud(true);
+    }
+  }
+
+  // --- QUICK DEMO PHRASE TEST BENCH ---
+  async runDemoTest() {
+    const demoPhrases = [
+      "um basically you know we need to deploy the new microservice by Thursday afternoon so yeah please review the PR and let me know your thoughts",
+      "hey team uh I was thinking we should reschedule the sync to Friday at 10 AM because like three people have conflicts",
+      "so yeah basically action items from the call are one update the database schema two send the contract to the client and three check the logs",
+      "could you please review the proposal and uh let me know if we need any revisions before signing"
+    ];
+
+    const sample = demoPhrases[Math.floor(Math.random() * demoPhrases.length)];
+
+    this.showToast('💡 Running sample speech test with filler words...', 'info');
+    this.updateStatusPill('listening', 'Simulating speech input...');
+    if (this.liveInterimContainer) {
+      this.liveInterimContainer.classList.add('active');
+      if (this.liveInterimText) this.liveInterimText.textContent = sample;
+    }
+
+    // Pulse simulated wave
+    if (window.flowSpeech && window.flowSpeech.onAudioVolumeCallback) {
+      window.flowSpeech.onAudioVolumeCallback(0.75, null);
+    }
+
+    setTimeout(async () => {
+      this.updateStatusPill('polishing', '✨ AI Polishing speech...');
+      await this.handleFinalSpeech(sample, 2200);
+      this.showToast('✓ Polished with Wispr Flow!', 'success');
+    }, 700);
   }
 
   // --- ANDROID KEYBOARD COMPANION SIMULATION ---

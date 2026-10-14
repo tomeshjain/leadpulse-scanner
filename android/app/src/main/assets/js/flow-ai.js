@@ -189,9 +189,16 @@ MODE: SMART POLISH (Wispr Flow Default).
     // 4. Apply custom vocabulary replacements
     if (Array.isArray(dictionary)) {
       dictionary.forEach(d => {
-        if (d.word && d.replacement) {
-          const reg = new RegExp(`\\b${d.word}\\b`, 'gi');
-          text = text.replace(reg, d.replacement);
+        if (d && d.word && d.replacement) {
+          try {
+            const escapedWord = d.word.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            if (escapedWord) {
+              const reg = new RegExp(`\\b${escapedWord}\\b`, 'gi');
+              text = text.replace(reg, d.replacement);
+            }
+          } catch (e) {
+            console.warn('Dictionary replacement warning:', e);
+          }
         }
       });
     }

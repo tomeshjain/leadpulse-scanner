@@ -132,6 +132,13 @@
             Tip: Press <kbd>Spacebar</kbd> anytime to start/stop dictating
           </div>
 
+          <!-- Quick Sample Speech Test Trigger -->
+          <div class="demo-test-container" style="margin-top: 10px; display: flex; justify-content: center;">
+            <button class="btn-demo-phrase" id="btnDemoPhrase" title="Test Flow AI instant transformation without speaking">
+              <span>💡 Tap to test sample speech with fillers</span>
+            </button>
+          </div>
+
         </div>
 
         <!-- Real-Time Interim Speech Stream -->
@@ -296,17 +303,23 @@
 
           <div class="guide-step-item">
             <div class="step-num">1</div>
-            <div>
+            <div style="flex: 1;">
               <strong>Floating Flow HUD / Bubble Overlay</strong>
               <p>A floating microphone bubble hovers over WhatsApp, Slack, and Gmail. Tap it to speak, and your polished thoughts are auto-copied to the clipboard with instant paste.</p>
+              <button class="btn-primary-sm" id="btnLaunchFloatingOverlay" style="margin-top: 8px;">
+                🚀 Launch Floating Voice HUD
+              </button>
             </div>
           </div>
 
           <div class="guide-step-item">
             <div class="step-num">2</div>
-            <div>
+            <div style="flex: 1;">
               <strong>Android Custom Keyboard (IME) Extension</strong>
               <p>In Android Settings &gt; System &gt; Languages &gt; On-screen keyboard, enable <strong>Wispr Flow Keyboard</strong>. The AI Mic is built right into your spacebar for 1-tap text field injection.</p>
+              <button class="btn-secondary-sm" id="btnOpenKeyboardSettings" style="margin-top: 8px;">
+                ⚙️ Open Android Keyboard Settings
+              </button>
             </div>
           </div>
         </div>

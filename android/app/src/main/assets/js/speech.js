@@ -1,7 +1,10 @@
 /**
  * Wispr Flow - Low-Latency Speech Recognition & Audio Wave Engine
- * Delivers instant continuous speech-to-text (<20ms perceived latency)
- * and 60 FPS Web Audio frequency visualization.
+ * Supports:
+ * 1. Native Android SpeechRecognizer bridge via window.AndroidNative (for Android APK & WebView)
+ * 2. Web Speech API (window.SpeechRecognition / window.webkitSpeechRecognition for Chrome, Edge, Safari)
+ * 3. 60 FPS Web Audio frequency visualization with graceful fallback for insecure HTTP
+ * 4. Sample test speech injection for zero-friction testing
  */
 
 class FlowSpeechEngine {
@@ -12,12 +15,16 @@ class FlowSpeechEngine {
     this.analyser = null;
     this.microphoneStream = null;
     this.dataArray = null;
+    this.simulatedVolumeInterval = null;
 
     this.rawTranscript = '';
     this.interimTranscript = '';
     this.startTime = 0;
     this.silenceTimer = null;
-    this.silenceThresholdMs = 1400; // auto-finish after 1.4s of silence
+    this.silenceThresholdMs = 1500; // auto-finish after 1.5s of silence
+
+    // Detect environment
+    this.isNative = !!(window.AndroidNative && typeof window.AndroidNative.isNativeApp === 'function' && window.AndroidNative.isNativeApp());
 
     // Callbacks
     this.onInterimCallback = null;
@@ -25,7 +32,17 @@ class FlowSpeechEngine {
     this.onStateChangeCallback = null;
     this.onAudioVolumeCallback = null;
 
-    this.initSpeechRecognition();
+    if (!this.isNative) {
+      this.initSpeechRecognition();
+    }
+  }
+
+  /**
+   * Check if speech recognition is supported in current environment
+   */
+  isSupported() {
+    if (this.isNative) return true;
+    return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
   }
 
   /**
@@ -35,7 +52,7 @@ class FlowSpeechEngine {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      console.warn('SpeechRecognition API not natively available in this browser. Fallback input available.');
+      console.warn('SpeechRecognition API not natively available in this browser. Native bridge or test mode active.');
       return false;
     }
 
@@ -77,7 +94,7 @@ class FlowSpeechEngine {
       };
 
       this.recognition.onerror = (event) => {
-        console.warn('Speech recognition event note:', event.error);
+        console.warn('Speech recognition event:', event.error);
         if (event.error === 'not-allowed') {
           if (this.onStateChangeCallback) this.onStateChangeCallback('permission-denied');
         } else if (event.error === 'no-speech') {
@@ -104,7 +121,7 @@ class FlowSpeechEngine {
   }
 
   /**
-   * Starts listening and launches Web Audio frequency analysis
+   * Starts listening (routes to Android Native bridge or Web Speech API)
    */
   async startListening() {
     if (this.isListening) return;
@@ -114,21 +131,46 @@ class FlowSpeechEngine {
     this.startTime = Date.now();
     this.isListening = true;
 
-    // 1. Initialize microphone audio stream & Web Audio analyser
-    await this.initAudioAnalyser();
+    // Check if running inside Android APK
+    this.isNative = !!(window.AndroidNative && typeof window.AndroidNative.isNativeApp === 'function' && window.AndroidNative.isNativeApp());
+
+    const lang = (window.flowStorage && window.flowStorage.getSettings().speechLanguage) || 'en-US';
+
+    // 1. Try launching Web Audio analyser for 60fps waveform (safe non-blocking)
+    try {
+      await this.initAudioAnalyser();
+    } catch (e) {
+      console.log('Audio analyser fallback:', e.message);
+      this.startSimulatedAudioVolume();
+    }
 
     // 2. Start speech recognizer
-    if (this.recognition) {
+    if (this.isNative) {
       try {
-        const lang = (window.flowStorage && window.flowStorage.getSettings().speechLanguage) || 'en-US';
-        this.recognition.lang = lang;
-        this.recognition.start();
-      } catch (e) {
-        console.log('Recognition start note:', e.message);
+        console.log('Starting native Android SpeechRecognizer...');
+        window.AndroidNative.startNativeSpeech(lang);
+        if (this.onStateChangeCallback) this.onStateChangeCallback('listening');
+      } catch (err) {
+        console.error('Failed to start Android Native speech:', err);
+        if (this.onStateChangeCallback) this.onStateChangeCallback('error');
       }
     } else {
-      this.initSpeechRecognition();
-      if (this.recognition) this.recognition.start();
+      // Browser Web Speech API
+      if (!this.recognition) {
+        this.initSpeechRecognition();
+      }
+
+      if (this.recognition) {
+        try {
+          this.recognition.lang = lang;
+          this.recognition.start();
+        } catch (e) {
+          console.log('Recognition start note:', e.message);
+        }
+      } else {
+        console.warn('Speech recognition not supported in this browser.');
+        if (this.onStateChangeCallback) this.onStateChangeCallback('unsupported');
+      }
     }
 
     if (this.onStateChangeCallback) this.onStateChangeCallback('listening');
@@ -138,19 +180,27 @@ class FlowSpeechEngine {
    * Stops listening and returns duration & transcript
    */
   stopListening() {
+    if (!this.isListening) return { speech: '', durationMs: 0 };
+
     this.isListening = false;
     this.clearSilenceTimer();
 
     const durationMs = Math.max(500, Date.now() - this.startTime);
     const finalSpeech = (this.rawTranscript + ' ' + this.interimTranscript).trim();
 
-    if (this.recognition) {
+    // Stop native Android or Web Speech
+    if (this.isNative && window.AndroidNative && typeof window.AndroidNative.stopNativeSpeech === 'function') {
+      try {
+        window.AndroidNative.stopNativeSpeech();
+      } catch (e) {}
+    } else if (this.recognition) {
       try {
         this.recognition.stop();
       } catch (e) {}
     }
 
     this.stopAudioAnalyser();
+    this.stopSimulatedAudioVolume();
     this.triggerHaptic([15, 30]);
 
     if (this.onStateChangeCallback) this.onStateChangeCallback('stopped');
@@ -162,10 +212,69 @@ class FlowSpeechEngine {
     return { speech: finalSpeech, durationMs };
   }
 
-  /**
-   * Initializes Web Audio analyser node for 60fps liquid soundwaves
-   */
+  // --- ANDROID NATIVE BRIDGE CALLBACKS (Invoked by MainActivity.java) ---
+
+  onNativeStateChange(state) {
+    console.log('Android Native State:', state);
+    if (state === 'listening') {
+      this.isListening = true;
+      this.startTime = Date.now();
+      if (this.onStateChangeCallback) this.onStateChangeCallback('listening');
+    } else if (state === 'processing') {
+      if (this.onStateChangeCallback) this.onStateChangeCallback('processing');
+    }
+  }
+
+  onNativeVolume(normalizedVolume) {
+    // Forward native volume (0.0 to 1.0) directly to audio wave visualizer
+    if (this.onAudioVolumeCallback) {
+      this.onAudioVolumeCallback(normalizedVolume, null);
+    }
+  }
+
+  onNativeResult(recognizedText, isFinal) {
+    console.log('Android Native Result:', { recognizedText, isFinal });
+    const text = (recognizedText || '').trim();
+
+    if (!isFinal) {
+      this.interimTranscript = text;
+      if (this.onInterimCallback) {
+        this.onInterimCallback(text, text);
+      }
+    } else {
+      this.isListening = false;
+      this.rawTranscript = text;
+      this.interimTranscript = '';
+      const durationMs = Math.max(600, Date.now() - this.startTime);
+
+      this.stopAudioAnalyser();
+      this.stopSimulatedAudioVolume();
+      this.triggerHaptic([20, 40]);
+
+      if (this.onStateChangeCallback) this.onStateChangeCallback('stopped');
+      if (this.onFinalCallback) {
+        this.onFinalCallback(text, durationMs);
+      }
+    }
+  }
+
+  onNativeError(error) {
+    console.warn('Android Native Speech Error:', error);
+    this.isListening = false;
+    this.stopAudioAnalyser();
+    this.stopSimulatedAudioVolume();
+    if (this.onStateChangeCallback) this.onStateChangeCallback('stopped');
+  }
+
+  // --- WEB AUDIO FREQUENCY ANALYSER (60 FPS) ---
+
   async initAudioAnalyser() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      console.log('navigator.mediaDevices not available, using simulated wave.');
+      this.startSimulatedAudioVolume();
+      return;
+    }
+
     try {
       if (!this.microphoneStream) {
         this.microphoneStream = await navigator.mediaDevices.getUserMedia({
@@ -178,7 +287,10 @@ class FlowSpeechEngine {
       }
 
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return;
+      if (!AudioCtx) {
+        this.startSimulatedAudioVolume();
+        return;
+      }
 
       this.audioContext = new AudioCtx();
       if (this.audioContext.state === 'suspended') {
@@ -196,12 +308,10 @@ class FlowSpeechEngine {
       this.pollAudioFrequency();
     } catch (err) {
       console.warn('Web Audio mic stream unavailable:', err.message);
+      this.startSimulatedAudioVolume();
     }
   }
 
-  /**
-   * Continuous loop feeding audio decibel levels to visualizer
-   */
   pollAudioFrequency() {
     if (!this.isListening || !this.analyser) return;
 
@@ -221,9 +331,34 @@ class FlowSpeechEngine {
     requestAnimationFrame(() => this.pollAudioFrequency());
   }
 
+  startSimulatedAudioVolume() {
+    this.stopSimulatedAudioVolume();
+    let tick = 0;
+    this.simulatedVolumeInterval = setInterval(() => {
+      if (!this.isListening) {
+        this.stopSimulatedAudioVolume();
+        return;
+      }
+      tick += 0.15;
+      const vol = 0.35 + Math.sin(tick) * 0.25 + Math.sin(tick * 2.3) * 0.15;
+      if (this.onAudioVolumeCallback) {
+        this.onAudioVolumeCallback(Math.max(0.1, Math.min(1, vol)), null);
+      }
+    }, 50);
+  }
+
+  stopSimulatedAudioVolume() {
+    if (this.simulatedVolumeInterval) {
+      clearInterval(this.simulatedVolumeInterval);
+      this.simulatedVolumeInterval = null;
+    }
+  }
+
   stopAudioAnalyser() {
     if (this.microphoneStream) {
-      this.microphoneStream.getTracks().forEach(t => t.stop());
+      try {
+        this.microphoneStream.getTracks().forEach(t => t.stop());
+      } catch (e) {}
       this.microphoneStream = null;
     }
     if (this.audioContext && this.audioContext.state !== 'closed') {
@@ -238,12 +373,11 @@ class FlowSpeechEngine {
   resetSilenceTimer() {
     this.clearSilenceTimer();
     const settings = window.flowStorage ? window.flowStorage.getSettings() : {};
-    const threshold = settings.silenceThresholdMs || 1400;
+    const threshold = settings.silenceThresholdMs || 1500;
 
-    // Auto-commit if user stops speaking and has accumulated speech
     this.silenceTimer = setTimeout(() => {
       if (this.isListening && (this.rawTranscript.trim() || this.interimTranscript.trim())) {
-        console.log('Wispr Flow: Silence detected, polishing speech...');
+        console.log('Wispr Flow: Silence detected, committing speech...');
         this.stopListening();
       }
     }, threshold);
@@ -257,6 +391,14 @@ class FlowSpeechEngine {
   }
 
   triggerHaptic(pattern) {
+    if (this.isNative && window.AndroidNative && typeof window.AndroidNative.triggerHaptic === 'function') {
+      try {
+        const ms = Array.isArray(pattern) ? pattern[0] : pattern;
+        window.AndroidNative.triggerHaptic(ms || 25);
+        return;
+      } catch (e) {}
+    }
+
     if (navigator.vibrate && window.flowStorage && window.flowStorage.getSettings().playHapticFeedback) {
       try {
         navigator.vibrate(pattern);
