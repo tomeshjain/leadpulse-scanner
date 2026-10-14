@@ -44,8 +44,17 @@ jobs:
 
       - name: Prepare APK Output
         run: |
-          ls -la android/app/build/outputs/apk/debug/
-          cp android/app/build/outputs/apk/debug/app-debug.apk ./LeadPulse.apk
+          echo "Finding all generated APK files:"
+          find android -name "*.apk"
+          APK_FILE=$(find android -name "*.apk" | head -n 1)
+          if [ -z "$APK_FILE" ]; then
+            echo "Error: No APK file found!"
+            find android/app/build -maxdepth 4
+            exit 1
+          fi
+          echo "Found APK at: $APK_FILE"
+          cp "$APK_FILE" ./LeadPulse.apk
+          ls -lh ./LeadPulse.apk
 
       - name: Upload APK Build Artifact
         uses: actions/upload-artifact@v4
