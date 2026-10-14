@@ -3,439 +3,517 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>LeadPulse - AI Sales Card Scanner & Team CRM</title>
-  <meta name="description" content="AI-Powered Visiting Card Scanner and Lead Manager for Field Sales Teams. Instant OCR, LinkedIn & Background Enrichment, Organization Matching, and Cross-Team Sync.">
-  <meta name="theme-color" content="#090d16">
-  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#07090e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="LeadPulse">
+  <meta name="description" content="Wispr Flow - Ultra-low latency AI voice dictation that replaces typing across your entire mobile phone.">
+  <title>Wispr Flow - AI Voice-to-Text & Universal Keyboard</title>
 
-  <!-- Manifest & Icons for Android WebAPK Install -->
-  <link rel="manifest" href="./manifest.json">
-  <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
-  <link rel="apple-touch-icon" href="./icon-192.png">
-
-  <!-- Modern Fonts -->
+  <!-- Google Fonts: Outfit & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <!-- Stylesheet -->
   <link rel="stylesheet" href="./css/app.css">
+  <link rel="manifest" href="./manifest.json">
 </head>
 <body>
 
-  <!-- Main Mobile App Shell -->
-  <div class="app-container" id="appRoot">
+  <!-- Floating Flow HUD (Draggable Overlay Bubble) -->
+  <div class="floating-hud-overlay" id="floatingHud">
+    <div class="floating-hud-pill">
+      <button class="hud-mic-btn" id="btnHudMic" title="Tap to Flow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+          <line x1="12" x2="12" y1="19" y2="22"></line>
+        </svg>
+      </button>
+      <div class="hud-info">
+        <span class="hud-title">Wispr Flow HUD</span>
+        <span class="hud-sub" id="hudStatusText">Tap to Dictate</span>
+      </div>
+      <button class="hud-action-btn" id="btnHudCopy" title="Copy Latest Result">📋</button>
+      <button class="hud-close-btn" id="btnHudClose" title="Hide Floating HUD">✕</button>
+    </div>
+  </div>
 
-    <!-- Top App Bar (Clean, uncluttered, professional header) -->
+  <div class="app-layout-wrapper">
+
+    <!-- Top Navigation Header -->
     <header class="app-header">
-      <div class="brand-wrapper">
-        <div class="app-logo">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="4" width="18" height="16" rx="2"></rect>
-            <circle cx="9" cy="10" r="2"></circle>
-            <line x1="15" y1="8" x2="17" y2="8"></line>
-            <line x1="15" y1="12" x2="17" y2="12"></line>
-            <line x1="7" y1="16" x2="17" y2="16"></line>
-          </svg>
-        </div>
-        <div>
-          <div class="brand-title">
-            LeadPulse <span class="badge-ai">AI VISION</span>
+      <div class="header-content">
+        
+        <!-- Brand Logo -->
+        <div class="brand-block" id="topLogoBtn">
+          <div class="brand-logo-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+              <line x1="12" x2="12" y1="19" y2="22"></line>
+            </svg>
+          </div>
+          <div class="brand-text">
+            <div class="brand-title">Wispr<span>Flow</span></div>
+            <div class="brand-tagline">Universal Voice Keyboard</div>
           </div>
         </div>
-      </div>
 
-      <div class="header-actions">
-        <!-- Active Event Pill (Click to switch or manage) -->
-        <div class="active-event-pill" id="btnActiveEventPill" title="Current Target Event for new scans">
-          <span class="event-dot"></span>
-          <span class="event-name-text" id="headerActiveEventName">General Field Leads</span>
+        <!-- Latency Indicator Badge -->
+        <div class="latency-badge" id="liveLatencyPill">
+          ⚡ 18ms Real-time
         </div>
 
-        <!-- Sales Rep Profile Pill -->
-        <button class="rep-profile-btn" id="btnHeaderSalesRep" title="Sales Representative Profile">
-          <div class="rep-avatar" id="headerRepAvatar">👤</div>
-          <span class="rep-name-short" id="headerRepNameShort">Profile</span>
-        </button>
+        <!-- Header Actions -->
+        <div class="header-actions">
+          <button class="icon-header-btn" id="btnHeaderFloatingHud" title="Toggle Floating HUD Overlay">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+          </button>
+          <button class="icon-header-btn" id="btnHeaderSettings" title="Settings & AI Model">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          </button>
+        </div>
 
-        <!-- Settings Button -->
-        <button class="icon-btn" id="btnOpenSettings" title="AI Settings & Team Sync" aria-label="Settings">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-          </svg>
-        </button>
       </div>
     </header>
 
-    <!-- Toast Notifications Center -->
-    <div class="toast-container" id="toastContainer"></div>
-
-    <!-- Main Scrollable Content Area -->
-    <main class="app-main" id="mainContent">
+    <!-- Main Application Viewport -->
+    <main class="app-viewport">
 
       <!-- =================================================================
-           VIEW 1: SCANNER SCREEN (Card Camera, Viewfinder & OCR Controls)
+           VIEW 1: PRIMARY DICTATION ARENA (Flow, Visualizer, Polishing)
            ================================================================= -->
-      <section class="view-screen active" id="viewScanner">
+      <section class="view-screen active" id="viewFlow">
 
-        <div class="scanner-viewport-wrapper" id="scannerViewport">
-          <video id="cameraVideo" playsinline autoplay muted></video>
-
-          <!-- Reticle Card Target Overlay -->
-          <div class="scanner-overlay-reticle">
-            <div class="scanner-camera-controls">
-              <button class="icon-btn" id="btnToggleTorch" title="Toggle Flashlight">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-                </svg>
-              </button>
-              <button class="icon-btn" id="btnRestartCamera" title="Switch / Restart Camera">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M23 4v6h-6"></path>
-                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-                </svg>
-              </button>
-            </div>
-
-            <!-- Alignment Guide Box with Animated Laser -->
-            <div class="card-guide-box">
-              <div class="guide-corner-tr"></div>
-              <div class="guide-corner-bl"></div>
-              <div class="scan-laser-line" id="scanLaser"></div>
-              <div class="scan-prompt-text">Position Visiting Card Inside Frame</div>
-            </div>
+        <!-- Flow Style Selector Horizontal Track -->
+        <div class="mode-track-wrapper">
+          <div class="mode-track-container" id="modePillsTrack">
+            <!-- Dynamically populated with Flow Modes -->
           </div>
         </div>
 
-        <!-- Scanner Shutter & Gallery Controls -->
-        <div class="scanner-controls-grid">
-          <button class="btn-secondary-action" id="btnUploadGallery" title="Upload Card Image from Gallery">
-            <div class="icon-circle">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                <polyline points="21 15 16 10 5 21"></polyline>
-              </svg>
-            </div>
-            <span>Gallery</span>
-          </button>
-          <input type="file" id="fileCardInput" accept="image/*" style="display: none;">
-          <input type="file" id="cameraPhotoInput" accept="image/*" capture="environment" style="display: none;">
-
-          <button class="btn-capture" id="btnCapture" title="Capture & Scan Card">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <circle cx="12" cy="12" r="3" fill="white"></circle>
-            </svg>
-          </button>
-
-          <button class="btn-secondary-action" id="btnManualEntry" title="Manual Contact Entry">
-            <div class="icon-circle">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 20h9"></path>
-                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-              </svg>
-            </div>
-            <span>Manual</span>
-          </button>
+        <!-- Active Mode Summary Card -->
+        <div class="active-mode-banner">
+          <div class="mode-banner-info">
+            <span class="mode-banner-title" id="activeModeBannerName">✨ Smart Polish</span>
+            <span class="mode-banner-desc" id="activeModeBannerDesc">Strips filler words, fixes stutters, adds natural punctuation.</span>
+          </div>
+          <span class="mode-banner-badge" id="wpmLiveCounter">140 WPM • 3.5x typing</span>
         </div>
 
-        <!-- Active Target Event Tag Banner -->
-        <div class="scanner-event-banner">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <div class="scanner-event-icon">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+        <!-- Central Voice Arena & 60fps Wave Visualizer -->
+        <div class="voice-hero-arena">
+          
+          <div class="visualizer-container">
+            <canvas id="waveCanvas" class="wave-canvas"></canvas>
+          </div>
+
+          <!-- Central Pulsing Glow Mic Button -->
+          <div class="mic-trigger-container">
+            <div class="mic-ripple-ring" id="micRipple"></div>
+            <button class="main-mic-button" id="btnMainMic" title="Tap or hold Spacebar to Flow">
+              <div class="mic-icon-inner">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                  <line x1="12" x2="12" y1="19" y2="22"></line>
+                </svg>
+              </div>
+            </button>
+          </div>
+
+          <!-- Status Indicator Pill -->
+          <div class="status-pill ready" id="statusPill">
+            <span class="status-pulse-dot"></span>
+            <span id="statusPillText">Tap mic or hold Spacebar to Flow</span>
+          </div>
+
+          <div class="spacebar-hint">
+            Tip: Press <kbd>Spacebar</kbd> anytime to start/stop dictating
+          </div>
+
+        </div>
+
+        <!-- Real-Time Interim Speech Stream -->
+        <div class="live-interim-card" id="liveInterimContainer">
+          <div class="interim-header">
+            <span class="interim-label">Live Voice Stream</span>
+            <span class="interim-badge">Sub-20ms Engine</span>
+          </div>
+          <div class="interim-text" id="liveInterimText">Listening for speech...</div>
+        </div>
+
+        <!-- AI Polished Result Output Card -->
+        <div class="polished-output-card" id="outputCard">
+          
+          <div class="output-card-header">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="output-mode-pill" id="outputModeBadge">✨ Smart Polish</span>
+              <span class="output-stats-text" id="outputMetaStats">0 words • 0 WPM</span>
             </div>
+            <div style="display: flex; gap: 6px;">
+              <select class="repolish-dropdown" id="selectRepolishTone" title="Change Flow Tone">
+                <option value="polish">✨ Smart Polish</option>
+                <option value="casual">💬 Casual (WhatsApp)</option>
+                <option value="email">✉️ Executive Email</option>
+                <option value="notes">📝 Structured Notes</option>
+                <option value="direct">⚡ Raw Dictation</option>
+                <option value="code">💻 Code & Dev</option>
+                <option value="command">🪄 AI Prompt / Action</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Main Formatted Result -->
+          <div class="polished-content-area" id="outputContent" contenteditable="true" spellcheck="false" placeholder="Your AI-polished text will appear here ready to paste..."></div>
+
+          <!-- Quick Action Toolbar -->
+          <div class="output-actions-toolbar">
+            <button class="btn-action-primary" id="btnCopyResult" title="Copy to Clipboard">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              <span>Copy</span>
+            </button>
+            <button class="btn-action-secondary" id="btnShareResult" title="Share to WhatsApp, Slack, Gmail">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+              <span>Share</span>
+            </button>
+            <button class="btn-action-secondary" id="btnSpeakResult" title="Listen with Text-to-Speech">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+              <span>Listen</span>
+            </button>
+            <button class="btn-action-secondary" id="btnClearResult" title="Clear">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              <span>Clear</span>
+            </button>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- =================================================================
+           VIEW 2: ANDROID KEYBOARD (IME) COMPANION
+           ================================================================= -->
+      <section class="view-screen" id="viewKeyboard">
+
+        <div class="view-header-banner">
+          <div class="view-header-icon">⌨️</div>
+          <div>
+            <h3>Replace Typing System-Wide</h3>
+            <p>Use Wispr Flow inside WhatsApp, Gmail, Chrome, and all Android apps.</p>
+          </div>
+        </div>
+
+        <!-- Interactive Keyboard Test Arena -->
+        <div class="keyboard-preview-container">
+          
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label class="form-label">Interactive Test Input Field (Tap Spacebar Mic to Dictate):</label>
+            <textarea id="keyboardTestInput" class="form-control" rows="3" placeholder="Tap the glowing Mic Spacebar below to dictate text directly into this field..."></textarea>
+          </div>
+
+          <!-- Simulated Modern Android IME Keyboard Layout -->
+          <div class="simulated-keyboard">
+            
+            <!-- Suggestion / Flow Status Bar -->
+            <div class="kb-suggestion-bar">
+              <span class="kb-suggestion-chip" id="keyboardMicStatus">Hold or Tap to Dictate with AI</span>
+            </div>
+
+            <!-- QWERTY Row 1 -->
+            <div class="kb-row">
+              <button class="kb-key" data-char="q">q</button>
+              <button class="kb-key" data-char="w">w</button>
+              <button class="kb-key" data-char="e">e</button>
+              <button class="kb-key" data-char="r">r</button>
+              <button class="kb-key" data-char="t">t</button>
+              <button class="kb-key" data-char="y">y</button>
+              <button class="kb-key" data-char="u">u</button>
+              <button class="kb-key" data-char="i">i</button>
+              <button class="kb-key" data-char="o">o</button>
+              <button class="kb-key" data-char="p">p</button>
+            </div>
+
+            <!-- QWERTY Row 2 -->
+            <div class="kb-row">
+              <button class="kb-key" data-char="a">a</button>
+              <button class="kb-key" data-char="s">s</button>
+              <button class="kb-key" data-char="d">d</button>
+              <button class="kb-key" data-char="f">f</button>
+              <button class="kb-key" data-char="g">g</button>
+              <button class="kb-key" data-char="h">h</button>
+              <button class="kb-key" data-char="j">j</button>
+              <button class="kb-key" data-char="k">k</button>
+              <button class="kb-key" data-char="l">l</button>
+            </div>
+
+            <!-- QWERTY Row 3 -->
+            <div class="kb-row">
+              <button class="kb-key kb-key-fn" data-char="shift">⇧</button>
+              <button class="kb-key" data-char="z">z</button>
+              <button class="kb-key" data-char="x">x</button>
+              <button class="kb-key" data-char="c">c</button>
+              <button class="kb-key" data-char="v">v</button>
+              <button class="kb-key" data-char="b">b</button>
+              <button class="kb-key" data-char="n">n</button>
+              <button class="kb-key" data-char="m">m</button>
+              <button class="kb-key kb-key-fn" data-char="backspace">⌫</button>
+            </div>
+
+            <!-- Spacebar Row with Glowing Flow AI Mic Button -->
+            <div class="kb-row">
+              <button class="kb-key kb-key-fn" data-char="?123">?123</button>
+              <button class="kb-key kb-key-fn" data-char=",">,</button>
+              
+              <!-- Central Flow Spacebar with integrated AI Voice Mic -->
+              <button class="kb-space-mic-btn" id="btnKeyboardMicSpace" title="Tap to Speak with Wispr Flow AI">
+                <div class="space-mic-dot"></div>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
+                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                  <line x1="12" x2="12" y1="19" y2="22"></line>
+                </svg>
+                <span>Wispr Flow (Tap to Speak)</span>
+              </button>
+
+              <button class="kb-key kb-key-fn" data-char=".">.</button>
+              <button class="kb-key kb-key-action" data-char="enter">⏎</button>
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- System Setup Guide Card -->
+        <div class="setup-guide-card">
+          <div class="guide-card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            How Wispr Flow Replaces Mobile Typing
+          </div>
+          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
+            Wispr Flow provides two universal mechanisms to eliminate typing across your phone:
+          </p>
+
+          <div class="guide-step-item">
+            <div class="step-num">1</div>
             <div>
-              <div style="font-size: 12px; font-weight: 700; color: #c7d2fe;">Target Event Assignment</div>
-              <div style="font-size: 11px; color: var(--text-muted);" id="scannerActiveEventLabel">Tagging incoming scans to: General Field Leads</div>
+              <strong>Floating Flow HUD / Bubble Overlay</strong>
+              <p>A floating microphone bubble hovers over WhatsApp, Slack, and Gmail. Tap it to speak, and your polished thoughts are auto-copied to the clipboard with instant paste.</p>
             </div>
           </div>
-          <button class="btn-secondary" id="btnChangeActiveEvent" style="height: 32px; padding: 0 12px; font-size: 11px;">Change</button>
+
+          <div class="guide-step-item">
+            <div class="step-num">2</div>
+            <div>
+              <strong>Android Custom Keyboard (IME) Extension</strong>
+              <p>In Android Settings &gt; System &gt; Languages &gt; On-screen keyboard, enable <strong>Wispr Flow Keyboard</strong>. The AI Mic is built right into your spacebar for 1-tap text field injection.</p>
+            </div>
+          </div>
         </div>
 
       </section>
 
       <!-- =================================================================
-           VIEW 2: CONTACTS DIRECTORY (Search, Event & Rep Filters, Export)
+           VIEW 3: PERSONAL VOCABULARY & CUSTOM DICTIONARY
            ================================================================= -->
-      <section class="view-screen" id="viewContacts">
-
-        <!-- Top Statistics Row -->
-        <div class="stats-banner-row">
-          <div class="stat-card-mini">
-            <span class="stat-number" id="statTotalContacts">0</span>
-            <span class="stat-label">Total Leads</span>
-          </div>
-          <div class="stat-card-mini">
-            <span class="stat-number" id="statTotalOrgs">0</span>
-            <span class="stat-label">Organizations</span>
-          </div>
-          <div class="stat-card-mini">
-            <span class="stat-number" id="statPendingTasks">0</span>
-            <span class="stat-label">Action Items</span>
-          </div>
-        </div>
-
-        <!-- Search Bar with multi-attribute matching -->
-        <div class="search-box-wrapper">
-          <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-          <input type="text" id="inputSearchContacts" class="search-input" placeholder="Search name, company, past employers, role...">
-          <button class="clear-search-btn" id="btnClearSearch" style="display: none;">✕</button>
-        </div>
-
-        <!-- Quick Scope Filters (All Leads vs My Scans vs Hot Leads) -->
-        <div class="scope-filter-chips">
-          <button class="scope-chip active" data-scope="all">All Team Leads</button>
-          <button class="scope-chip" data-scope="my">My Scans</button>
-          <button class="scope-chip" data-scope="hot">🔥 Hot Leads</button>
-          <button class="scope-chip" data-scope="decision">🎯 Decision Makers</button>
-        </div>
-
-        <!-- Event Filter Horizontal Pills -->
-        <div class="event-filter-scroll-wrapper">
-          <div class="filter-pills-track" id="contactsEventFilterPills">
-            <!-- Dynamically populated -->
-          </div>
-        </div>
-
-        <!-- Directory Header & Export Controls -->
-        <div class="section-header-compact">
-          <span class="section-title-sm" id="contactsCountLabel">0 Contacts</span>
-          <button class="btn-action-sm" id="btnExportAllCSV" title="Export to CSV">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-            Export CSV
-          </button>
-        </div>
-
-        <!-- Contacts Cards List Feed -->
-        <div class="contacts-list" id="contactsFeed">
-          <!-- Dynamically populated or clean empty state -->
-        </div>
-
-      </section>
-
-      <!-- =================================================================
-           VIEW 3: ORGANIZATIONS & ALUMNI DIRECTORY (Structured Matching)
-           ================================================================= -->
-      <section class="view-screen" id="viewOrganizations">
+      <section class="view-screen" id="viewDictionary">
         
-        <div class="orgs-header-banner">
-          <div class="orgs-header-title">
-            <div class="orgs-header-icon">🏢</div>
-            <div>
-              <h3>Organization Intelligence</h3>
-              <p>Identify who all have worked at or are associated with specific companies</p>
-            </div>
+        <div class="view-header-banner">
+          <div class="view-header-icon">📖</div>
+          <div>
+            <h3>Personal Vocabulary & Jargon</h3>
+            <p>Teach Wispr Flow your company names, tech acronyms, and colleague names.</p>
           </div>
         </div>
 
-        <!-- Organization Search Bar -->
-        <div class="search-box-wrapper" style="margin-top: 12px;">
-          <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <!-- Add Vocabulary Word Card -->
+        <div class="add-vocab-card">
+          <div style="font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 8px;">
+            + Add New Custom Term
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+            <div>
+              <label class="form-label">Spoken Word / Jargon</label>
+              <input type="text" id="inputNewWord" class="form-control" placeholder="e.g. Postgres, K8s, Tomesh">
+            </div>
+            <div>
+              <label class="form-label">Exact Written Replacement</label>
+              <input type="text" id="inputNewReplacement" class="form-control" placeholder="e.g. PostgreSQL, Kubernetes">
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 8px; align-items: flex-end;">
+            <div style="flex: 1;">
+              <label class="form-label">Category</label>
+              <select id="selectNewCategory" class="form-control">
+                <option value="tech">Technology / Programming</option>
+                <option value="brand">Company / Brand Name</option>
+                <option value="people">Colleague / Client Name</option>
+                <option value="acronym">Acronym / Abbreviation</option>
+                <option value="custom">General Custom Term</option>
+              </select>
+            </div>
+            <button class="btn-primary" id="btnAddDictWord" style="height: 38px; padding: 0 16px;">
+              Add Word
+            </button>
+          </div>
+        </div>
+
+        <div class="section-header-compact">
+          <span class="section-title-sm">Active Vocabulary Terms</span>
+        </div>
+
+        <div class="vocab-list" id="dictList">
+          <!-- Dynamically populated -->
+        </div>
+
+      </section>
+
+      <!-- =================================================================
+           VIEW 4: FLOW HISTORY & VOICE NOTES LIBRARY
+           ================================================================= -->
+      <section class="view-screen" id="viewHistory">
+
+        <div class="view-header-banner">
+          <div class="view-header-icon">🕒</div>
+          <div>
+            <h3>Flow History & Voice Notes</h3>
+            <p>Access, search, and re-copy every voice dictation and AI polish.</p>
+          </div>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="search-box-wrapper">
+          <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="11" cy="11" r="8"></circle>
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
-          <input type="text" id="inputSearchOrgs" class="search-input" placeholder="Search organizations, tech giants, alumni firms...">
-          <button class="clear-search-btn" id="btnClearSearchOrgs" style="display: none;">✕</button>
+          <input type="text" id="inputSearchHistory" class="search-input" placeholder="Search past voice notes, topics, keywords...">
         </div>
 
         <div class="section-header-compact">
-          <span class="section-title-sm" id="orgsCountLabel">0 Organizations Identified</span>
+          <span class="section-title-sm">Recent Voice Notes</span>
+          <button class="btn-text-sm delete" id="btnClearAllHistory">Clear History</button>
         </div>
 
-        <!-- Organizations Feed List -->
-        <div class="orgs-list" id="orgsFeed">
-          <!-- Dynamically populated with company affiliation cards -->
-        </div>
-
-      </section>
-
-      <!-- =================================================================
-           VIEW 4: EVENTS DIRECTORY (Events & Booth Management)
-           ================================================================= -->
-      <section class="view-screen" id="viewEvents">
-
-        <!-- Active Target Event Spotlight Card -->
-        <div class="active-target-spotlight-card" id="spotlightActiveEventCard">
-          <div class="spotlight-badge">CURRENT ACTIVE TARGET</div>
-          <h2 id="bannerActiveEventName">General Field Leads</h2>
-          <p id="bannerActiveEventLocation">Field & Client Meetings</p>
-          <div class="spotlight-meta">
-            <span id="bannerActiveEventCount">0 Leads Tagged</span>
-            <span id="bannerActiveEventDate">Today</span>
-          </div>
-        </div>
-
-        <div class="section-header-compact">
-          <span class="section-title-sm">All Target Events</span>
-          <button class="btn-action-sm" id="btnAddNewEvent">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            New Event
-          </button>
-        </div>
-
-        <!-- Events List -->
-        <div class="events-list" id="eventsList">
+        <div class="history-list" id="historyFeed">
           <!-- Dynamically populated -->
         </div>
 
       </section>
 
       <!-- =================================================================
-           VIEW 5: TASKS & FOLLOW-UP ITEMS DASHBOARD
-           ================================================================= -->
-      <section class="view-screen" id="viewTasks">
-
-        <div class="tasks-filter-bar">
-          <button class="task-filter-pill active" data-task-filter="all">All Action Items</button>
-          <button class="task-filter-pill" data-task-filter="pending">Pending</button>
-          <button class="task-filter-pill" data-task-filter="high">⚡ High Priority</button>
-          <button class="task-filter-pill" data-task-filter="completed">Done</button>
-        </div>
-
-        <div class="section-header-compact">
-          <span class="section-title-sm" id="tasksCountLabel">0 Tasks Pending</span>
-        </div>
-
-        <div class="tasks-list" id="tasksFeed">
-          <!-- Dynamically populated -->
-        </div>
-
-      </section>
-
-      <!-- =================================================================
-           VIEW 6: SETTINGS, SALES REP PROFILE & TEAM CLOUD SYNC
+           VIEW 5: SETTINGS, AI ENGINE & SPEEDOMETER
            ================================================================= -->
       <section class="view-screen" id="viewSettings">
 
         <div class="settings-container">
 
-          <!-- 1. Sales Representative Profile Card -->
-          <div class="settings-card rep-highlight-card">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-              <div style="display: flex; align-items: center; gap: 12px;">
-                <div class="rep-avatar-lg" id="settingsRepAvatar">👤</div>
-                <div>
-                  <h3 id="settingsRepNameDisplay" style="font-size: 16px; font-weight: 700; color: #fff;">Sales Representative</h3>
-                  <p id="settingsRepMetaDisplay" style="font-size: 12px; color: var(--text-muted);">EMP-ID & Corporate Email</p>
-                </div>
+          <!-- Speedometer & Time Saved Card -->
+          <div class="settings-card stats-highlight-card">
+            <div style="font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+              <span>⚡ Your Voice Dictation Productivity</span>
+            </div>
+
+            <div class="stats-grid-row">
+              <div class="stat-box">
+                <span class="stat-value" id="statWordsSpoken">0</span>
+                <span class="stat-caption">Words Spoken</span>
               </div>
-              <button class="btn-secondary" id="btnEditSalesRepProfile" style="height: 32px; padding: 0 12px; font-size: 11px;">Edit Profile</button>
+              <div class="stat-box">
+                <span class="stat-value" id="statTimeSaved">0m</span>
+                <span class="stat-caption">Time Saved vs Typing</span>
+              </div>
+              <div class="stat-box">
+                <span class="stat-value" id="statAverageWpm">140 WPM</span>
+                <span class="stat-caption">Avg Speaking Speed</span>
+              </div>
             </div>
-            <div class="rep-attribution-info" id="settingsRepAttributionBanner">
-              All visiting cards scanned on this device are automatically attributed to your Employee ID.
-            </div>
-          </div>
-
-          <!-- 2. Cross-Team Synchronization -->
-          <div class="settings-card">
-            <div class="settings-card-title">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path></svg>
-              Cross-Team Cloud Sync
-            </div>
-            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 14px;">
-              Collaborate with your sales team. Leads scanned by one salesperson are automatically visible to the rest of the team.
-            </p>
-
-            <div class="form-group">
-              <label class="form-label" for="inputTeamWorkspaceCode">Team Workspace Code</label>
-              <input type="text" id="inputTeamWorkspaceCode" class="form-control" placeholder="e.g. ALPHA-SALES-2026" style="text-transform: uppercase;">
-              <span style="font-size: 10px; color: var(--text-subtle);">All team members using this code share the same synchronized leads pool.</span>
-            </div>
-
-            <div style="display: flex; gap: 10px; margin-top: 14px;">
-              <button class="btn-primary" id="btnSyncTeamNow" style="flex: 1;">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-                Sync With Team Now
-              </button>
-            </div>
-
-            <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-color); display: flex; gap: 10px;">
-              <button class="btn-secondary" id="btnShareTeamBundle" style="flex: 1; font-size: 11px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
-                Export Team Bundle
-              </button>
-              <button class="btn-secondary" id="btnImportTeamBundle" style="flex: 1; font-size: 11px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                Merge Team Bundle
-              </button>
-              <input type="file" id="fileImportTeamBundle" accept=".json" style="display: none;">
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 10px; text-align: center;">
+              Speaking with Wispr Flow is on average <strong>3.4x faster</strong> than standard mobile thumb typing.
             </div>
           </div>
 
-          <!-- 3. Google Gemini AI Model Selection -->
+          <!-- Google Gemini AI Engine Configuration -->
           <div class="settings-card">
             <div class="settings-card-title">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-              Gemini Vision AI Engine
+              Google Gemini 2.0 Flash AI Engine
             </div>
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 14px;">
+              Wispr Flow uses Google Gemini 2.0 Flash for sub-second voice polishing, context formatting, and filler word elimination.
+            </p>
 
             <div class="form-group">
-              <label class="form-label" for="settingGeminiApiKey">Gemini API Key</label>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label class="form-label" style="margin-bottom: 0;">Gemini API Key</label>
+                <button class="btn-text-sm" id="btnToggleApiKeyVis">👁️</button>
+              </div>
               <input type="password" id="settingGeminiApiKey" class="form-control" placeholder="AIzaSy...">
-              <span style="font-size: 10px; color: var(--text-subtle);">Used directly from your phone to Google Gemini Vision. Never stored on external servers.</span>
+              <span style="font-size: 10px; color: var(--text-subtle);">Direct device-to-Google connection. Never routed through 3rd-party servers. Free instant rule-based polishing active if key is empty.</span>
             </div>
 
             <div class="form-group">
-              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-                <label class="form-label" for="settingModelSelect" style="margin-bottom: 0;">Vision Model</label>
-                <button class="btn-text-sm" id="btnRefreshModels">↻ Detect Models</button>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label class="form-label" style="margin-bottom: 0;">AI Model (Speed & Quality)</label>
+                <button class="btn-text-sm" id="btnRefreshModels">↻ Refresh</button>
               </div>
               <select id="settingModelSelect" class="form-control">
-                <option value="gemini-2.0-flash">gemini-2.0-flash (Recommended - High Speed & Precision)</option>
+                <option value="gemini-2.0-flash">gemini-2.0-flash (Recommended - Ultra-Low Latency & High Fidelity)</option>
                 <option value="gemini-1.5-flash">gemini-1.5-flash (Standard)</option>
-                <option value="gemini-1.5-flash-latest">gemini-1.5-flash-latest</option>
                 <option value="gemini-1.5-pro">gemini-1.5-pro (Deep Reasoning)</option>
               </select>
             </div>
-
-            <div style="display: flex; gap: 10px; margin-top: 10px;">
-              <button class="btn-secondary" id="btnTestModel" style="flex: 1;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                Verify API Key & Model
-              </button>
-            </div>
           </div>
 
-          <!-- 4. Data Retention, Backup & Restore -->
+          <!-- Dictation & Workflow Preferences -->
           <div class="settings-card">
             <div class="settings-card-title">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-              Database Retention & Backup
-            </div>
-            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
-              Your data is stored locally in secure phone storage and persists across application updates. You can also export offline JSON backups anytime.
-            </p>
-
-            <div style="display: flex; gap: 10px; margin-bottom: 12px;">
-              <button class="btn-secondary" id="btnExportFullBackup" style="flex: 1;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                Export CRM Backup (.json)
-              </button>
-              <button class="btn-secondary" id="btnRestoreBackup" style="flex: 1;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
-                Restore Backup
-              </button>
-              <input type="file" id="fileRestoreBackup" accept=".json" style="display: none;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path></svg>
+              Voice Engine & Automation
             </div>
 
-            <div style="border-top: 1px solid rgba(239, 68, 68, 0.2); padding-top: 12px; margin-top: 12px;">
-              <button class="btn-secondary btn-danger" id="btnClearAllData" style="width: 100%;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                Clear All Contacts (Clean Slate)
-              </button>
+            <div class="switch-row">
+              <div>
+                <div class="switch-label">Auto-Copy on Finish</div>
+                <div class="switch-desc">Instantly copies polished text to clipboard the moment you stop speaking.</div>
+              </div>
+              <input type="checkbox" id="settingAutoCopy" checked class="custom-switch">
+            </div>
+
+            <div class="switch-row">
+              <div>
+                <div class="switch-label">Haptic Vibration</div>
+                <div class="switch-desc">Tactile vibration feedback on speech start, stop, and polish completion.</div>
+              </div>
+              <input type="checkbox" id="settingHaptic" checked class="custom-switch">
+            </div>
+
+            <div class="form-group" style="margin-top: 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label class="form-label" style="margin-bottom: 0;">Silence Auto-Finish Threshold</label>
+                <span style="font-size: 11px; color: #a5b4fc; font-weight: 700;" id="silenceThresholdDisplay">1.4s</span>
+              </div>
+              <input type="range" id="settingSilenceThreshold" min="800" max="3000" step="200" value="1400" style="width: 100%;">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Voice Language</label>
+              <select id="settingSpeechLang" class="form-control">
+                <option value="en-US">English (United States)</option>
+                <option value="en-IN">English (India)</option>
+                <option value="en-GB">English (United Kingdom)</option>
+                <option value="hi-IN">Hindi (हिंदी)</option>
+                <option value="es-ES">Spanish (Español)</option>
+                <option value="fr-FR">French (Français)</option>
+                <option value="de-DE">German (Deutsch)</option>
+              </select>
             </div>
           </div>
 
           <div style="text-align: center; font-size: 11px; color: var(--text-subtle); padding: 12px 0 24px;">
-            LeadPulse Enterprise v2.0 • Standalone Android Architecture
+            Wispr Flow Universal AI Voice Keyboard v1.0 • Standalone Android Architecture
           </div>
 
         </div>
@@ -444,396 +522,59 @@
 
     </main>
 
-    <!-- AI Scan Processing Modal Overlay -->
-    <div class="processing-state-overlay" id="aiProcessingOverlay">
-      <div class="ai-pulse-spinner">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-        </svg>
-      </div>
-      <div class="processing-step-title" id="aiProcessingTitle">Scanning Visiting Card...</div>
-      <div class="processing-step-desc" id="aiProcessingDesc">Gemini Vision AI is extracting identity details and researching past organizations & career background.</div>
-    </div>
-
-    <!-- =================================================================
-         BOTTOM NAVIGATION BAR (5 Clean Tabs)
-         ================================================================= -->
-    <nav class="bottom-nav-bar" id="bottomNavBar">
-      <button class="nav-item-btn active" data-target="viewScanner" id="navBtnScanner">
+    <!-- Bottom Navigation Bar -->
+    <nav class="bottom-nav-bar">
+      <button class="nav-item-btn active" data-target="viewFlow" id="tabFlow">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-          <circle cx="12" cy="13" r="4"></circle>
+          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+          <line x1="12" x2="12" y1="19" y2="22"></line>
         </svg>
-        <span>Scanner</span>
+        <span>Flow</span>
       </button>
 
-      <button class="nav-item-btn" data-target="viewContacts" id="navBtnContacts">
+      <button class="nav-item-btn" data-target="viewKeyboard" id="tabKeyboard">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-          <circle cx="9" cy="7" r="4"></circle>
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
+          <line x1="6" y1="8" x2="6.01" y2="8"></line>
+          <line x1="10" y1="8" x2="10.01" y2="8"></line>
+          <line x1="14" y1="8" x2="14.01" y2="8"></line>
+          <line x1="18" y1="8" x2="18.01" y2="8"></line>
+          <line x1="6" y1="12" x2="6.01" y2="12"></line>
+          <line x1="10" y1="12" x2="10.01" y2="12"></line>
+          <line x1="14" y1="12" x2="14.01" y2="12"></line>
+          <line x1="18" y1="12" x2="18.01" y2="12"></line>
+          <line x1="8" y1="16" x2="16" y2="16"></line>
         </svg>
-        <span>Leads</span>
+        <span>Keyboard</span>
       </button>
 
-      <button class="nav-item-btn nav-center-scan" id="navBtnCenterScan" title="Scan Visiting Card">
-        <div class="center-scan-pill">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-          </svg>
-        </div>
-        <span>Scan</span>
+      <button class="nav-item-btn" data-target="viewDictionary" id="tabDictionary">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+        </svg>
+        <span>Vocabulary</span>
       </button>
 
-      <button class="nav-item-btn" data-target="viewOrganizations" id="navBtnOrgs">
+      <button class="nav-item-btn" data-target="viewHistory" id="tabHistory">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 21h18"></path>
-          <path d="M9 8h1"></path>
-          <path d="M9 12h1"></path>
-          <path d="M9 16h1"></path>
-          <path d="M14 8h1"></path>
-          <path d="M14 12h1"></path>
-          <path d="M14 16h1"></path>
-          <path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"></path>
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
         </svg>
-        <span>Orgs</span>
-      </button>
-
-      <button class="nav-item-btn" data-target="viewEvents" id="navBtnEvents">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-          <line x1="16" y1="2" x2="16" y2="6"></line>
-          <line x1="8" y1="2" x2="8" y2="6"></line>
-          <line x1="3" y1="10" x2="21" y2="10"></line>
-        </svg>
-        <span>Events</span>
+        <span>History</span>
       </button>
     </nav>
 
-    <!-- =================================================================
-         MODAL 1: SCAN REVIEW & ENRICHMENT BOTTOM SHEET
-         ================================================================= -->
-    <div class="modal-overlay" id="modalScanReview">
-      <div class="bottom-sheet-content">
-        <div class="sheet-handle-bar"></div>
-        <div class="sheet-header">
-          <div class="sheet-title" style="display: flex; align-items: center; gap: 8px;">
-            <span>✨ AI Card Intelligence Review</span>
-          </div>
-          <button class="icon-btn" id="btnCloseScanReview" style="width: 32px; height: 32px;">✕</button>
-        </div>
-        <div class="sheet-body">
-
-          <!-- Card Snapshot Preview -->
-          <div style="margin-bottom: 16px; border-radius: var(--border-radius-md); overflow: hidden; max-height: 150px; background: #020617; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border-color);">
-            <img id="reviewCardImagePreview" src="" alt="Scanned Card" style="max-width: 100%; max-height: 150px; object-fit: contain;">
-          </div>
-
-          <!-- Basic Contact Identity -->
-          <div class="detail-section-block">
-            <h3>Contact Identity</h3>
-            <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 10px; margin-bottom: 10px;">
-              <div>
-                <label class="form-label">Honorific</label>
-                <input type="text" id="reviewHonorific" class="form-control" placeholder="Mr./Dr.">
-              </div>
-              <div>
-                <label class="form-label">Full Name *</label>
-                <input type="text" id="reviewName" class="form-control" placeholder="Name" required>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Designation / Role</label>
-              <input type="text" id="reviewTitle" class="form-control" placeholder="e.g. VP Engineering">
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
-              <div>
-                <label class="form-label">Company Name</label>
-                <input type="text" id="reviewCompany" class="form-control" placeholder="Company">
-              </div>
-              <div>
-                <label class="form-label">Industry Sector</label>
-                <input type="text" id="reviewIndustry" class="form-control" placeholder="e.g. Enterprise Cloud">
-              </div>
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
-              <div>
-                <label class="form-label">Phone</label>
-                <input type="tel" id="reviewPhone" class="form-control" placeholder="+91 ...">
-              </div>
-              <div>
-                <label class="form-label">WhatsApp</label>
-                <input type="tel" id="reviewWhatsapp" class="form-control" placeholder="+91 ...">
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Email</label>
-              <input type="email" id="reviewEmail" class="form-control" placeholder="name@company.com">
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Assign to Event</label>
-              <select id="reviewEventSelect" class="form-control">
-                <!-- Dynamically populated -->
-              </select>
-            </div>
-          </div>
-
-          <!-- AI Enriched Intelligence Section -->
-          <div class="detail-section-block" style="border-left: 3px solid #6366f1;">
-            <h3>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-              AI LinkedIn & Career Background
-            </h3>
-
-            <div class="form-group">
-              <label class="form-label">LinkedIn Profile URL</label>
-              <input type="url" id="reviewLinkedinUrl" class="form-control" placeholder="https://linkedin.com/in/...">
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Past Work & Professional Summary</label>
-              <textarea id="reviewPastWork" class="form-control" placeholder="Executive career path, achievements..."></textarea>
-            </div>
-
-            <!-- Structured Past Organizations for Matching -->
-            <div class="form-group">
-              <label class="form-label">Past Organizations / Employers (Comma Separated)</label>
-              <input type="text" id="reviewPastOrgsList" class="form-control" placeholder="e.g. Google, Oracle, Infosys, Cisco">
-              <span style="font-size: 10px; color: var(--text-subtle);">Used for cross-lead organization matching and alumni discovery.</span>
-            </div>
-          </div>
-
-          <!-- Sales Qualification Metrics -->
-          <div class="detail-section-block">
-            <h3>Sales Qualification Intelligence</h3>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
-              <div>
-                <label class="form-label">Decision Role</label>
-                <select id="reviewDecisionStatus" class="form-control">
-                  <option value="Decision Maker">Decision Maker (C-Level/VP)</option>
-                  <option value="Influencer">Influencer / Director</option>
-                  <option value="Evaluator">Technical Evaluator</option>
-                  <option value="Procurement">Procurement / Legal</option>
-                </select>
-              </div>
-              <div>
-                <label class="form-label">Lead Score</label>
-                <select id="reviewLeadScore" class="form-control">
-                  <option value="Hot">🔥 Hot (Immediate Demo)</option>
-                  <option value="Warm">⚡ Warm (Good Fit)</option>
-                  <option value="Nurture">🌱 Nurture (Long Term)</option>
-                </select>
-              </div>
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-              <div>
-                <label class="form-label">Estimated Deal Budget</label>
-                <select id="reviewBudget" class="form-control">
-                  <option value="$50k - $200k+">$50,000 - $200,000+</option>
-                  <option value="$20k - $50k">$20,000 - $50,000</option>
-                  <option value="$5k - $20k">$5,000 - $20,000</option>
-                  <option value="Undisclosed">Undisclosed / TBD</option>
-                </select>
-              </div>
-              <div>
-                <label class="form-label">Buying Timeline</label>
-                <select id="reviewTimeline" class="form-control">
-                  <option value="Immediate (< 1 mo)">Immediate (< 1 month)</option>
-                  <option value="1 - 3 months">1 - 3 months</option>
-                  <option value="3 - 6 months">3 - 6 months</option>
-                  <option value="Exploring">Exploring / Evaluation</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <!-- Meeting Notes & Action Items -->
-          <div class="detail-section-block">
-            <h3>Meeting Notes & Immediate Actions</h3>
-            <div class="form-group">
-              <label class="form-label">Meeting Notes</label>
-              <textarea id="reviewNotes" class="form-control" placeholder="Discussion points from the meeting..."></textarea>
-            </div>
-
-            <div>
-              <label class="form-label">Follow-Up Action Items</label>
-              <div id="reviewSuggestedActionItems" style="display: flex; flex-direction: column; gap: 6px;">
-                <!-- Populated dynamically -->
-              </div>
-            </div>
-          </div>
-
-        </div>
-        <div class="sheet-footer">
-          <button class="btn-secondary" id="btnCancelReview">Cancel</button>
-          <button class="btn-primary" id="btnSaveReviewContact">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-            Save Contact
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- =================================================================
-         MODAL 2: FULL CONTACT DETAILS BOTTOM SHEET
-         ================================================================= -->
-    <div class="modal-overlay" id="modalContactDetail">
-      <div class="bottom-sheet-content">
-        <div class="sheet-handle-bar"></div>
-        <div class="sheet-header">
-          <div class="sheet-title" id="detailSheetHeaderTitle">Contact Details</div>
-          <button class="icon-btn" id="btnCloseContactDetail" style="width: 32px; height: 32px;">✕</button>
-        </div>
-        <div class="sheet-body" id="detailSheetContentBody">
-          <!-- Dynamically populated from contact object -->
-        </div>
-        <div class="sheet-footer">
-          <button class="btn-secondary btn-danger" id="btnDeleteContact">Delete</button>
-          <button class="btn-primary" id="btnDownloadVCardSingle">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-            Save to Contacts (.vcf)
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- =================================================================
-         MODAL 3: ORGANIZATION MATCHING & AFFILIATIONS INSPECTOR
-         ================================================================= -->
-    <div class="modal-overlay" id="modalOrgMatching">
-      <div class="bottom-sheet-content">
-        <div class="sheet-handle-bar"></div>
-        <div class="sheet-header">
-          <div class="sheet-title" id="orgMatchingModalTitle">Organization Matches</div>
-          <button class="icon-btn" id="btnCloseOrgMatching" style="width: 32px; height: 32px;">✕</button>
-        </div>
-        <div class="sheet-body" id="orgMatchingModalBody">
-          <!-- Dynamically populated with current & alumni contacts -->
-        </div>
-      </div>
-    </div>
-
-    <!-- =================================================================
-         MODAL 4: SALES REPRESENTATIVE PROFILE
-         ================================================================= -->
-    <div class="modal-overlay" id="modalSalesRep">
-      <div class="bottom-sheet-content">
-        <div class="sheet-handle-bar"></div>
-        <div class="sheet-header">
-          <div class="sheet-title">Sales Representative Profile</div>
-          <button class="icon-btn" id="btnCloseSalesRepModal" style="width: 32px; height: 32px;">✕</button>
-        </div>
-        <div class="sheet-body">
-          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 14px;">
-            Set your corporate sales identity. Every business card you scan is stamped with your Employee ID and synced with your team.
-          </p>
-
-          <div class="form-group">
-            <label class="form-label" for="repFormName">Employee Full Name *</label>
-            <input type="text" id="repFormName" class="form-control" placeholder="e.g. Rahul Sharma" required>
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
-            <div>
-              <label class="form-label" for="repFormEmpId">Employee ID *</label>
-              <input type="text" id="repFormEmpId" class="form-control" placeholder="e.g. EMP-1042" style="text-transform: uppercase;" required>
-            </div>
-            <div>
-              <label class="form-label" for="repFormPhone">Phone Number</label>
-              <input type="tel" id="repFormPhone" class="form-control" placeholder="+91 ...">
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="repFormEmail">Corporate Email *</label>
-            <input type="email" id="repFormEmail" class="form-control" placeholder="name@company.com" required>
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
-            <div>
-              <label class="form-label" for="repFormRegion">Sales Territory / Region</label>
-              <input type="text" id="repFormRegion" class="form-control" placeholder="e.g. North India / Enterprise">
-            </div>
-            <div>
-              <label class="form-label" for="repFormDesignation">Designation</label>
-              <input type="text" id="repFormDesignation" class="form-control" placeholder="e.g. Senior Account Exec">
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="repFormTeamCode">Team Workspace Code *</label>
-            <input type="text" id="repFormTeamCode" class="form-control" placeholder="e.g. ALPHA-SALES-2026" style="text-transform: uppercase;" required>
-            <span style="font-size: 10px; color: var(--text-subtle);">Connects your device to your team's shared lead database.</span>
-          </div>
-
-        </div>
-        <div class="sheet-footer">
-          <button class="btn-secondary" id="btnCancelSalesRep">Cancel</button>
-          <button class="btn-primary" id="btnSaveSalesRep">Save Profile</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- =================================================================
-         MODAL 5: CREATE NEW EVENT MODAL
-         ================================================================= -->
-    <div class="modal-overlay" id="modalAddEvent">
-      <div class="bottom-sheet-content">
-        <div class="sheet-handle-bar"></div>
-        <div class="sheet-header">
-          <div class="sheet-title">Create New Event</div>
-          <button class="icon-btn" id="btnCloseAddEvent" style="width: 32px; height: 32px;">✕</button>
-        </div>
-        <div class="sheet-body">
-          <div class="form-group">
-            <label class="form-label" for="newEventName">Event Name *</label>
-            <input type="text" id="newEventName" class="form-control" placeholder="e.g. Dubai Gitex 2026" required>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="newEventDate">Event Date *</label>
-            <input type="date" id="newEventDate" class="form-control" required>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="newEventLocation">Location / Venue</label>
-            <input type="text" id="newEventLocation" class="form-control" placeholder="e.g. World Trade Centre, Hall 3">
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="newEventDescription">Description / Target Focus</label>
-            <textarea id="newEventDescription" class="form-control" placeholder="Target buyers, booth focus, sales targets..."></textarea>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="newEventColor">Badge Theme</label>
-            <select id="newEventColor" class="form-control">
-              <option value="#6366f1">Indigo (Tech & Enterprise)</option>
-              <option value="#ec4899">Pink (SaaS & AI)</option>
-              <option value="#10b981">Emerald (Hardware & IoT)</option>
-              <option value="#06b6d4">Cyan (FinTech)</option>
-              <option value="#f59e0b">Amber (Leadership Summit)</option>
-            </select>
-          </div>
-        </div>
-        <div class="sheet-footer">
-          <button class="btn-secondary" id="btnCancelAddEvent">Cancel</button>
-          <button class="btn-primary" id="btnSubmitAddEvent">Create Event</button>
-        </div>
-      </div>
-    </div>
-
   </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
 
   <!-- Application Logic Scripts -->
   <script src="./js/storage.js"></script>
-  <script src="./js/gemini.js"></script>
-  <script src="./js/camera.js"></script>
-  <script src="./js/vcard.js"></script>
+  <script src="./js/speech.js"></script>
+  <script src="./js/flow-ai.js"></script>
   <script src="./js/app.js"></script>
 
 </body>

@@ -1,3 +1,5 @@
 <resources>
-    <string name="app_name">LeadPulse</string>
+    <string name="app_name">Wispr Flow</string>
+    <string name="ime_name">Wispr Flow AI Keyboard</string>
+    <string name="overlay_service_name">Wispr Flow Floating HUD</string>
 </resources>

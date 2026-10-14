@@ -1,706 +1,140 @@
 /**
- * LeadPulse Enterprise Storage & Collaboration Service
- * Handles persistence, data retention across updates, sales representative attribution,
- * structured organization matching & career history, and cross-team cloud synchronization.
- * 
- * STRICT POLICY: Zero dummy data. Only genuine user-created and team-synced records.
+ * Wispr Flow - Storage & Local Intelligence Service
+ * Handles persistence for Flow history, personal dictionary, custom vocabulary,
+ * quick voice snippets, user settings, and typing speed analytics.
  */
 
 const STORAGE_KEYS = {
-  CONTACTS: 'leadpulse_contacts_v1',
-  EVENTS: 'leadpulse_events_v1',
-  TASKS: 'leadpulse_tasks_v1',
-  SETTINGS: 'leadpulse_settings_v1',
-  ACTIVE_EVENT: 'leadpulse_active_event_id',
-  SALES_REP: 'leadpulse_sales_rep_profile_v1',
-  TEAM_SYNC: 'leadpulse_team_sync_config_v1',
-  DUMMY_PURGED_FLAG: 'leadpulse_zero_dummy_purged_v2',
-  AVAILABLE_MODELS: 'leadpulse_cached_gemini_models_v1',
-  SELECTED_MODEL: 'leadpulse_selected_model_v1'
+  SETTINGS: 'wisprflow_settings_v1',
+  HISTORY: 'wisprflow_history_v1',
+  DICTIONARY: 'wisprflow_dictionary_v1',
+  SNIPPETS: 'wisprflow_snippets_v1',
+  STATS: 'wisprflow_stats_v1',
+  ACTIVE_MODE: 'wisprflow_active_mode_v1'
 };
 
-// Known dummy demo IDs to purge from any legacy test runs
-const LEGACY_DUMMY_IDS = new Set(['cnt-1001', 'cnt-1002', 'cnt-1003', 'cnt-1004']);
-const LEGACY_DUMMY_NAMES = new Set([
-  'Vikramaditya Sharma',
-  'Ananya Deshmukh',
-  'Dr. Ananya Deshmukh',
-  'Rajeev Menon',
-  'Rajiv Menon',
-  'Marcus Vance'
-]);
+// Default Flow Modes
+const FLOW_MODES = {
+  POLISH: {
+    id: 'polish',
+    name: 'Smart Polish',
+    icon: '✨',
+    badge: 'Wispr Default',
+    desc: 'Removes "um/uh", fixes stutters, adds perfect punctuation while keeping your natural voice.',
+    targetApp: 'Universal / All Apps'
+  },
+  CASUAL: {
+    id: 'casual',
+    name: 'Casual Chat',
+    icon: '💬',
+    badge: 'WhatsApp & DMs',
+    desc: 'Friendly, concise, conversational tone. Perfect for WhatsApp, Slack DMs, Telegram, and texting.',
+    targetApp: 'WhatsApp, Telegram, Slack'
+  },
+  EMAIL: {
+    id: 'email',
+    name: 'Executive Email',
+    icon: '✉️',
+    badge: 'Work & Clients',
+    desc: 'Polished professional email with proper greeting, structured paragraphs, and sign-off.',
+    targetApp: 'Gmail, Outlook, Superhuman'
+  },
+  NOTES: {
+    id: 'notes',
+    name: 'Structured Notes',
+    icon: '📝',
+    badge: 'Brain Dump',
+    desc: 'Organizes rambling thoughts into structured Markdown with headings, bullet points, and action items.',
+    targetApp: 'Notion, Apple Notes, Obsidian'
+  },
+  DIRECT: {
+    id: 'direct',
+    name: 'Raw Dictation',
+    icon: '⚡',
+    badge: '1:1 Exact',
+    desc: 'Zero alteration. Transcribes exact words with precision punctuation and zero hallucinations.',
+    targetApp: 'Form Fields, Search Bars'
+  },
+  CODE: {
+    id: 'code',
+    name: 'Code & Dev',
+    icon: '💻',
+    badge: 'Technical',
+    desc: 'camelCase variables, SQL queries, markdown code blocks, and terminal commands.',
+    targetApp: 'GitHub, Terminal, VS Code'
+  },
+  COMMAND: {
+    id: 'command',
+    name: 'Voice Prompt / AI',
+    icon: '🪄',
+    badge: 'AI Action',
+    desc: 'Speak an instruction (e.g. "Draft reply declining politely") and AI outputs the completed task.',
+    targetApp: 'AI Assistant, Drafting'
+  }
+};
 
-class StorageService {
+class FlowStorageService {
   constructor() {
-    this.init();
+    this.initDefaults();
   }
 
-  init() {
-    // 1. Purge legacy dummy sample data if present from older versions
-    this.purgeLegacyDummyData();
-
-    // 2. Ensure initial events container
-    if (!localStorage.getItem(STORAGE_KEYS.EVENTS)) {
-      const initialEvent = [{
-        id: 'evt-general',
-        name: 'General Field Leads',
-        date: new Date().toISOString().split('T')[0],
-        location: 'Field & Client Meetings',
-        description: 'Standard event category for day-to-day sales meetings and visiting card scans.',
-        badgeColor: '#6366f1',
-        createdAt: new Date().toISOString()
-      }];
-      this.saveEvents(initialEvent);
-      this.setActiveEventId(initialEvent[0].id);
+  initDefaults() {
+    // Initialize default dictionary if empty
+    if (!localStorage.getItem(STORAGE_KEYS.DICTIONARY)) {
+      const defaultVocab = [
+        { id: 'v1', word: 'Kubernetes', replacement: 'Kubernetes (K8s)', category: 'tech' },
+        { id: 'v2', word: 'PostgreSQL', replacement: 'PostgreSQL', category: 'tech' },
+        { id: 'v3', word: 'Wispr Flow', replacement: 'Wispr Flow', category: 'brand' },
+        { id: 'v4', word: 'API', replacement: 'API', category: 'acronym' },
+        { id: 'v5', word: 'SaaS', replacement: 'SaaS', category: 'acronym' }
+      ];
+      this.saveDictionary(defaultVocab);
     }
 
-    // 3. Ensure contacts container exists (empty by default - NO DUMMY DATA)
-    if (!localStorage.getItem(STORAGE_KEYS.CONTACTS)) {
-      this.saveContacts([]);
-    }
-
-    // 4. Ensure tasks container exists (empty by default)
-    if (!localStorage.getItem(STORAGE_KEYS.TASKS)) {
-      this.saveTasks([]);
-    }
-
-    // 5. Ensure default active event
-    if (!this.getActiveEventId()) {
-      const events = this.getEvents();
-      if (events.length > 0) {
-        this.setActiveEventId(events[0].id);
-      }
-    }
-  }
-
-  /**
-   * Cleanses any leftover dummy test leads from early testing phases
-   */
-  purgeLegacyDummyData() {
-    try {
-      const isAlreadyPurged = localStorage.getItem(STORAGE_KEYS.DUMMY_PURGED_FLAG);
-      if (!isAlreadyPurged) {
-        const rawContacts = localStorage.getItem(STORAGE_KEYS.CONTACTS);
-        if (rawContacts) {
-          const contacts = JSON.parse(rawContacts);
-          const cleanContacts = contacts.filter(c => 
-            !LEGACY_DUMMY_IDS.has(c.id) && 
-            !LEGACY_DUMMY_NAMES.has((c.name || '').trim())
-          );
-          this.saveContacts(cleanContacts);
-        }
-
-        // Clean legacy dummy events
-        const rawEvents = localStorage.getItem(STORAGE_KEYS.EVENTS);
-        if (rawEvents) {
-          const events = JSON.parse(rawEvents);
-          const cleanEvents = events.filter(e => e.id !== 'evt-101' && e.id !== 'evt-102' && e.id !== 'evt-103');
-          if (cleanEvents.length > 0) {
-            this.saveEvents(cleanEvents);
-          }
-        }
-
-        localStorage.setItem(STORAGE_KEYS.DUMMY_PURGED_FLAG, 'true');
-        console.log('LeadPulse: Database cleansed of legacy dummy data.');
-      }
-    } catch (e) {
-      console.warn('Error purging legacy dummy data:', e);
-    }
-  }
-
-  // =========================================================================
-  // SALES REPRESENTATIVE (EMPLOYEE) PROFILE
-  // =========================================================================
-
-  /**
-   * Retrieves active Sales Representative profile
-   */
-  getSalesRepProfile() {
-    try {
-      const data = localStorage.getItem(STORAGE_KEYS.SALES_REP);
-      return data ? JSON.parse(data) : {
-        name: '',
-        email: '',
-        employeeId: '',
-        phone: '',
-        region: '',
-        designation: '',
-        teamCode: 'LEADPULSE-GLOBAL'
-      };
-    } catch (e) {
-      console.error('Failed to get sales rep profile:', e);
-      return {
-        name: '',
-        email: '',
-        employeeId: '',
-        phone: '',
-        region: '',
-        designation: '',
-        teamCode: 'LEADPULSE-GLOBAL'
-      };
-    }
-  }
-
-  /**
-   * Saves or updates active Sales Representative profile
-   */
-  saveSalesRepProfile(profile) {
-    const cleanProfile = {
-      name: (profile.name || '').trim(),
-      email: (profile.email || '').trim().toLowerCase(),
-      employeeId: (profile.employeeId || '').trim().toUpperCase(),
-      phone: (profile.phone || '').trim(),
-      region: (profile.region || '').trim(),
-      designation: (profile.designation || '').trim(),
-      teamCode: ((profile.teamCode || '').trim() || 'LEADPULSE-GLOBAL').toUpperCase(),
-      updatedAt: new Date().toISOString()
-    };
-    localStorage.setItem(STORAGE_KEYS.SALES_REP, JSON.stringify(cleanProfile));
-    return cleanProfile;
-  }
-
-  /**
-   * Checks if user has configured their sales rep profile
-   */
-  isSalesRepConfigured() {
-    const profile = this.getSalesRepProfile();
-    return Boolean(profile.name && profile.employeeId);
-  }
-
-  // =========================================================================
-  // CONTACTS MANAGEMENT (WITH STRUCTURED ORGANIZATIONS & ATTRIBUTION)
-  // =========================================================================
-
-  /**
-   * Retrieves all contacts, ensuring schema integrity
-   */
-  getContacts() {
-    try {
-      const data = localStorage.getItem(STORAGE_KEYS.CONTACTS);
-      const contacts = data ? JSON.parse(data) : [];
-      return Array.isArray(contacts) ? contacts : [];
-    } catch (e) {
-      console.error('Failed to parse contacts from storage:', e);
-      return [];
-    }
-  }
-
-  saveContacts(contacts) {
-    localStorage.setItem(STORAGE_KEYS.CONTACTS, JSON.stringify(contacts));
-  }
-
-  getContactById(contactId) {
-    const contacts = this.getContacts();
-    return contacts.find(c => c.id === contactId) || null;
-  }
-
-  /**
-   * Adds a newly scanned / created contact with full attribution
-   */
-  addContact(contactData) {
-    const contacts = this.getContacts();
-    const rep = this.getSalesRepProfile();
-
-    // Normalize past organizations
-    let pastOrganizations = [];
-    if (Array.isArray(contactData.pastOrganizations)) {
-      pastOrganizations = contactData.pastOrganizations.map(o => ({
-        companyName: typeof o === 'string' ? o.trim() : (o.companyName || '').trim(),
-        role: typeof o === 'object' && o.role ? o.role.trim() : '',
-        duration: typeof o === 'object' && o.duration ? o.duration.trim() : '',
-        notes: typeof o === 'object' && o.notes ? o.notes.trim() : ''
-      })).filter(o => o.companyName);
-    } else if (Array.isArray(contactData.pastCompaniesList)) {
-      pastOrganizations = contactData.pastCompaniesList.map(name => ({
-        companyName: (name || '').trim(),
-        role: '',
-        duration: '',
-        notes: ''
-      })).filter(o => o.companyName);
-    }
-
-    // Extract quick lookup list of past companies
-    const pastCompaniesList = [...new Set(pastOrganizations.map(o => o.companyName))];
-
-    const newContact = {
-      id: contactData.id || ('cnt_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7)),
-      name: (contactData.name || '').trim(),
-      honorific: (contactData.honorific || '').trim(),
-      title: (contactData.title || '').trim(),
-      company: (contactData.company || '').trim(),
-      industry: (contactData.industry || '').trim(),
-      email: (contactData.email || '').trim().toLowerCase(),
-      phone: (contactData.phone || '').trim(),
-      whatsapp: (contactData.whatsapp || '').trim(),
-      website: (contactData.website || '').trim(),
-      address: (contactData.address || '').trim(),
-      eventId: contactData.eventId || this.getActiveEventId() || 'evt-general',
-      linkedinUrl: (contactData.linkedinUrl || '').trim(),
-      
-      // Structured Organization Affiliations
-      pastWorkSummary: (contactData.pastWorkSummary || '').trim(),
-      pastOrganizations: pastOrganizations,
-      pastCompaniesList: pastCompaniesList,
-      alumniInstitutions: Array.isArray(contactData.alumniInstitutions) ? contactData.alumniInstitutions : [],
-      
-      companyOverview: (contactData.companyOverview || '').trim(),
-      salesIcebreakers: Array.isArray(contactData.salesIcebreakers) ? contactData.salesIcebreakers : [],
-      cardImage: contactData.cardImage || '',
-      cardColorTheme: contactData.cardColorTheme || 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-      notes: (contactData.notes || '').trim(),
-      
-      // Sales Qualification Metrics
-      decisionStatus: contactData.decisionStatus || 'Evaluator',
-      leadScore: contactData.leadScore || 'Warm',
-      dealBudget: contactData.dealBudget || 'Undisclosed',
-      buyingTimeline: contactData.buyingTimeline || 'Exploring',
-      
-      // Sales Employee Attribution
-      scannedBy: contactData.scannedBy || {
-        name: rep.name || 'Sales Rep',
-        email: rep.email || '',
-        employeeId: rep.employeeId || 'REP-01',
-        region: rep.region || ''
-      },
-
-      actionItems: Array.isArray(contactData.actionItems) ? contactData.actionItems : [],
-      createdAt: contactData.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    contacts.unshift(newContact);
-    this.saveContacts(contacts);
-
-    // Sync action items to tasks list if any
-    if (newContact.actionItems.length > 0) {
-      newContact.actionItems.forEach(item => {
-        this.addTask({
-          contactId: newContact.id,
-          contactName: newContact.name,
-          contactCompany: newContact.company,
-          title: item.title,
-          dueDate: item.dueDate,
-          priority: item.priority || 'medium',
-          completed: Boolean(item.completed)
-        });
+    // Initialize stats if empty
+    if (!localStorage.getItem(STORAGE_KEYS.STATS)) {
+      this.saveStats({
+        totalWordsSpoken: 0,
+        totalDictations: 0,
+        totalTimeSavedSeconds: 0, // estimated vs 40 WPM average mobile typing
+        averageWpm: 140
       });
     }
-
-    return newContact;
   }
 
-  updateContact(contactId, updatedFields) {
-    const contacts = this.getContacts();
-    const index = contacts.findIndex(c => c.id === contactId);
-    if (index === -1) return null;
-
-    contacts[index] = {
-      ...contacts[index],
-      ...updatedFields,
-      updatedAt: new Date().toISOString()
-    };
-
-    this.saveContacts(contacts);
-    return contacts[index];
-  }
-
-  deleteContact(contactId) {
-    let contacts = this.getContacts();
-    contacts = contacts.filter(c => c.id !== contactId);
-    this.saveContacts(contacts);
-
-    // Remove associated tasks
-    let tasks = this.getTasks();
-    tasks = tasks.filter(t => t.contactId !== contactId);
-    this.saveTasks(tasks);
-  }
-
-  // =========================================================================
-  // ORGANIZATION DIRECTORY & AFFILIATION MATCHING
-  // =========================================================================
-
-  /**
-   * Scans all contacts and aggregates by organization (current and past).
-   * Identifies who all have been associated with any specific organization!
-   */
-  getAllOrganizations() {
-    const contacts = this.getContacts();
-    const orgMap = new Map();
-
-    const normalizeOrgName = (name) => {
-      if (!name) return '';
-      return name.trim();
-    };
-
-    contacts.forEach(contact => {
-      // 1. Current Company
-      const currentOrg = normalizeOrgName(contact.company);
-      if (currentOrg) {
-        const key = currentOrg.toLowerCase();
-        if (!orgMap.has(key)) {
-          orgMap.set(key, {
-            name: currentOrg,
-            industry: contact.industry || 'Technology / Enterprise',
-            currentContacts: [],
-            pastContacts: [],
-            totalCount: 0
-          });
-        }
-        const record = orgMap.get(key);
-        record.currentContacts.push({
-          contact,
-          role: contact.title || 'Current Member',
-          type: 'current'
-        });
-      }
-
-      // 2. Past Companies / Former Organizations
-      const pastList = contact.pastOrganizations || [];
-      pastList.forEach(pastOrg => {
-        const pastName = normalizeOrgName(typeof pastOrg === 'string' ? pastOrg : pastOrg.companyName);
-        if (pastName) {
-          const key = pastName.toLowerCase();
-          if (!orgMap.has(key)) {
-            orgMap.set(key, {
-              name: pastName,
-              industry: 'Former Association',
-              currentContacts: [],
-              pastContacts: [],
-              totalCount: 0
-            });
-          }
-          const record = orgMap.get(key);
-          // Avoid duplicate entry for the same person
-          if (!record.pastContacts.some(p => p.contact.id === contact.id)) {
-            record.pastContacts.push({
-              contact,
-              role: (typeof pastOrg === 'object' && pastOrg.role) ? pastOrg.role : 'Former Employee / Alumni',
-              duration: (typeof pastOrg === 'object' && pastOrg.duration) ? pastOrg.duration : '',
-              type: 'past'
-            });
-          }
-        }
-      });
-    });
-
-    // Calculate totals and convert to sorted array
-    const orgs = Array.from(orgMap.values()).map(org => {
-      org.totalCount = org.currentContacts.length + org.pastContacts.length;
-      return org;
-    });
-
-    // Sort by highest connections first
-    orgs.sort((a, b) => b.totalCount - a.totalCount || a.name.localeCompare(b.name));
-    return orgs;
-  }
-
-  /**
-   * Finds all contacts currently or previously associated with a specific company
-   */
-  getContactsForOrganization(orgName) {
-    if (!orgName) return { name: '', currentContacts: [], pastContacts: [], totalCount: 0 };
-    const query = orgName.trim().toLowerCase();
-    const all = this.getAllOrganizations();
-    const found = all.find(o => o.name.toLowerCase() === query);
-    return found || {
-      name: orgName,
-      currentContacts: [],
-      pastContacts: [],
-      totalCount: 0
-    };
-  }
-
-  // =========================================================================
-  // EVENTS MANAGEMENT
-  // =========================================================================
-
-  getEvents() {
-    try {
-      const data = localStorage.getItem(STORAGE_KEYS.EVENTS);
-      return data ? JSON.parse(data) : [];
-    } catch (e) {
-      console.error('Failed to get events:', e);
-      return [];
-    }
-  }
-
-  saveEvents(events) {
-    localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(events));
-  }
-
-  addEvent(eventData) {
-    const events = this.getEvents();
-    const newEvent = {
-      id: 'evt-' + Date.now(),
-      name: eventData.name.trim(),
-      date: eventData.date || new Date().toISOString().split('T')[0],
-      location: eventData.location ? eventData.location.trim() : '',
-      description: eventData.description ? eventData.description.trim() : '',
-      badgeColor: eventData.badgeColor || '#6366f1',
-      createdAt: new Date().toISOString()
-    };
-    events.unshift(newEvent);
-    this.saveEvents(events);
-    return newEvent;
-  }
-
-  deleteEvent(eventId) {
-    let events = this.getEvents();
-    events = events.filter(e => e.id !== eventId);
-    this.saveEvents(events);
-
-    if (this.getActiveEventId() === eventId) {
-      this.setActiveEventId(events.length > 0 ? events[0].id : '');
-    }
-  }
-
-  getActiveEventId() {
-    return localStorage.getItem(STORAGE_KEYS.ACTIVE_EVENT) || '';
-  }
-
-  setActiveEventId(eventId) {
-    localStorage.setItem(STORAGE_KEYS.ACTIVE_EVENT, eventId);
-  }
-
-  // =========================================================================
-  // TASKS / FOLLOW-UP ACTION ITEMS
-  // =========================================================================
-
-  getTasks() {
-    try {
-      const data = localStorage.getItem(STORAGE_KEYS.TASKS);
-      return data ? JSON.parse(data) : [];
-    } catch (e) {
-      console.error('Failed to get tasks:', e);
-      return [];
-    }
-  }
-
-  saveTasks(tasks) {
-    localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(tasks));
-  }
-
-  addTask(taskData) {
-    const tasks = this.getTasks();
-    const newTask = {
-      id: 'tsk-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
-      contactId: taskData.contactId || null,
-      contactName: taskData.contactName || '',
-      contactCompany: taskData.contactCompany || '',
-      title: taskData.title.trim(),
-      dueDate: taskData.dueDate || new Date().toISOString().split('T')[0],
-      priority: taskData.priority || 'medium',
-      completed: Boolean(taskData.completed),
-      createdAt: new Date().toISOString()
-    };
-    tasks.unshift(newTask);
-    this.saveTasks(tasks);
-    return newTask;
-  }
-
-  toggleTaskCompletion(taskId) {
-    const tasks = this.getTasks();
-    const task = tasks.find(t => t.id === taskId);
-    if (!task) return null;
-    task.completed = !task.completed;
-    this.saveTasks(tasks);
-
-    // Also update contact actionItems if linked
-    if (task.contactId) {
-      const contacts = this.getContacts();
-      const contact = contacts.find(c => c.id === task.contactId);
-      if (contact && Array.isArray(contact.actionItems)) {
-        const cItem = contact.actionItems.find(i => i.title === task.title || i.id === task.id);
-        if (cItem) {
-          cItem.completed = task.completed;
-          this.saveContacts(contacts);
-        }
-      }
-    }
-    return task;
-  }
-
-  deleteTask(taskId) {
-    let tasks = this.getTasks();
-    tasks = tasks.filter(t => t.id !== taskId);
-    this.saveTasks(tasks);
-  }
-
-  // =========================================================================
-  // CROSS-TEAM COLLABORATION & MULTI-USER CLOUD SYNC
-  // =========================================================================
-
-  getTeamSyncConfig() {
-    try {
-      const data = localStorage.getItem(STORAGE_KEYS.TEAM_SYNC);
-      return data ? JSON.parse(data) : {
-        enabled: true,
-        teamCode: 'LEADPULSE-GLOBAL',
-        lastSynced: null,
-        autoSyncOnScan: true
-      };
-    } catch (e) {
-      return {
-        enabled: true,
-        teamCode: 'LEADPULSE-GLOBAL',
-        lastSynced: null,
-        autoSyncOnScan: true
-      };
-    }
-  }
-
-  saveTeamSyncConfig(config) {
-    const current = this.getTeamSyncConfig();
-    const updated = {
-      ...current,
-      ...config,
-      teamCode: ((config.teamCode || current.teamCode || '').trim() || 'LEADPULSE-GLOBAL').toUpperCase()
-    };
-    localStorage.setItem(STORAGE_KEYS.TEAM_SYNC, JSON.stringify(updated));
-    return updated;
-  }
-
-  /**
-   * Generates a complete JSON backup bundle for direct team sharing
-   */
-  exportFullDatabaseBundle() {
-    const bundle = {
-      leadpulseVersion: '2.0.0',
-      exportedAt: new Date().toISOString(),
-      salesRep: this.getSalesRepProfile(),
-      teamCode: this.getTeamSyncConfig().teamCode,
-      contacts: this.getContacts(),
-      events: this.getEvents(),
-      tasks: this.getTasks()
-    };
-    return JSON.stringify(bundle, null, 2);
-  }
-
-  /**
-   * Imports and merges team leads non-destructively.
-   * Deduplicates by ID, Email, and Phone number.
-   * Retains all existing data and integrates teammates' scans.
-   */
-  importAndMergeDatabaseBundle(jsonString) {
-    try {
-      const bundle = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
-      if (!bundle || (!bundle.contacts && !Array.isArray(bundle))) {
-        throw new Error('Invalid LeadPulse bundle format.');
-      }
-
-      const incomingContacts = Array.isArray(bundle) ? bundle : (bundle.contacts || []);
-      const incomingEvents = bundle.events || [];
-      const incomingTasks = bundle.tasks || [];
-
-      let existingContacts = this.getContacts();
-      let addedCount = 0;
-      let updatedCount = 0;
-
-      // Map existing by ID and phone/email
-      const existingIdMap = new Map();
-      const existingKeyMap = new Map();
-
-      existingContacts.forEach(c => {
-        existingIdMap.set(c.id, c);
-        if (c.email) existingKeyMap.set(c.email.toLowerCase(), c);
-        if (c.phone) existingKeyMap.set(c.phone.replace(/[^0-9]/g, ''), c);
-      });
-
-      incomingContacts.forEach(inc => {
-        if (!inc || !inc.name) return;
-
-        // Skip legacy dummy records from imported bundle
-        if (LEGACY_DUMMY_IDS.has(inc.id) || LEGACY_DUMMY_NAMES.has((inc.name || '').trim())) {
-          return;
-        }
-
-        const phoneKey = inc.phone ? inc.phone.replace(/[^0-9]/g, '') : null;
-        const emailKey = inc.email ? inc.email.toLowerCase() : null;
-
-        let match = existingIdMap.get(inc.id) || 
-                    (emailKey && existingKeyMap.get(emailKey)) || 
-                    (phoneKey && existingKeyMap.get(phoneKey));
-
-        if (match) {
-          // Merge missing fields
-          let modified = false;
-          if (!match.linkedinUrl && inc.linkedinUrl) { match.linkedinUrl = inc.linkedinUrl; modified = true; }
-          if (!match.pastWorkSummary && inc.pastWorkSummary) { match.pastWorkSummary = inc.pastWorkSummary; modified = true; }
-          if ((!match.pastOrganizations || match.pastOrganizations.length === 0) && inc.pastOrganizations) {
-            match.pastOrganizations = inc.pastOrganizations;
-            modified = true;
-          }
-          if (modified) updatedCount++;
-        } else {
-          // New contact from teammate!
-          existingContacts.push(inc);
-          existingIdMap.set(inc.id, inc);
-          if (emailKey) existingKeyMap.set(emailKey, inc);
-          if (phoneKey) existingKeyMap.set(phoneKey, inc);
-          addedCount++;
-        }
-      });
-
-      this.saveContacts(existingContacts);
-
-      // Merge Events
-      const existingEvents = this.getEvents();
-      incomingEvents.forEach(e => {
-        if (!existingEvents.some(ex => ex.id === e.id || ex.name.toLowerCase() === e.name.toLowerCase())) {
-          existingEvents.push(e);
-        }
-      });
-      this.saveEvents(existingEvents);
-
-      // Merge Tasks
-      const existingTasks = this.getTasks();
-      incomingTasks.forEach(t => {
-        if (!existingTasks.some(et => et.id === t.id)) {
-          existingTasks.push(t);
-        }
-      });
-      this.saveTasks(existingTasks);
-
-      return {
-        success: true,
-        addedCount,
-        updatedCount,
-        totalContacts: existingContacts.length
-      };
-    } catch (e) {
-      console.error('Import failed:', e);
-      return { success: false, error: e.message };
-    }
-  }
-
-  // =========================================================================
-  // SETTINGS & GEMINI MODELS
-  // =========================================================================
-
+  // --- SETTINGS ---
   getSettings() {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
       return data ? JSON.parse(data) : {
         geminiApiKey: '',
-        customPromptInstructions: '',
-        enableOfflineFallbacks: true,
-        selectedModel: 'gemini-1.5-flash',
-        autoSyncWithTeam: true
+        selectedModel: 'gemini-2.0-flash', // Ultra-low latency Google DeepMind model
+        autoCopyOnFinish: true,
+        playHapticFeedback: true,
+        continuousListening: false,
+        silenceThresholdMs: 1400,
+        floatingHudEnabled: true,
+        keyboardCompanionActive: true,
+        speechLanguage: 'en-US'
       };
     } catch (e) {
       return {
         geminiApiKey: '',
-        customPromptInstructions: '',
-        enableOfflineFallbacks: true,
-        selectedModel: 'gemini-1.5-flash',
-        autoSyncWithTeam: true
+        selectedModel: 'gemini-2.0-flash',
+        autoCopyOnFinish: true,
+        playHapticFeedback: true,
+        continuousListening: false,
+        silenceThresholdMs: 1400,
+        floatingHudEnabled: true,
+        keyboardCompanionActive: true,
+        speechLanguage: 'en-US'
       };
     }
   }
 
-  saveSettings(settings) {
+  saveSettings(newSettings) {
     const current = this.getSettings();
-    const updated = { ...current, ...settings };
+    const updated = { ...current, ...newSettings };
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(updated));
     return updated;
   }
@@ -710,45 +144,181 @@ class StorageService {
   }
 
   setGeminiApiKey(key) {
-    this.saveSettings({ geminiApiKey: key.trim() });
-  }
-
-  getCustomPromptInstructions() {
-    return this.getSettings().customPromptInstructions || '';
+    this.saveSettings({ geminiApiKey: (key || '').trim() });
   }
 
   getSelectedModel() {
-    return localStorage.getItem(STORAGE_KEYS.SELECTED_MODEL) || this.getSettings().selectedModel || 'gemini-1.5-flash';
+    return this.getSettings().selectedModel || 'gemini-2.0-flash';
   }
 
   setSelectedModel(modelId) {
-    localStorage.setItem(STORAGE_KEYS.SELECTED_MODEL, modelId);
     this.saveSettings({ selectedModel: modelId });
   }
 
-  getAvailableModels() {
+  // --- ACTIVE MODE ---
+  getActiveMode() {
+    return localStorage.getItem(STORAGE_KEYS.ACTIVE_MODE) || 'polish';
+  }
+
+  setActiveMode(modeId) {
+    if (FLOW_MODES[modeId.toUpperCase()] || Object.values(FLOW_MODES).some(m => m.id === modeId)) {
+      localStorage.setItem(STORAGE_KEYS.ACTIVE_MODE, modeId);
+    }
+  }
+
+  // --- FLOW HISTORY ---
+  getHistory() {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.AVAILABLE_MODELS);
+      const data = localStorage.getItem(STORAGE_KEYS.HISTORY);
+      return data ? JSON.parse(data) : [];
+    } catch (e) {
+      console.error('Failed to get history:', e);
+      return [];
+    }
+  }
+
+  saveHistory(history) {
+    localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(history));
+  }
+
+  addHistoryItem(item) {
+    const history = this.getHistory();
+    const wordCount = (item.polishedText || item.rawSpeech || '').trim().split(/\s+/).filter(Boolean).length;
+
+    const newItem = {
+      id: 'flow_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      rawSpeech: item.rawSpeech || '',
+      polishedText: item.polishedText || item.rawSpeech || '',
+      mode: item.mode || this.getActiveMode(),
+      durationMs: item.durationMs || 2500,
+      wpm: item.wpm || Math.round((wordCount / Math.max(1, (item.durationMs || 2500) / 60000))),
+      latencyMs: item.latencyMs || 280,
+      wordCount: wordCount,
+      timestamp: new Date().toISOString(),
+      isFavorite: false,
+      copiedCount: 1
+    };
+
+    history.unshift(newItem);
+    // Keep last 150 items for optimal performance
+    if (history.length > 150) history.pop();
+    this.saveHistory(history);
+
+    // Update global typing stats
+    this.incrementStats(wordCount, newItem.durationMs);
+
+    return newItem;
+  }
+
+  deleteHistoryItem(id) {
+    let history = this.getHistory();
+    history = history.filter(h => h.id !== id);
+    this.saveHistory(history);
+  }
+
+  clearHistory() {
+    this.saveHistory([]);
+  }
+
+  toggleFavoriteHistory(id) {
+    const history = this.getHistory();
+    const item = history.find(h => h.id === id);
+    if (item) {
+      item.isFavorite = !item.isFavorite;
+      this.saveHistory(history);
+      return item.isFavorite;
+    }
+    return false;
+  }
+
+  // --- CUSTOM VOCABULARY & PERSONAL DICTIONARY ---
+  getDictionary() {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.DICTIONARY);
       return data ? JSON.parse(data) : [];
     } catch (e) {
       return [];
     }
   }
 
-  setAvailableModels(models) {
-    localStorage.setItem(STORAGE_KEYS.AVAILABLE_MODELS, JSON.stringify(models));
+  saveDictionary(dict) {
+    localStorage.setItem(STORAGE_KEYS.DICTIONARY, JSON.stringify(dict));
   }
 
-  /**
-   * Resets all leads and tasks with explicit user confirmation.
-   * GUARANTEE: Does NOT restore dummy data. Resets to a completely clean slate.
-   */
-  clearAllData() {
-    this.saveContacts([]);
-    this.saveTasks([]);
-    console.log('LeadPulse: Database cleared to 0 contacts.');
+  addDictionaryWord(word, replacement, category = 'custom') {
+    const dict = this.getDictionary();
+    const cleanWord = (word || '').trim();
+    if (!cleanWord) return null;
+
+    // Check existing
+    const existingIndex = dict.findIndex(d => d.word.toLowerCase() === cleanWord.toLowerCase());
+    const newItem = {
+      id: 'vocab_' + Date.now(),
+      word: cleanWord,
+      replacement: (replacement || cleanWord).trim(),
+      category: category,
+      addedAt: new Date().toISOString()
+    };
+
+    if (existingIndex >= 0) {
+      dict[existingIndex] = newItem;
+    } else {
+      dict.unshift(newItem);
+    }
+
+    this.saveDictionary(dict);
+    return newItem;
+  }
+
+  deleteDictionaryWord(id) {
+    let dict = this.getDictionary();
+    dict = dict.filter(d => d.id !== id);
+    this.saveDictionary(dict);
+  }
+
+  // --- TYPING SPEED & TIME SAVED STATS ---
+  getStats() {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.STATS);
+      return data ? JSON.parse(data) : {
+        totalWordsSpoken: 0,
+        totalDictations: 0,
+        totalTimeSavedSeconds: 0,
+        averageWpm: 140
+      };
+    } catch (e) {
+      return { totalWordsSpoken: 0, totalDictations: 0, totalTimeSavedSeconds: 0, averageWpm: 140 };
+    }
+  }
+
+  saveStats(stats) {
+    localStorage.setItem(STORAGE_KEYS.STATS, JSON.stringify(stats));
+  }
+
+  incrementStats(words, durationMs) {
+    const stats = this.getStats();
+    stats.totalWordsSpoken += words;
+    stats.totalDictations += 1;
+
+    // Standard mobile thumb typing speed is approx 38 WPM (0.63 words/second).
+    // Speaking speed with Wispr Flow is approx 140-160 WPM (2.5 words/second).
+    // Time saved calculation:
+    const typingTimeSec = (words / 38) * 60;
+    const voiceTimeSec = (durationMs / 1000);
+    const savedSec = Math.max(0, typingTimeSec - voiceTimeSec);
+
+    stats.totalTimeSavedSeconds += Math.round(savedSec);
+
+    if (durationMs > 1000 && words > 1) {
+      const currentWpm = Math.round((words / (durationMs / 60000)));
+      stats.averageWpm = Math.round((stats.averageWpm * 0.7) + (currentWpm * 0.3));
+    }
+
+    this.saveStats(stats);
+    return stats;
   }
 }
 
-// Global Singleton Initialization
-window.storageService = new StorageService();
+// Global Storage Singleton
+window.flowStorage = new FlowStorageService();
+window.FLOW_MODES = FLOW_MODES;

@@ -1,14 +1,13 @@
-// LeadPulse Service Worker for Android PWA offline support
-const CACHE_NAME = 'leadpulse-cache-v2';
+// Wispr Flow Service Worker for Low-Latency PWA Offline Execution
+const CACHE_NAME = 'wisprflow-cache-v1';
 const ASSETS = [
   './',
   './index.html',
   './css/app.css',
   './js/app.js',
   './js/storage.js',
-  './js/gemini.js',
-  './js/camera.js',
-  './js/vcard.js',
+  './js/speech.js',
+  './js/flow-ai.js',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
@@ -33,7 +32,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Let external API calls to Google Gemini pass through
+  // Pass Google Gemini AI API requests straight to network
   if (event.request.url.includes('generativelanguage.googleapis.com')) {
     return;
   }

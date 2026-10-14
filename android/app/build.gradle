@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace 'com.leadpulse.scanner'
+    namespace 'com.wisprflow.ai'
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.leadpulse.scanner"
+        applicationId "com.wisprflow.ai"
         minSdk 23
         targetSdk 34
         versionCode 1

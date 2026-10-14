@@ -1,12 +1,12 @@
 {
-  "name": "LeadPulse - AI Sales Card Scanner",
-  "short_name": "LeadPulse",
-  "description": "Android Sales Lead & Visiting Card Scanner with AI Enrichment",
+  "name": "Wispr Flow - AI Voice Keyboard & Dictation",
+  "short_name": "Wispr Flow",
+  "description": "Ultra-low latency AI voice dictation that replaces typing across your entire mobile phone.",
   "id": "./",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#090d16",
+  "background_color": "#07090e",
   "theme_color": "#6366f1",
   "orientation": "portrait-primary",
   "icons": [

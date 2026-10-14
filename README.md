@@ -1,54 +1,74 @@
-# LeadPulse - Android AI Sales Card Scanner & CRM
+# 🎙️ Wispr Flow - Universal AI Voice Keyboard & Dictation
 
-[![Build Android APK](https://github.com/tomeshjain/leadpulse-scanner/actions/workflows/build-apk.yml/badge.svg)](https://github.com/tomeshjain/leadpulse-scanner/actions/workflows/build-apk.yml)
+> **Low-Latency AI Voice Recognition that replaces typing across your entire mobile phone.**
 
-An AI-powered visiting card scanner, lead enrichment, and event CRM built specifically for sales teams attending conferences, expos, and client summits.
-
----
-
-## 📱 How to Install on Android
-
-### Method 1: Download Native Android APK (.apk)
-1. Go to the **[Releases](https://github.com/tomeshjain/leadpulse-scanner/releases)** section of this repository.
-2. Download **`LeadPulse.apk`**.
-3. Open the `.apk` on your Android phone and tap **Install**.
-4. The app runs 100% standalone and offline — no laptop or web server required!
-
-### Method 2: Install as WebAPK / PWA
-1. Open your GitHub Pages link in **Google Chrome** on your Android phone:
-   `https://tomeshjain.github.io/leadpulse-scanner/`
-2. Tap the three dots (**⋮**) in Chrome and select **"Install app"** or **"Add to Home screen"**.
-3. The app installs as a native WebAPK with full camera access.
+Wispr Flow is an AI-powered voice dictation and universal keyboard application. It transforms natural, rambling speech into clean, professionally formatted text in **sub-second latency** (<300ms) using **Google Gemini 2.0 Flash** and continuous streaming speech recognition.
 
 ---
 
-## 🚀 Key Features
+## 🚀 Key Innovations
 
-### 1. 📷 Visiting Card Camera Scanner & OCR
-- **High-Resolution Viewfinder**: Framed reticle with animated laser scan.
-- **Hardware Camera Trigger**: Native camera photo capture on Android or upload from phone gallery.
-- **Instant Test Cards**: 1-click realistic demo business cards for instant testing without physical cards.
-
-### 2. 🧠 Google Gemini Multimodal Vision & Dynamic Model Selection
-- **Self-Healing Model Fallback**: Automatically tries multiple Gemini models (`gemini-2.0-flash`, `gemini-1.5-flash`, `gemini-1.5-pro`, `gemini-2.5-flash`) to ensure zero "model not found" failures.
-- **Dynamic Model Discovery**: Tap **"Refresh Models"** in Settings to query and select from all active models authorized for your Google AI Studio API key.
-- **Customizable Intelligence**: Guide Gemini to extract custom sales metrics (e.g., Company size, IT budget, competitor products).
-
-### 3. 🔍 AI Background Enrichment
-- **LinkedIn Discovery**: Auto-extracts or infers LinkedIn profile URLs.
-- **Career & Past Work History**: Synthesizes 2-4 sentence executive summaries of the prospect's previous roles and scale.
-- **Company Intelligence**: Concise overview of their enterprise solutions and business model.
-- **Sales Icebreakers**: Generates tailored conversational talking points for sales reps.
-
-### 4. 🎯 Event-Wise Organization & Action Items
-- **Event Switcher**: Create conferences and tag newly scanned leads automatically to the active event.
-- **Follow-up Action Items**: Assign tasks per contact with priority tags (`HIGH`, `MED`, `LOW`) and track them in a centralized dashboard.
-- **1-Tap Android Contacts Sync**: Export leads directly into phone Google Contacts via standard `.vcf` (vCard 3.0) and export CSV spreadsheets for CRM pipelines.
+### 1. Dual-Engine Low-Latency Recognition
+* **Tier 1 (Instant Live Feedback, <20ms)**: Real-time continuous speech recognition with interim syllable streaming. Words light up on screen the millisecond you speak them.
+* **Tier 2 (Gemini 2.0 Flash Flow Engine, ~200ms)**: Sub-second AI polishing that strips filler words (*"um", "uh", "like", "you know", "basically"*), eliminates stuttering, and inlines perfect punctuation and capitalization.
+* **60 FPS Liquid Audio Waveform**: Built with the Web Audio API (`AudioContext` + `AnalyserNode`), rendering real-time responsive neon soundwaves reacting to your vocal pitch and volume.
 
 ---
 
-## 🛠️ Tech Stack
-- **Frontend**: Vanilla HTML5, CSS3 (Material 3 Dark Design), Modern JavaScript ES6+
-- **AI Core**: Google Gemini Multimodal Flash & Pro Vision APIs
-- **Storage**: HTML5 LocalStorage + Service Worker Cache v2
-- **Android Native**: Standalone WebView Activity with Camera & FileProvider support + GitHub Actions APK builder.
+## 📱 How Wispr Flow Replaces Mobile Typing System-Wide
+
+### A. Floating Voice Overlay HUD
+A draggable, compact microphone bubble that hovers on top of any active Android application (**WhatsApp, Chrome, Slack, Telegram, Gmail, Instagram, Notes**).
+1. Tap the floating mic.
+2. Speak your thoughts naturally.
+3. Release or pause — Wispr Flow automatically polishes the text and **copies it to your system clipboard** with a 1-tap instant paste button.
+
+### B. Android Custom Keyboard (Input Method Service)
+Wispr Flow includes a native Android `InputMethodService` that registers as a full system keyboard:
+1. Enable **Wispr Flow AI Keyboard** in **Android Settings > System > Languages & Input > On-Screen Keyboard**.
+2. When typing in any app, tap the central **Flow AI Mic Spacebar**.
+3. Speech is captured, refined with AI, and **directly injected into the active text field** (`InputConnection.commitText()`).
+
+---
+
+## 🎨 Multi-Flow Tone Presets
+
+| Mode | Target Apps | Formatting Behavior |
+| :--- | :--- | :--- |
+| **✨ Smart Polish** | Universal | Strips filler words, corrects stutters, adds natural punctuation while preserving your authentic voice. |
+| **💬 Casual Chat** | WhatsApp, Telegram, Slack | Conversational, friendly, concise, with contextual emojis where appropriate. |
+| **✉️ Executive Email** | Gmail, Outlook, Clients | Formats into structured business emails with greetings, clean paragraphs, and sign-offs. |
+| **📝 Structured Notes** | Notion, Apple Notes, Obsidian | Converts rambling thoughts into Markdown `# Headings`, bullet points, and `[ ]` action checkboxes. |
+| **⚡ Raw Dictation** | Form Fields, Search | 1:1 exact transcription with high-accuracy punctuation. |
+| **💻 Code & Dev** | IDEs, GitHub, Terminal | Recognizes technical terms, formats `camelCase`, SQL queries, and terminal commands. |
+| **🪄 Voice Prompt** | AI Assistant, Drafting | Speaks an instruction (e.g. *"Draft a polite reply declining the meeting"*), and the AI executes the deliverable. |
+
+---
+
+## 📖 Personal Vocabulary & Custom Dictionary
+Never suffer misspelled technical jargon again:
+* Add custom terms like `Kubernetes (K8s)`, `PostgreSQL`, `API Gateway`, or colleague names like `Tomesh`.
+* The AI engine prioritizes your personal dictionary when phonetically matching spoken words.
+
+---
+
+## ⚡ Productivity Analytics
+* **Words Per Minute (WPM)**: Real-time speaking speed speedometer (typically 140–160 WPM vs. 38 WPM thumb typing).
+* **Time Saved Tracker**: Automatically calculates minutes and hours saved across your daily messaging and emailing.
+
+---
+
+## 📦 Android APK Build & GitHub Actions CI/CD
+
+Wispr Flow is automatically built into a native Android APK via GitHub Actions:
+* **Workflow**: `.github/workflows/build-apk.yml`
+* **Output**: `WisprFlow.apk`
+* **Releases**: Download the latest APK directly from the [GitHub Releases](https://github.com/tomeshjain/leadpulse-scanner/releases) tab.
+
+---
+
+## 🛠️ Technology Stack
+* **Frontend**: HTML5, Vanilla CSS3 (Custom Dark Luxury Glassmorphism), Modern ES6+ JavaScript.
+* **Audio & Speech**: Web Speech API (`webkitSpeechRecognition`), Web Audio API (`AudioContext`, `AnalyserNode`).
+* **AI Model**: Google Gemini 2.0 Flash (`gemini-2.0-flash`) with instant offline rule-based fallback.
+* **Android Native**: Java, WebView, `InputMethodService` (Custom IME Keyboard), `Service` with `SYSTEM_ALERT_WINDOW` (Floating HUD).
