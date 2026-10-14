@@ -132,8 +132,11 @@
             Tip: Press <kbd>Spacebar</kbd> anytime to start/stop dictating
           </div>
 
-          <!-- Quick Sample Speech Test Trigger -->
-          <div class="demo-test-container" style="margin-top: 10px; display: flex; justify-content: center;">
+          <!-- Voice Actions & Quick Tests -->
+          <div class="demo-test-container" style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;">
+            <button class="btn-demo-phrase" id="btnStandardVoiceDialog" title="Open Google Voice / Android Standard Voice Input Dialog">
+              <span>🎙️ Standard Android Voice Dialog</span>
+            </button>
             <button class="btn-demo-phrase" id="btnDemoPhrase" title="Test Flow AI instant transformation without speaking">
               <span>💡 Tap to test sample speech with fillers</span>
             </button>
@@ -151,12 +154,12 @@
         </div>
 
         <!-- AI Polished Result Output Card -->
-        <div class="polished-output-card" id="outputCard">
+        <div class="polished-output-card has-content" id="outputCard">
           
           <div class="output-card-header">
             <div style="display: flex; align-items: center; gap: 8px;">
               <span class="output-mode-pill" id="outputModeBadge">✨ Smart Polish</span>
-              <span class="output-stats-text" id="outputMetaStats">0 words • 0 WPM</span>
+              <span class="output-stats-text" id="outputMetaStats">Ready for speech</span>
             </div>
             <div style="display: flex; gap: 6px;">
               <select class="repolish-dropdown" id="selectRepolishTone" title="Change Flow Tone">
@@ -172,7 +175,7 @@
           </div>
 
           <!-- Main Formatted Result -->
-          <div class="polished-content-area" id="outputContent" contenteditable="true" spellcheck="false" placeholder="Your AI-polished text will appear here ready to paste..."></div>
+          <div class="polished-content-area" id="outputContent" contenteditable="true" spellcheck="false" data-placeholder="Your AI-polished text will appear here ready to paste..."></div>
 
           <!-- Quick Action Toolbar -->
           <div class="output-actions-toolbar">

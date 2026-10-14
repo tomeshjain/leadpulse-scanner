@@ -263,7 +263,20 @@ class FlowSpeechEngine {
     this.isListening = false;
     this.stopAudioAnalyser();
     this.stopSimulatedAudioVolume();
-    if (this.onStateChangeCallback) this.onStateChangeCallback('stopped');
+    if (error === 'permission-denied' || error === 9) {
+      if (this.onStateChangeCallback) this.onStateChangeCallback('permission-denied');
+    } else {
+      if (this.onStateChangeCallback) this.onStateChangeCallback('error', error);
+    }
+  }
+
+  launchNativeSpeechDialog() {
+    if (this.isNative && window.AndroidNative && typeof window.AndroidNative.launchSpeechDialog === 'function') {
+      const lang = (window.flowStorage && window.flowStorage.getSettings().speechLanguage) || 'en-US';
+      window.AndroidNative.launchSpeechDialog(lang);
+      return true;
+    }
+    return false;
   }
 
   // --- WEB AUDIO FREQUENCY ANALYSER (60 FPS) ---

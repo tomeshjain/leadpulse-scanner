@@ -67,6 +67,7 @@ class FlowAppController {
     this.liveLatencyPill = document.getElementById('liveLatencyPill');
     this.wpmLiveCounter = document.getElementById('wpmLiveCounter');
     this.btnDemoPhrase = document.getElementById('btnDemoPhrase');
+    this.btnStandardVoiceDialog = document.getElementById('btnStandardVoiceDialog');
     this.btnOpenKeyboardSettings = document.getElementById('btnOpenKeyboardSettings');
     this.btnLaunchFloatingOverlay = document.getElementById('btnLaunchFloatingOverlay');
 
@@ -159,6 +160,18 @@ class FlowAppController {
     // Quick Sample Speech Demo Test
     if (this.btnDemoPhrase) {
       this.btnDemoPhrase.addEventListener('click', () => this.runDemoTest());
+    }
+
+    // Standard Android Voice Dialog Trigger
+    if (this.btnStandardVoiceDialog) {
+      this.btnStandardVoiceDialog.addEventListener('click', () => {
+        if (window.AndroidNative && typeof window.AndroidNative.launchSpeechDialog === 'function') {
+          const lang = (window.flowStorage && window.flowStorage.getSettings().speechLanguage) || 'en-US';
+          window.AndroidNative.launchSpeechDialog(lang);
+        } else {
+          this.toggleListening();
+        }
+      });
     }
 
     // Android System Integration Buttons
@@ -415,13 +428,12 @@ class FlowAppController {
   }
 
   async handleFinalSpeech(finalSpeech, durationMs) {
-    if (this.liveInterimContainer) {
-      this.liveInterimContainer.classList.remove('active');
-    }
+    this.resetListeningUi();
 
     if (!finalSpeech || !finalSpeech.trim()) {
-      this.updateStatusPill('ready', 'Tap mic or Spacebar to Flow');
+      this.updateStatusPill('ready', 'No speech detected • Tap mic or try Demo');
       if (this.keyboardMicStatus) this.keyboardMicStatus.textContent = 'Hold or Tap to Dictate with AI';
+      this.showToast('No speech detected. Please speak clearly or tap Demo Test!', 'info');
       return;
     }
 
@@ -521,11 +533,51 @@ class FlowAppController {
     this.statusPillText.textContent = text;
   }
 
-  handleSpeechStateChange(state) {
+  handleSpeechStateChange(state, errorInfo) {
+    console.log('Wispr Flow Speech State:', state, errorInfo);
+
     if (state === 'permission-denied') {
-      alert('Microphone permission is required for Wispr Flow voice dictation. Please allow microphone access in your browser or Android settings.');
+      this.resetListeningUi();
       this.updateStatusPill('ready', 'Microphone Permission Needed');
+      this.showToast('Microphone permission required for voice dictation', 'warning');
+    } else if (state === 'listening') {
+      this.isRecording = true;
+      if (this.btnMainMic) this.btnMainMic.classList.add('is-listening');
+      if (this.micRipple) this.micRipple.classList.add('active');
+      this.updateStatusPill('listening', '🎙️ Listening... speak naturally');
+      if (this.liveInterimContainer) {
+        this.liveInterimContainer.classList.add('active');
+        if (this.liveInterimText) this.liveInterimText.textContent = 'Listening for speech...';
+      }
+    } else if (state === 'processing') {
+      this.updateStatusPill('polishing', '✨ AI Polishing speech...');
+    } else if (state === 'stopped') {
+      this.resetListeningUi();
+      if (!this.currentPolishedText) {
+        this.updateStatusPill('ready', 'Tap mic or Spacebar to Flow');
+      }
+    } else if (state === 'error' || state === 'unsupported') {
+      this.resetListeningUi();
+      this.updateStatusPill('ready', 'Tap mic to retry or tap Demo test');
+
+      // If continuous recognizer had an error on Android, fallback to standard voice dialog
+      if (window.AndroidNative && typeof window.AndroidNative.launchSpeechDialog === 'function') {
+        this.showToast('Switching to standard Android voice dialog...', 'info');
+        const lang = (window.flowStorage && window.flowStorage.getSettings().speechLanguage) || 'en-US';
+        window.AndroidNative.launchSpeechDialog(lang);
+      } else {
+        this.showToast('Voice engine unavailable or quiet. Tap Demo test for sample speech!', 'warning');
+      }
     }
+  }
+
+  resetListeningUi() {
+    this.isRecording = false;
+    if (this.btnMainMic) this.btnMainMic.classList.remove('is-listening');
+    if (this.micRipple) this.micRipple.classList.remove('active');
+    if (this.btnHudMic) this.btnHudMic.classList.remove('is-listening');
+    if (this.btnKeyboardMicSpace) this.btnKeyboardMicSpace.classList.remove('is-listening');
+    if (this.liveInterimContainer) this.liveInterimContainer.classList.remove('active');
   }
 
   // --- AUDIO WAVEFORM VISUALIZER (60 FPS) ---

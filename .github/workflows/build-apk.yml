@@ -30,7 +30,7 @@ jobs:
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Build APK with Gradle
+      - name: Build Standard APK with Gradle
         working-directory: android
         run: |
           set -o pipefail
@@ -55,7 +55,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Prepare APK Output
+      - name: Prepare Standard APK Output
         run: |
           echo "=== Locating APK Files ==="
           find . -name "*.apk" -ls
@@ -72,37 +72,36 @@ jobs:
       - name: Upload APK Build Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: WisprFlow-Android-APK
+          name: WisprFlow-Standard-APK
           path: ./WisprFlow.apk
 
-      - name: Create or Update GitHub Release
+      - name: Create or Update GitHub Release (v1.0.1)
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/heads/main')
         with:
-          tag_name: wispr-flow-v1.0.0
-          name: "Wispr Flow - AI Voice Keyboard & Universal Dictation (v1.0.0)"
+          tag_name: wispr-flow-v1.0.1
+          name: "Wispr Flow - Standard Installation APK (v1.0.1)"
           draft: false
           prerelease: false
+          make_latest: true
           body: |
-            ## 🎙️ Wispr Flow - Universal AI Voice Keyboard & Dictation (Android APK)
+            ## 🎙️ Wispr Flow - Standard Installation APK (v1.0.1)
 
-            Wispr Flow replaces typing across your entire mobile phone with ultra-low latency AI voice recognition and smart formatting.
+            **Standard, ready-to-install Android APK with full voice recognition and Gemini AI polishing.**
 
-            ### 🚀 What's Inside:
-            - **Sub-Second Low-Latency Voice Engine**: Real-time streaming voice recognition (<20ms perceived feedback) + 60fps dynamic liquid audio visualizer.
-            - **Google Gemini 2.0 Flash Flow Engine**: Ultra-fast AI voice polishing that strips filler words ("um", "uh", "like", "you know"), fixes stutters, and infers natural punctuation.
-            - **Multi-Flow Style Presets**:
-              - 💬 **Casual Chat**: Natural, friendly, concise, with emojis for WhatsApp, Telegram, Slack DMs.
-              - ✉️ **Executive Email**: Structured professional emails with greetings, paragraphs, and sign-offs for Gmail & Outlook.
-              - 📝 **Structured Notes**: Markdown headings, bullet points, and checkbox action items for Notion and Notes.
-              - ⚡ **Raw Dictation**: 1:1 exact word transcription with precision punctuation.
-              - 💻 **Code & Dev**: Formats camelCase variables, SQL queries, and terminal commands.
-              - 🪄 **Voice Prompt / Action**: Speak instructions to the AI (e.g. "Draft polite reply declining meeting").
-            - **📱 Replaces Typing Across ALL Mobile Apps**:
-              - **Floating Voice Overlay HUD**: Draggable microphone pill that hovers on top of WhatsApp, Chrome, Slack, etc., auto-copying polished text to your clipboard.
-              - **Android Custom Keyboard (IME)**: Custom on-screen keyboard with a dedicated **Flow AI Mic Spacebar** that directly injects text into any input field.
-            - **📖 Personal Vocabulary & Custom Dictionary**: Teach the AI your specific acronyms, company jargon, and colleague names so they are never misspelled.
-            - **⚡ 3.4x Faster Than Typing**: Track your words per minute (140+ WPM) and total time saved vs mobile typing.
+            ### 🚀 Updates in v1.0.1:
+            - **Standard Android Voice Dialog Integration**: Integrated `RecognizerIntent.ACTION_RECOGNIZE_SPEECH` fallback that works on 100% of Android phones with system voice typing.
+            - **Android 11+ (API 30+) Package Visibility Queries**: Added `<queries>` declarations in AndroidManifest so Android OS grants voice recognition permissions.
+            - **No More Silent Freezes**: All speech errors, timeouts, or permission requests now give immediate visible feedback and reset the UI cleanly.
+            - **Live Speech & AI Output Box**: Output card is always visible with live placeholder so you can see your text stream in real time.
+            - **Quick Demo Voice Test**: 1-tap testing button to test instant AI formatting without needing microphone access.
+            - **System-Wide Replacement**: Floating Voice HUD + Custom Android Keyboard with Flow AI Mic Spacebar.
+
+            ### 📲 Installation Instructions:
+            1. Download **`WisprFlow.apk`** below.
+            2. If you have an older version installed, uninstall it first to avoid signature conflicts.
+            3. Tap the downloaded APK to install. If prompted by Play Protect, tap **"More details"** -> **"Install anyway"**.
+            4. Open Wispr Flow, tap the mic, and speak!
           files: |
             ./WisprFlow.apk
         env:

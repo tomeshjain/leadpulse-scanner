@@ -79,26 +79,30 @@ class FlowStorageService {
   }
 
   initDefaults() {
-    // Initialize default dictionary if empty
-    if (!localStorage.getItem(STORAGE_KEYS.DICTIONARY)) {
-      const defaultVocab = [
-        { id: 'v1', word: 'Kubernetes', replacement: 'Kubernetes (K8s)', category: 'tech' },
-        { id: 'v2', word: 'PostgreSQL', replacement: 'PostgreSQL', category: 'tech' },
-        { id: 'v3', word: 'Wispr Flow', replacement: 'Wispr Flow', category: 'brand' },
-        { id: 'v4', word: 'API', replacement: 'API', category: 'acronym' },
-        { id: 'v5', word: 'SaaS', replacement: 'SaaS', category: 'acronym' }
-      ];
-      this.saveDictionary(defaultVocab);
-    }
+    try {
+      // Initialize default dictionary if empty
+      if (!localStorage.getItem(STORAGE_KEYS.DICTIONARY)) {
+        const defaultVocab = [
+          { id: 'v1', word: 'Kubernetes', replacement: 'Kubernetes (K8s)', category: 'tech' },
+          { id: 'v2', word: 'PostgreSQL', replacement: 'PostgreSQL', category: 'tech' },
+          { id: 'v3', word: 'Wispr Flow', replacement: 'Wispr Flow', category: 'brand' },
+          { id: 'v4', word: 'API', replacement: 'API', category: 'acronym' },
+          { id: 'v5', word: 'SaaS', replacement: 'SaaS', category: 'acronym' }
+        ];
+        this.saveDictionary(defaultVocab);
+      }
 
-    // Initialize stats if empty
-    if (!localStorage.getItem(STORAGE_KEYS.STATS)) {
-      this.saveStats({
-        totalWordsSpoken: 0,
-        totalDictations: 0,
-        totalTimeSavedSeconds: 0, // estimated vs 40 WPM average mobile typing
-        averageWpm: 140
-      });
+      // Initialize stats if empty
+      if (!localStorage.getItem(STORAGE_KEYS.STATS)) {
+        this.saveStats({
+          totalWordsSpoken: 0,
+          totalDictations: 0,
+          totalTimeSavedSeconds: 0, // estimated vs 40 WPM average mobile typing
+          averageWpm: 140
+        });
+      }
+    } catch (e) {
+      console.warn('Storage init warning:', e);
     }
   }
 

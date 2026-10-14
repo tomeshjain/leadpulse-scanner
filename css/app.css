@@ -678,8 +678,9 @@ body {
 }
 
 .polished-content-area:empty::before {
-  content: attr(placeholder);
-  color: var(--text-subtle);
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 .output-actions-toolbar {

@@ -14,6 +14,8 @@ import android.provider.Settings;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
+import android.util.Log;
+import android.webkit.ConsoleMessage;
 import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
@@ -27,21 +29,28 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import org.json.JSONObject;
+
 import java.util.ArrayList;
 import java.util.Locale;
 
 /**
  * Wispr Flow Main Native Activity
  * Hosts the local WebView app with full hardware acceleration,
- * native SpeechRecognizer bridge, and Android OS integration.
+ * continuous SpeechRecognizer with automatic fallback to standard Android Voice Dialog,
+ * and Android OS integration (Clipboard, Overlay, IME Keyboard).
  */
 public class MainActivity extends AppCompatActivity {
 
+    private static final String TAG = "WisprFlow";
     private static final int PERMISSION_REQ_CODE = 101;
     private static final int OVERLAY_PERMISSION_REQ_CODE = 102;
+    private static final int SPEECH_DIALOG_REQ_CODE = 103;
+
     private WebView webView;
     private SpeechRecognizer speechRecognizer;
     private boolean isListening = false;
+    private String pendingLanguage = "en-US";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -65,6 +74,8 @@ public class MainActivity extends AppCompatActivity {
         settings.setDatabaseEnabled(true);
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
+        settings.setAllowFileAccessFromFileURLs(true);
+        settings.setAllowUniversalAccessFromFileURLs(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
         settings.setUseWideViewPort(true);
@@ -83,10 +94,21 @@ public class MainActivity extends AppCompatActivity {
                 }
                 return false;
             }
+
+            @Override
+            public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
+                Log.e(TAG, "WebView error: " + description + " (" + failingUrl + ")");
+            }
         });
 
         // Grant Web Audio / Microphone permission to WebView
         webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
+                Log.d("WisprFlowJS", consoleMessage.message() + " [" + consoleMessage.lineNumber() + "]");
+                return true;
+            }
+
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
                 runOnUiThread(() -> {
@@ -133,15 +155,24 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
             if (allGranted) {
-                webView.reload();
+                Toast.makeText(this, "✓ Microphone permission granted!", Toast.LENGTH_SHORT).show();
+                postToWeb("window.flowSpeech && window.flowSpeech.onNativeStateChange('ready')");
+            } else {
+                Toast.makeText(this, "Microphone permission is required for voice recognition", Toast.LENGTH_LONG).show();
+                postToWeb("window.flowSpeech && window.flowSpeech.onNativeError('permission-denied')");
             }
         }
     }
 
-    private void startNativeSpeechRecognizer(String language) {
+    /**
+     * Continuous Speech Recognizer with real-time audio volume
+     */
+    private void startContinuousSpeechRecognizer(String language) {
+        this.pendingLanguage = (language != null && !language.isEmpty()) ? language : Locale.getDefault().toString();
+
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            Toast.makeText(this, "Android Speech Recognizer not available on this device", Toast.LENGTH_SHORT).show();
-            postToWeb("window.flowSpeech && window.flowSpeech.onNativeError('speech-not-available')");
+            Log.w(TAG, "Continuous SpeechRecognizer unavailable, falling back to standard dialog.");
+            launchStandardSpeechDialog(this.pendingLanguage);
             return;
         }
 
@@ -151,69 +182,115 @@ public class MainActivity extends AppCompatActivity {
             } catch (Exception ignored) {}
         }
 
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
-        speechRecognizer.setRecognitionListener(new RecognitionListener() {
-            @Override
-            public void onReadyForSpeech(Bundle params) {
-                isListening = true;
-                postToWeb("window.flowSpeech && window.flowSpeech.onNativeStateChange('listening')");
-            }
+        try {
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
+            speechRecognizer.setRecognitionListener(new RecognitionListener() {
+                @Override
+                public void onReadyForSpeech(Bundle params) {
+                    isListening = true;
+                    postToWeb("window.flowSpeech && window.flowSpeech.onNativeStateChange('listening')");
+                }
 
-            @Override
-            public void onBeginningOfSpeech() {}
+                @Override
+                public void onBeginningOfSpeech() {}
 
-            @Override
-            public void onRmsChanged(float rmsdB) {
-                float normalized = Math.max(0f, Math.min(1f, (rmsdB + 2f) / 12f));
-                postToWeb("window.flowSpeech && window.flowSpeech.onNativeVolume(" + normalized + ")");
-            }
+                @Override
+                public void onRmsChanged(float rmsdB) {
+                    float normalized = Math.max(0f, Math.min(1f, (rmsdB + 2f) / 12f));
+                    postToWeb("window.flowSpeech && window.flowSpeech.onNativeVolume(" + normalized + ")");
+                }
 
-            @Override
-            public void onBufferReceived(byte[] buffer) {}
+                @Override
+                public void onBufferReceived(byte[] buffer) {}
 
-            @Override
-            public void onEndOfSpeech() {
-                postToWeb("window.flowSpeech && window.flowSpeech.onNativeStateChange('processing')");
-            }
+                @Override
+                public void onEndOfSpeech() {
+                    postToWeb("window.flowSpeech && window.flowSpeech.onNativeStateChange('processing')");
+                }
 
-            @Override
-            public void onError(int error) {
-                isListening = false;
-                postToWeb("window.flowSpeech && window.flowSpeech.onNativeError(" + error + ")");
-            }
+                @Override
+                public void onError(int error) {
+                    Log.w(TAG, "SpeechRecognizer error: " + error);
+                    isListening = false;
 
-            @Override
-            public void onResults(Bundle results) {
-                isListening = false;
-                ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                    // If error indicates speech service failure, fall back to standard Android dialog
+                    if (error == SpeechRecognizer.ERROR_CLIENT ||
+                        error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY ||
+                        error == SpeechRecognizer.ERROR_SERVER) {
+                        runOnUiThread(() -> launchStandardSpeechDialog(pendingLanguage));
+                        return;
+                    }
+
+                    postToWeb("window.flowSpeech && window.flowSpeech.onNativeError(" + error + ")");
+                }
+
+                @Override
+                public void onResults(Bundle results) {
+                    isListening = false;
+                    ArrayList<String> matches = results != null ? results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) : null;
+                    if (matches != null && !matches.isEmpty()) {
+                        sendResultToWeb(matches.get(0), true);
+                    } else {
+                        sendResultToWeb("", true);
+                    }
+                }
+
+                @Override
+                public void onPartialResults(Bundle partialResults) {
+                    ArrayList<String> matches = partialResults != null ? partialResults.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) : null;
+                    if (matches != null && !matches.isEmpty()) {
+                        sendResultToWeb(matches.get(0), false);
+                    }
+                }
+
+                @Override
+                public void onEvent(int eventType, Bundle params) {}
+            });
+
+            Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, pendingLanguage);
+            intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
+            intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+
+            speechRecognizer.startListening(intent);
+        } catch (Exception e) {
+            Log.e(TAG, "Error starting SpeechRecognizer: " + e.getMessage());
+            launchStandardSpeechDialog(this.pendingLanguage);
+        }
+    }
+
+    /**
+     * Standard Universal Android Voice Recognition Dialog (100% compatible on all Android devices)
+     */
+    private void launchStandardSpeechDialog(String language) {
+        try {
+            Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, (language != null && !language.isEmpty()) ? language : Locale.getDefault().toString());
+            intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak to Wispr Flow AI...");
+            startActivityForResult(intent, SPEECH_DIALOG_REQ_CODE);
+            postToWeb("window.flowSpeech && window.flowSpeech.onNativeStateChange('listening')");
+        } catch (Exception e) {
+            Toast.makeText(this, "Voice recognition not supported: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            postToWeb("window.flowSpeech && window.flowSpeech.onNativeError('no-speech-engine')");
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == SPEECH_DIALOG_REQ_CODE) {
+            if (resultCode == RESULT_OK && data != null) {
+                ArrayList<String> matches = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
                 if (matches != null && !matches.isEmpty()) {
-                    String recognized = matches.get(0).replace("\\", "\\\\").replace("'", "\\'").replace("\n", " ");
-                    postToWeb("window.flowSpeech && window.flowSpeech.onNativeResult('" + recognized + "', true)");
-                } else {
-                    postToWeb("window.flowSpeech && window.flowSpeech.onNativeResult('', true)");
+                    String recognized = matches.get(0);
+                    sendResultToWeb(recognized, true);
+                    return;
                 }
             }
-
-            @Override
-            public void onPartialResults(Bundle partialResults) {
-                ArrayList<String> matches = partialResults.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
-                if (matches != null && !matches.isEmpty()) {
-                    String recognized = matches.get(0).replace("\\", "\\\\").replace("'", "\\'").replace("\n", " ");
-                    postToWeb("window.flowSpeech && window.flowSpeech.onNativeResult('" + recognized + "', false)");
-                }
-            }
-
-            @Override
-            public void onEvent(int eventType, Bundle params) {}
-        });
-
-        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, (language != null && !language.isEmpty()) ? language : Locale.getDefault().toString());
-        intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
-        intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
-
-        speechRecognizer.startListening(intent);
+            postToWeb("window.flowSpeech && window.flowSpeech.onNativeStateChange('stopped')");
+        }
     }
 
     private void stopNativeSpeechRecognizer() {
@@ -222,6 +299,18 @@ public class MainActivity extends AppCompatActivity {
             try {
                 speechRecognizer.stopListening();
             } catch (Exception ignored) {}
+        }
+    }
+
+    private void sendResultToWeb(String recognized, boolean isFinal) {
+        try {
+            JSONObject obj = new JSONObject();
+            obj.put("text", recognized != null ? recognized : "");
+            obj.put("isFinal", isFinal);
+            postToWeb("window.flowSpeech && window.flowSpeech.onNativeResult(" + obj.toString() + ".text, " + isFinal + ")");
+        } catch (Exception e) {
+            String safe = (recognized != null ? recognized : "").replace("'", "\\'").replace("\n", " ");
+            postToWeb("window.flowSpeech && window.flowSpeech.onNativeResult('" + safe + "', " + isFinal + ")");
         }
     }
 
@@ -247,7 +336,18 @@ public class MainActivity extends AppCompatActivity {
                 if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
                     ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.RECORD_AUDIO}, PERMISSION_REQ_CODE);
                 } else {
-                    startNativeSpeechRecognizer(language);
+                    startContinuousSpeechRecognizer(language);
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void launchSpeechDialog(String language) {
+            runOnUiThread(() -> {
+                if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                    ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.RECORD_AUDIO}, PERMISSION_REQ_CODE);
+                } else {
+                    launchStandardSpeechDialog(language);
                 }
             });
         }

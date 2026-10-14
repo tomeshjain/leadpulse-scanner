@@ -11,6 +11,16 @@
 
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
+    <!-- Package visibility declarations for Android 11+ (API 30+) speech recognition -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -20,12 +30,13 @@
         android:theme="@style/AppTheme"
         android:hardwareAccelerated="true">
 
-        <!-- Main WebView App Activity -->
+        <!-- Main Standalone App Activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:configChanges="orientation|screenSize|keyboardHidden"
-            android:screenOrientation="portrait">
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
