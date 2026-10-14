@@ -1,0 +1,66 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build APK with Gradle Wrapper
+        run: |
+          cd android
+          gradle wrapper --gradle-version 8.5
+          chmod +x gradlew
+          ./gradlew assembleDebug --stacktrace
+
+      - name: Rename APK
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk ./LeadPulse.apk
+
+      - name: Upload APK Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LeadPulse-Android-APK
+          path: ./LeadPulse.apk
+
+      - name: Create or Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/heads/main')
+        with:
+          tag_name: v1.0.0
+          name: "LeadPulse Android App v1.0.0"
+          body: |
+            ## 📱 LeadPulse - Standalone Android APK
+
+            Download `LeadPulse.apk` below and install it directly on your Android phone.
+
+            ### Features:
+            - **Visiting Card Scanner**: Live camera scanning and gallery photo processing.
+            - **AI Extraction & Background Enrichment**: Google Gemini Multimodal Vision extracts contact details and synthesizes LinkedIn profiles, past work history, and company background.
+            - **Model Discovery**: Dynamically select from all available Gemini models (`gemini-2.0-flash`, `gemini-1.5-flash`, `gemini-1.5-pro`) with self-healing auto-fallbacks.
+            - **Follow-up Action Items**: Track per-contact and global action items with priority tags.
+            - **Event-Wise Organization**: Assign leads to specific conferences, trade shows, and expos.
+            - **1-Tap Android Contacts Sync**: Export directly to phone contact book via `.vcf` (vCard 3.0).
+            - **Offline Standalone**: Bundled assets inside the APK run without any laptop or web server.
+          files: |
+            ./LeadPulse.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

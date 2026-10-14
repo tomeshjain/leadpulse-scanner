@@ -1,0 +1,17 @@
+# Local scratch files
+server.ps1
+package.ps1
+copy_assets.ps1
+git_commit.ps1
+git_setup.ps1
+make_icons.ps1
+install_mingit.ps1
+
+# Android build outputs
+android/.gradle/
+android/app/build/
+android/local.properties
+*.apk
+*.zip
+.DS_Store
+Thumbs.db
