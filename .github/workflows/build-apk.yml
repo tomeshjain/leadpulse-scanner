@@ -1,4 +1,4 @@
-name: Build LeadPulse AI Keyboard APK
+name: Build Smart AI Keyboard APK
 
 on:
   push:
@@ -30,7 +30,7 @@ jobs:
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Build LeadPulse AI Keyboard APK with Gradle
+      - name: Build Smart AI Keyboard APK with Gradle
         working-directory: wispr-flow-keyboard
         run: |
           set -o pipefail

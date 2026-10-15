@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 echo ============================================================
-echo   LeadPulse - Auto Sync and Android APK Cloud Builder
+echo   Smart AI Keyboard - Auto Sync and Android APK Cloud Builder
 echo   Repository: https://github.com/tomeshjain/leadpulse-scanner
 echo ============================================================
 echo.
@@ -19,7 +19,7 @@ echo [2/3] Checking for changes to commit...
 %GIT% diff --cached --quiet
 if errorlevel 1 (
     echo Committing latest changes...
-    %GIT% commit -m "update: Auto-sync LeadPulse codebase"
+    %GIT% commit -m "feat(branding): update to Smart AI Keyboard with new premium icon"
 ) else (
     echo No new changes to commit. Local branch is clean.
 )
@@ -42,7 +42,7 @@ echo.
 echo 1. Check APK build status in GitHub Actions:
 echo    https://github.com/tomeshjain/leadpulse-scanner/actions
 echo.
-echo 2. Once finished, download LeadPulse.apk from Releases:
+echo 2. Once finished, download SmartAIKeyboard.apk from Releases:
 echo    https://github.com/tomeshjain/leadpulse-scanner/releases
 echo ============================================================
 pause

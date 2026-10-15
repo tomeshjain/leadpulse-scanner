@@ -37,7 +37,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.WisprFlow">
+        android:theme="@style/Theme.SmartAI">
 
         <!-- ML Kit OCR Model Download -->
         <meta-data
@@ -61,14 +61,14 @@
             android:name=".CardScannerActivity"
             android:exported="false"
             android:label="Contact Card Scanner"
-            android:theme="@style/Theme.WisprFlow"
+            android:theme="@style/Theme.SmartAI"
             android:taskAffinity="com.wisprflow.keyboard.scanner"
             android:excludeFromRecents="true"
             android:launchMode="singleTask"
             android:clearTaskOnLaunch="true"
             android:windowSoftInputMode="adjustResize" />
 
-        <!-- Wispr Flow System-Wide Custom Keyboard (InputMethodService) -->
+        <!-- Smart AI System-Wide Custom Keyboard (InputMethodService) -->
         <service
             android:name=".WisprKeyboardService"
             android:label="@string/keyboard_label"

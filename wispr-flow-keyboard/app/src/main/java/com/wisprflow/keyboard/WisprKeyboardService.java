@@ -2856,7 +2856,7 @@ public class WisprKeyboardService extends InputMethodService {
                     conn.setConnectTimeout(8000);
                     conn.setReadTimeout(12000);
                     conn.setInstanceFollowRedirects(true);
-                    conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Android; WisprFlow)");
+                    conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Android; SmartAIKeyboard)");
                     conn.connect();
 
                     InputStream in = conn.getInputStream();

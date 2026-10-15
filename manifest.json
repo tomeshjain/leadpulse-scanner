@@ -1,7 +1,7 @@
 {
-  "name": "LeadPulse AI Keyboard & Smart Scanner",
-  "short_name": "LeadPulse AI",
-  "description": "Ultra-low latency AI voice dictation, smart lead scanner, and executive Android keyboard.",
+  "name": "Smart AI Keyboard & Smart Scanner",
+  "short_name": "Smart AI",
+  "description": "Smart AI Keyboard - Ultra-low latency voice dictation, meeting conversation assistant, smart contact scanner, and Android keyboard.",
   "id": "./",
   "start_url": "./index.html",
   "scope": "./",

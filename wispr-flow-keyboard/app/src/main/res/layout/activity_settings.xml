@@ -22,10 +22,10 @@
             android:layout_marginBottom="24dp">
 
             <ImageView
-                android:layout_width="52dp"
-                android:layout_height="52dp"
-                android:src="@mipmap/ic_launcher"
-                android:contentDescription="LeadPulse AI Logo" />
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:src="@drawable/smart_ai_logo"
+                android:contentDescription="Smart AI Keyboard Logo" />
 
             <LinearLayout
                 android:layout_width="wrap_content"
@@ -37,16 +37,16 @@
                     android:id="@+id/tvBrandTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="LeadPulse AI"
+                    android:text="Smart AI Keyboard"
                     android:textColor="@color/text_primary"
-                    android:textSize="24sp"
+                    android:textSize="22sp"
                     android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/tvBrandSubtitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="PulseFlow Voice Dictation &amp; LeadPulse Smart Scanner"
+                    android:text="Smart AI Voice Dictation &amp; Card Scanner"
                     android:textColor="@color/accent_primary"
                     android:textSize="12sp"
                     android:textStyle="bold"
@@ -76,7 +76,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Activate LeadPulse AI Keyboard in Android system settings and select it as your default input method:"
+                android:text="Activate Smart AI Keyboard in Android system settings and select it as your default input method:"
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp"
                 android:layout_marginBottom="14dp" />
@@ -86,7 +86,7 @@
                 android:id="@+id/btnEnableKeyboard"
                 android:layout_width="match_parent"
                 android:layout_height="46dp"
-                android:text="1. Enable LeadPulse in Settings"
+                android:text="1. Enable Smart AI in Settings"
                 android:textColor="#ffffff"
                 android:background="@drawable/bg_btn_primary"
                 android:textAllCaps="false"
@@ -99,7 +99,7 @@
                 android:id="@+id/btnSelectKeyboard"
                 android:layout_width="match_parent"
                 android:layout_height="46dp"
-                android:text="2. Switch to LeadPulse Keyboard"
+                android:text="2. Switch to Smart AI Keyboard"
                 android:textColor="@color/btn_secondary_text"
                 android:background="@drawable/bg_btn_secondary"
                 android:textAllCaps="false"
@@ -467,7 +467,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Tap below to bring up LeadPulse AI. Try typing, testing suggestions, emojis, or pressing the 🎙️ mic button:"
+                android:text="Tap below to bring up Smart AI Keyboard. Try typing, testing suggestions, emojis, or pressing the 🎙️ mic button:"
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp"
                 android:layout_marginBottom="14dp" />
@@ -476,7 +476,7 @@
                 android:id="@+id/etTestInput"
                 android:layout_width="match_parent"
                 android:layout_height="100dp"
-                android:hint="Tap here to bring up LeadPulse AI Keyboard..."
+                android:hint="Tap here to bring up Smart AI Keyboard..."
                 android:textColorHint="@color/text_muted"
                 android:textColor="@color/text_primary"
                 android:textSize="14sp"

@@ -5,7 +5,7 @@
     <string name="subtype_en_us">English (US)</string>
 
     <string name="setup_title">Smart AI Keyboard</string>
-    <string name="setup_subtitle">PulseFlow Voice Dictation &amp; Smart Scanner</string>
+    <string name="setup_subtitle">Smart AI Voice Dictation &amp; Card Scanner</string>
     <string name="step_1_title">1. Enable in System Settings</string>
     <string name="step_1_desc">Enable Smart AI Keyboard in Android on-screen keyboards.</string>
     <string name="btn_enable_keyboard">Enable Smart AI Keyboard</string>
@@ -23,6 +23,6 @@
     <string name="label_mode">Default Flow Mode:</string>
 
     <string name="step_4_title">4. Test Your Keyboard</string>
-    <string name="step_4_desc">Tap the box below to bring up LeadPulse AI Keyboard and test voice dictation.</string>
+    <string name="step_4_desc">Tap the box below to bring up Smart AI Keyboard and test voice dictation.</string>
     <string name="hint_test_input">Tap here to test typing and voice flow...</string>
 </resources>

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.WisprFlow" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <style name="Theme.SmartAI" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="colorPrimary">@color/accent_primary</item>
         <item name="colorPrimaryDark">@color/bg_dark</item>
         <item name="colorAccent">@color/accent_primary</item>
@@ -8,4 +8,6 @@
         <item name="android:statusBarColor">@color/bg_dark</item>
         <item name="android:navigationBarColor">@color/bg_dark</item>
     </style>
+
+    <style name="Theme.WisprFlow" parent="Theme.SmartAI" />
 </resources>
