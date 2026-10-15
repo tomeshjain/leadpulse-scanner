@@ -18,6 +18,7 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
@@ -40,6 +41,8 @@ import java.util.List;
  * - Gemini API key and model selection
  * - Custom text shortcuts manager (e.g. GM -> Good Morning)
  * - Typing pattern and collocation statistics
+ * - Keyboard Themes & Appearance
+ * - Dedicated Contact Card Scanner
  * - Live interactive keyboard test
  */
 public class SettingsActivity extends AppCompatActivity {
@@ -57,6 +60,9 @@ public class SettingsActivity extends AppCompatActivity {
     private Button btnSaveApiKey;
     private Spinner spinnerModel;
     private Spinner spinnerMode;
+    private Spinner spinnerTheme;
+    private CheckBox cbShowNumberRow;
+    private Button btnLaunchScanner;
     private LinearLayout llShortcutsList;
     private Button btnAddShortcut;
     private TextView tvPatternStats;
@@ -98,6 +104,9 @@ public class SettingsActivity extends AppCompatActivity {
         btnSaveApiKey = findViewById(R.id.btnSaveApiKey);
         spinnerModel = findViewById(R.id.spinnerModel);
         spinnerMode = findViewById(R.id.spinnerMode);
+        spinnerTheme = findViewById(R.id.spinnerTheme);
+        cbShowNumberRow = findViewById(R.id.cbShowNumberRow);
+        btnLaunchScanner = findViewById(R.id.btnLaunchScanner);
         llShortcutsList = findViewById(R.id.llShortcutsList);
         btnAddShortcut = findViewById(R.id.btnAddShortcut);
         tvPatternStats = findViewById(R.id.tvPatternStats);
@@ -126,6 +135,22 @@ public class SettingsActivity extends AppCompatActivity {
                 imm.showInputMethodPicker();
             }
         });
+
+        // Launch Contact Card Scanner
+        if (btnLaunchScanner != null) {
+            btnLaunchScanner.setOnClickListener(v -> {
+                Intent intent = new Intent(this, CardScannerActivity.class);
+                startActivity(intent);
+            });
+        }
+
+        // Toggle Number Row
+        if (cbShowNumberRow != null) {
+            cbShowNumberRow.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                prefs.setShowNumberRow(isChecked);
+                Toast.makeText(this, isChecked ? "Permanent Number Row enabled" : "Text & Numbers separated (Default)", Toast.LENGTH_SHORT).show();
+            });
+        }
 
         // Microphone Permission Request
         btnGrantMicPermission.setOnClickListener(v -> {
@@ -260,6 +285,43 @@ public class SettingsActivity extends AppCompatActivity {
             @Override
             public void onNothingSelected(AdapterView<?> parent) {}
         });
+
+        // Theme Spinner
+        if (spinnerTheme != null) {
+            final List<KeyboardTheme> allThemes = KeyboardTheme.getAllThemes();
+            List<String> themeDisplayNames = new ArrayList<>();
+            int selectedThemeIdx = 0;
+            String curThemeId = prefs.getThemeId();
+
+            for (int i = 0; i < allThemes.size(); i++) {
+                KeyboardTheme t = allThemes.get(i);
+                themeDisplayNames.add(t.icon + "  " + t.name);
+                if (t.id.equalsIgnoreCase(curThemeId)) {
+                    selectedThemeIdx = i;
+                }
+            }
+
+            ArrayAdapter<String> themeAdapter = new ArrayAdapter<>(this, R.layout.spinner_item, themeDisplayNames);
+            themeAdapter.setDropDownViewResource(R.layout.spinner_item);
+            spinnerTheme.setAdapter(themeAdapter);
+            spinnerTheme.setSelection(selectedThemeIdx);
+
+            spinnerTheme.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                @Override
+                public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                    if (position >= 0 && position < allThemes.size()) {
+                        prefs.setThemeId(allThemes.get(position).id);
+                    }
+                }
+                @Override
+                public void onNothingSelected(AdapterView<?> parent) {}
+            });
+        }
+
+        // Permanent Number Row CheckBox
+        if (cbShowNumberRow != null) {
+            cbShowNumberRow.setChecked(prefs.isShowNumberRow());
+        }
     }
 
     private void updateModelsSpinner(List<String> models) {

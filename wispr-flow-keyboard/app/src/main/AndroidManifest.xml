@@ -5,16 +5,23 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
-    <!-- Queries for Android 11+ Speech Recognition -->
+    <!-- Queries for Android 11+ Speech Recognition & Camera -->
     <queries>
         <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>
         <intent>
             <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
         </intent>
     </queries>
 
@@ -38,6 +45,14 @@
             </intent-filter>
         </activity>
 
+        <!-- Dedicated Contact Card Scanner Activity -->
+        <activity
+            android:name=".CardScannerActivity"
+            android:exported="true"
+            android:label="Contact Card Scanner"
+            android:theme="@style/Theme.WisprFlow"
+            android:windowSoftInputMode="adjustResize" />
+
         <!-- Wispr Flow System-Wide Custom Keyboard (InputMethodService) -->
         <service
             android:name=".WisprKeyboardService"
@@ -51,6 +66,17 @@
                 android:name="android.view.im"
                 android:resource="@xml/method" />
         </service>
+
+        <!-- FileProvider for Sharing & Inserting Scanned Contact Card Images -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.wisprflow.keyboard.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
     </application>
 

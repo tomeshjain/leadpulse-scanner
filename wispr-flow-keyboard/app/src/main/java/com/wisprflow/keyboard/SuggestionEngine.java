@@ -12,17 +12,17 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
 /**
- * Intelligent Typing Suggestion Engine.
- * - Dynamically learns typing patterns and word usage frequencies from the user.
- * - Remembers collocated words (bigram transitions e.g. "Good" -> "Morning", "Thank" -> "you").
- * - Integrates shortcuts expansion and autocomplete.
+ * Intelligent Typing Suggestion Engine with:
+ * - Dynamic pattern learning and word frequency tracking.
+ * - Bigram collocations (next-word prediction).
+ * - Real-time spelling suggestions, typo detection & autocorrect candidates.
+ * - Shortcuts expansion.
  */
 public class SuggestionEngine {
 
@@ -49,6 +49,86 @@ public class SuggestionEngine {
     // Bigram Collocations: prevWord -> (nextWord -> count)
     private final Map<String, Map<String, Integer>> collocations = new HashMap<>();
 
+    // Fast Lookup Map for Common English Typos & Misspellings
+    private static final Map<String, String> COMMON_TYPOS = new HashMap<>();
+
+    static {
+        // High frequency common misspellings
+        COMMON_TYPOS.put("teh", "the");
+        COMMON_TYPOS.put("taht", "that");
+        COMMON_TYPOS.put("wiht", "with");
+        COMMON_TYPOS.put("becuase", "because");
+        COMMON_TYPOS.put("becasue", "because");
+        COMMON_TYPOS.put("bcuz", "because");
+        COMMON_TYPOS.put("recieved", "received");
+        COMMON_TYPOS.put("receved", "received");
+        COMMON_TYPOS.put("seperate", "separate");
+        COMMON_TYPOS.put("separete", "separate");
+        COMMON_TYPOS.put("definately", "definitely");
+        COMMON_TYPOS.put("definitly", "definitely");
+        COMMON_TYPOS.put("adress", "address");
+        COMMON_TYPOS.put("addres", "address");
+        COMMON_TYPOS.put("tommorow", "tomorrow");
+        COMMON_TYPOS.put("tommorrow", "tomorrow");
+        COMMON_TYPOS.put("tomorow", "tomorrow");
+        COMMON_TYPOS.put("alot", "a lot");
+        COMMON_TYPOS.put("beleive", "believe");
+        COMMON_TYPOS.put("occured", "occurred");
+        COMMON_TYPOS.put("untill", "until");
+        COMMON_TYPOS.put("wierd", "weird");
+        COMMON_TYPOS.put("thier", "their");
+        COMMON_TYPOS.put("writting", "writing");
+        COMMON_TYPOS.put("goverment", "government");
+        COMMON_TYPOS.put("reccomend", "recommend");
+        COMMON_TYPOS.put("accomodate", "accommodate");
+        COMMON_TYPOS.put("calender", "calendar");
+        COMMON_TYPOS.put("concious", "conscious");
+        COMMON_TYPOS.put("neccessary", "necessary");
+        COMMON_TYPOS.put("necesary", "necessary");
+        COMMON_TYPOS.put("truely", "truly");
+        COMMON_TYPOS.put("embarass", "embarrass");
+        COMMON_TYPOS.put("oppurtunity", "opportunity");
+        COMMON_TYPOS.put("schedul", "schedule");
+        COMMON_TYPOS.put("mispell", "misspell");
+        COMMON_TYPOS.put("suprise", "surprise");
+        COMMON_TYPOS.put("succesful", "successful");
+        COMMON_TYPOS.put("intrest", "interest");
+        COMMON_TYPOS.put("bussiness", "business");
+        COMMON_TYPOS.put("buisness", "business");
+        COMMON_TYPOS.put("collegue", "colleague");
+        COMMON_TYPOS.put("relevent", "relevant");
+        COMMON_TYPOS.put("maintainance", "maintenance");
+        COMMON_TYPOS.put("familar", "familiar");
+        COMMON_TYPOS.put("priviledge", "privilege");
+        COMMON_TYPOS.put("noticable", "noticeable");
+        COMMON_TYPOS.put("guarentee", "guarantee");
+        COMMON_TYPOS.put("experiance", "experience");
+        COMMON_TYPOS.put("enviroment", "environment");
+        COMMON_TYPOS.put("diferent", "different");
+        COMMON_TYPOS.put("commited", "committed");
+        COMMON_TYPOS.put("begining", "beginning");
+        COMMON_TYPOS.put("basicly", "basically");
+        COMMON_TYPOS.put("appologies", "apologies");
+        COMMON_TYPOS.put("agian", "again");
+        COMMON_TYPOS.put("acceptible", "acceptable");
+        COMMON_TYPOS.put("acheive", "achieve");
+        COMMON_TYPOS.put("aquire", "acquire");
+        COMMON_TYPOS.put("comming", "coming");
+        COMMON_TYPOS.put("doesnt", "doesn't");
+        COMMON_TYPOS.put("dont", "don't");
+        COMMON_TYPOS.put("cant", "can't");
+        COMMON_TYPOS.put("wont", "won't");
+        COMMON_TYPOS.put("didnt", "didn't");
+        COMMON_TYPOS.put("couldnt", "couldn't");
+        COMMON_TYPOS.put("shouldnt", "shouldn't");
+        COMMON_TYPOS.put("wouldnt", "wouldn't");
+        COMMON_TYPOS.put("whats", "what's");
+        COMMON_TYPOS.put("its", "it's");
+        COMMON_TYPOS.put("youre", "you're");
+        COMMON_TYPOS.put("theyre", "they're");
+        COMMON_TYPOS.put("weve", "we've");
+    }
+
     // Default base vocabulary
     private static final String[] BASE_WORDS = {
         "the", "be", "to", "of", "and", "a", "in", "that", "have", "I", "it", "for", "not", "on", "with",
@@ -62,7 +142,13 @@ public class SuggestionEngine {
         "morning", "evening", "afternoon", "night", "tomorrow", "today", "yesterday", "meeting", "please",
         "help", "send", "call", "email", "check", "update", "project", "ready", "done", "fine", "sure",
         "happy", "welcome", "best", "regards", "wishes", "hello", "hi", "hey", "awesome", "perfect",
-        "sounds", "looking", "forward", "urgent", "client", "sales", "status", "team", "review", "schedule"
+        "sounds", "looking", "forward", "urgent", "client", "sales", "status", "team", "review", "schedule",
+        "business", "address", "company", "customer", "invoice", "payment", "received", "separate",
+        "definitely", "believe", "opportunity", "contact", "phone", "number", "message", "service",
+        "support", "contract", "proposal", "agreement", "account", "manager", "product", "price",
+        "discount", "order", "delivery", "confirm", "available", "discuss", "connect", "question",
+        "answer", "details", "information", "attachment", "feedback", "solution", "issue", "problem",
+        "resolved", "experience", "different", "always", "coming", "again", "truly", "basically"
     };
 
     public SuggestionEngine(Context context, ShortcutsManager shortcutsManager) {
@@ -73,12 +159,11 @@ public class SuggestionEngine {
     }
 
     private void initializeBaseVocabulary() {
-        // Seed base words with a default baseline weight of 5
         for (String w : BASE_WORDS) {
             wordFrequency.put(w.toLowerCase(Locale.US), 5);
         }
 
-        // Seed common English collocations
+        // Common English collocations
         seedCollocation("good", "morning", 20);
         seedCollocation("good", "afternoon", 18);
         seedCollocation("good", "evening", 18);
@@ -118,6 +203,8 @@ public class SuggestionEngine {
 
         seedCollocation("can", "we connect", 20);
         seedCollocation("can", "you please", 18);
+        seedCollocation("contact", "card", 20);
+        seedCollocation("business", "card", 20);
     }
 
     private void seedCollocation(String w1, String w2, int weight) {
@@ -127,7 +214,6 @@ public class SuggestionEngine {
     }
 
     private void loadLearnedPatterns() {
-        // Load user word frequencies
         String wordsJson = prefs.getString(KEY_USER_WORDS_JSON, null);
         if (wordsJson != null) {
             try {
@@ -140,7 +226,6 @@ public class SuggestionEngine {
             } catch (JSONException ignored) {}
         }
 
-        // Load user collocations
         String collocationsJson = prefs.getString(KEY_COLLOCATIONS_JSON, null);
         if (collocationsJson != null) {
             try {
@@ -164,7 +249,7 @@ public class SuggestionEngine {
         try {
             JSONObject wordsObj = new JSONObject();
             for (Map.Entry<String, Integer> e : wordFrequency.entrySet()) {
-                if (e.getValue() > 5) { // Only save learned words exceeding baseline
+                if (e.getValue() > 5) {
                     wordsObj.put(e.getKey(), e.getValue());
                 }
             }
@@ -182,9 +267,6 @@ public class SuggestionEngine {
         } catch (JSONException ignored) {}
     }
 
-    /**
-     * Learns a single word and updates its frequency based on typing patterns.
-     */
     public synchronized void recordWord(String word) {
         if (word == null || word.trim().length() < 2) return;
         String clean = word.trim().toLowerCase(Locale.US);
@@ -192,9 +274,6 @@ public class SuggestionEngine {
         wordFrequency.put(clean, current + 2);
     }
 
-    /**
-     * Learns a collocated word pair (previous word -> current word).
-     */
     public synchronized void recordWordPair(String prevWord, String currentWord) {
         if (prevWord == null || currentWord == null) return;
         String w1 = prevWord.trim().toLowerCase(Locale.US);
@@ -205,14 +284,37 @@ public class SuggestionEngine {
 
         Map<String, Integer> map = collocations.computeIfAbsent(w1, k -> new HashMap<>());
         int count = map.getOrDefault(w2, 0);
-        map.put(w2, count + 3); // High reinforcement for collocated bigrams
+        map.put(w2, count + 3);
     }
 
     /**
-     * Generates up to maxCount suggestions based on current typing context.
-     * @param prevWord The previously completed word (for collocation prediction).
-     * @param currentPrefix The prefix of the word currently being typed.
-     * @param maxCount Maximum number of suggestions to return (typically 3 to 5).
+     * Calculates Damerau-Levenshtein distance between two strings for spelling correction.
+     */
+    public static int levenshteinDistance(String s1, String s2) {
+        if (s1 == null || s2 == null) return 999;
+        int len1 = s1.length();
+        int len2 = s2.length();
+        if (Math.abs(len1 - len2) > 2) return 999;
+
+        int[] costs = new int[len2 + 1];
+        for (int j = 0; j <= len2; j++) costs[j] = j;
+
+        for (int i = 1; i <= len1; i++) {
+            costs[0] = i;
+            int nw = i - 1;
+            for (int j = 1; j <= len2; j++) {
+                int cj = Math.min(1 + Math.min(costs[j], costs[j - 1]),
+                        s1.charAt(i - 1) == s2.charAt(j - 1) ? nw : nw + 1);
+                nw = costs[j];
+                costs[j] = cj;
+            }
+        }
+        return costs[len2];
+    }
+
+    /**
+     * Generates up to maxCount suggestions based on current typing context,
+     * including SPELLING SUGGESTIONS, shortcuts expansion, prefix matching, and collocations.
      */
     public synchronized List<String> getSuggestions(String prevWord, String currentPrefix, int maxCount) {
         List<String> results = new ArrayList<>();
@@ -238,7 +340,23 @@ public class SuggestionEngine {
             }
         }
 
-        // 2. If typing a prefix: filter words starting with prefix ordered by learned frequency
+        // 2. SPELLING SUGGESTIONS & Autocorrect lookup
+        if (!cleanPrefix.isEmpty() && cleanPrefix.length() >= 3) {
+            String lower = cleanPrefix.toLowerCase(Locale.US);
+            // Check known typo map
+            if (COMMON_TYPOS.containsKey(lower)) {
+                String correction = COMMON_TYPOS.get(lower);
+                if (Character.isUpperCase(cleanPrefix.charAt(0)) && correction.length() > 0) {
+                    correction = Character.toUpperCase(correction.charAt(0)) + correction.substring(1);
+                }
+                if (!added.contains(correction.toLowerCase(Locale.US))) {
+                    results.add(correction);
+                    added.add(correction.toLowerCase(Locale.US));
+                }
+            }
+        }
+
+        // 3. If typing a prefix: filter words starting with prefix ordered by learned frequency
         if (!cleanPrefix.isEmpty()) {
             final String lowerPrefix = cleanPrefix.toLowerCase(Locale.US);
             boolean isCapitalized = Character.isUpperCase(cleanPrefix.charAt(0));
@@ -251,7 +369,7 @@ public class SuggestionEngine {
                 }
             }
 
-            // Also check if collocations from prevWord match the prefix!
+            // Also check if collocations from prevWord match the prefix
             if (!cleanPrev.isEmpty() && collocations.containsKey(cleanPrev)) {
                 Map<String, Integer> colMap = collocations.get(cleanPrev);
                 for (Map.Entry<String, Integer> ce : colMap.entrySet()) {
@@ -261,7 +379,21 @@ public class SuggestionEngine {
                 }
             }
 
-            // Sort by frequency descending
+            // If few or no prefix matches found, check Levenshtein distance for spelling corrections
+            if (candidates.size() < 2 && lowerPrefix.length() >= 3) {
+                int maxDist = lowerPrefix.length() >= 5 ? 2 : 1;
+                for (Map.Entry<String, Integer> entry : wordFrequency.entrySet()) {
+                    String dictWord = entry.getKey();
+                    if (Math.abs(dictWord.length() - lowerPrefix.length()) <= maxDist) {
+                        int dist = levenshteinDistance(lowerPrefix, dictWord);
+                        if (dist <= maxDist) {
+                            candidates.add(new ScoredWord(dictWord, (10 - dist * 4) + entry.getValue()));
+                        }
+                    }
+                }
+            }
+
+            // Sort candidates by frequency / match score descending
             Collections.sort(candidates, (a, b) -> Integer.compare(b.score, a.score));
 
             for (ScoredWord c : candidates) {
@@ -276,7 +408,7 @@ public class SuggestionEngine {
                 }
             }
         } 
-        // 3. If NOT typing a prefix (at a word boundary): Predict next collocated words from prevWord!
+        // 4. If NOT typing a prefix (at a word boundary): Predict next collocated words from prevWord!
         else if (!cleanPrev.isEmpty() && collocations.containsKey(cleanPrev)) {
             Map<String, Integer> colMap = collocations.get(cleanPrev);
             List<Map.Entry<String, Integer>> sortedCollocations = new ArrayList<>(colMap.entrySet());
@@ -292,7 +424,7 @@ public class SuggestionEngine {
             }
         }
 
-        // 4. Fill remaining slots with top common words or helpful contextual phrases
+        // 5. Fill remaining slots with top common words or helpful contextual phrases
         if (results.size() < maxCount) {
             String[] fallbacks = cleanPrev.isEmpty() ? 
                 new String[]{"I", "Hello", "Thanks"} : 

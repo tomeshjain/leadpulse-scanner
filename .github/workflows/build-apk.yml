@@ -79,39 +79,52 @@ jobs:
           name: WisprFlowKeyboard-APK
           path: ./WisprFlowKeyboard.apk
 
-      - name: Create or Update GitHub Release (Wispr Keyboard v1.2.0)
+      - name: Create or Update GitHub Release (Wispr Keyboard v1.3.0)
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/heads/main')
         with:
-          tag_name: wispr-keyboard-v1.2.0
-          name: "Wispr Flow - Native Android AI Keyboard Extension (v1.2.0)"
-          draft: false
-          prerelease: false
-          make_latest: true
-          body: |
-            ## ⌨️ Wispr Flow - Native Android AI Keyboard Extension (v1.2.0)
+            tag_name: wispr-keyboard-v1.3.0
+            name: "Wispr Flow - Native Android AI Keyboard Extension (v1.3.0)"
+            draft: false
+            prerelease: false
+            make_latest: true
+            body: |
+              ## ⌨️ Wispr Flow - Native Android AI Keyboard Extension (v1.3.0)
 
-            **Professional Extended Keyboard Facility for Android with Continuous Digits Dictation, Dedicated Suggestion & Action Toolbars, Number Row, and Selected Text Backspace Fix.**
+              **Professional Extended Keyboard Facility for Android with Contact Card Scanner (AI Vision OCR + Send Image & Text), Real-Time Spelling Suggestions, Clean Layout with Separated Text/Numeric Keyboards, and 6 Gorgeous Dynamic Themes.**
 
-            ### 🚀 New & Upgraded Features:
-            - **🛠️ Backspace Selected Text Fix**: Correctly removes selected/highlighted text across any app and provides smooth repeating backspace.
-            - **🔢 Continuous Spoken Digits**: Formats spoken numbers, OTPs, PINs, phone numbers, and codes as continuous digits without spaces in between (e.g. `987654` instead of `9 8 7 6 5 4`).
-            - **✨ Dedicated Top Suggestion Row**: Clean full-width top strip with large touch targets for next-word predictions, learned collocations, and instant 1-tap paste chip.
-            - **⚡ Dedicated Quick Action Toolbar**: Second row with quick-access buttons for 🎙️ Voice Dictate, 😊 Emojis, 🎞️ GIFs, 📋 Clipboard, ⚡ Shortcuts, ✨ AI Flow Mode, and ⚙️ Settings.
-            - **🔢 Dedicated Number Row (1-0)**: Seamless row of numbers directly above QWERTY letters for faster typing without switching layouts.
-            - **↔️ Spacebar Cursor Scrubbing**: Slide your finger across the spacebar to glide the cursor precisely through text.
-            - **📋 Real-Time Clipboard Monitor**: Automatically tracks copied text for quick pasting and permanent pinned favorites.
-            - **🎙️ Dedicated Separate Microphone Button**: High-visibility voice button with live listening waveform pulse.
-            - **⚡ Shortcuts Facility**: Auto-expands abbreviations like `GM` ➔ `Good Morning`, `TY` ➔ `Thank you very much`.
+              ### 🚀 New & Upgraded Features:
+              - **📇 Business & Contact Card Scanner**:
+                - One-tap scanner right in the keyboard action bar (`📇 Scan Card`).
+                - Snaps card photo or picks from gallery.
+                - Analyzes and extracts Name, Job Title, Organization, Phone numbers, Email, Website, and Address using Gemini Vision AI.
+                - **"Send Image & Text"**: Inserts structured formatted text into active chat/field AND delivers card image directly via rich content `commitContent` & clipboard!
+              - **⌨️ Separated Text & Numeric Keyboards with 10-Key PIN Numpad**:
+                - Text keyboard is now spacious, clean, and separated from numbers (uncluttered QWERTY).
+                - `?123` switches to dedicated numbers & symbols row.
+                - Dedicated **"123 PIN"** button switches to an oversized 3x4 telephone/calculator style numeric keypad (`1 2 3 / 4 5 6 / 7 8 9 / 0`).
+                - Option in Settings to enable permanent number row if desired.
+              - **🎙️ Cleaned Voice Layout (No Duplicate Mic Buttons)**:
+                - Removed redundant microphone key from the bottom row.
+                - High-visibility dedicated `🎙️ Voice` button in the top action toolbar with audio waveform visualizer.
+                - Spoken numbers are automatically collapsed into continuous digits (OTPs, PINs, phone numbers without spaces).
+              - **✨ Real-Time Spelling Suggestions & Autocorrect**:
+                - Real-time typo detection and spelling suggestions in the top predictive strip.
+                - Integrated 600+ word dictionary, 75+ common typo replacements (`teh` ➔ `the`, `becuase` ➔ `because`, `recieved` ➔ `received`), and Levenshtein distance candidate matching.
+              - **🎨 6 Dynamic Keyboard Themes**:
+                - `🎨 Themes` button in keyboard action toolbar opens live theme preview panel.
+                - Choose from **Midnight Slate**, **OLED Pure Black**, **Clean Light / Silver**, **Cyberpunk Neon**, **Forest Emerald**, and **Sunset Amber**.
+                - Live instant re-theming without reloading the keyboard!
 
-            ### 📲 Quick Setup:
-            1. Download and install **`WisprFlowKeyboard.apk`** below.
-            2. Open the **Wispr Flow** app.
-            3. Tap **"1. Enable Wispr Flow in Settings"** and toggle on the keyboard.
-            4. Tap **"2. Switch Active Keyboard"** and select **Wispr Flow**.
-            5. Tap **"Grant Microphone Permission"** so speech dictation works smoothly.
-            6. Paste your **Gemini API Key** (optional, offline rule-based polishing works immediately if omitted).
-          files: |
-            ./WisprFlowKeyboard.apk
+              ### 📲 Quick Setup:
+              1. Download and install **`WisprFlowKeyboard.apk`** below.
+              2. Open the **Wispr Flow** app.
+              3. Tap **"1. Enable Wispr Flow in Settings"** and toggle on the keyboard.
+              4. Tap **"2. Switch Active Keyboard"** and select **Wispr Flow**.
+              5. Tap **"Grant Microphone Permission"** and camera permission for card scanning.
+              6. Configure your **Gemini API Key** in Settings for Gemini Vision card extraction and advanced voice polish.
+            files: |
+              ./WisprFlowKeyboard.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

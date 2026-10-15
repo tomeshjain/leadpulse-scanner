@@ -18,9 +18,12 @@ public class KeyboardPreferences {
     private static final String KEY_FLOW_MODE = "flow_mode";
     private static final String KEY_HAPTIC = "haptic_feedback";
     private static final String KEY_AVAILABLE_MODELS = "available_models";
+    private static final String KEY_THEME_ID = "keyboard_theme_id";
+    private static final String KEY_SHOW_NUMBER_ROW = "show_permanent_number_row";
 
     public static final String DEFAULT_MODEL = "gemini-2.0-flash";
     public static final String DEFAULT_MODE = "polish";
+    public static final String DEFAULT_THEME = "midnight_slate";
 
     private final SharedPreferences prefs;
 
@@ -62,6 +65,22 @@ public class KeyboardPreferences {
 
     public void setHapticEnabled(boolean enabled) {
         prefs.edit().putBoolean(KEY_HAPTIC, enabled).apply();
+    }
+
+    public String getThemeId() {
+        return prefs.getString(KEY_THEME_ID, DEFAULT_THEME);
+    }
+
+    public void setThemeId(String themeId) {
+        prefs.edit().putString(KEY_THEME_ID, themeId != null ? themeId.trim() : DEFAULT_THEME).apply();
+    }
+
+    public boolean isShowNumberRow() {
+        return prefs.getBoolean(KEY_SHOW_NUMBER_ROW, false);
+    }
+
+    public void setShowNumberRow(boolean show) {
+        prefs.edit().putBoolean(KEY_SHOW_NUMBER_ROW, show).apply();
     }
 
     public List<String> getAvailableModels() {

@@ -2,6 +2,7 @@ package com.wisprflow.keyboard;
 
 import android.Manifest;
 import android.content.ClipData;
+import android.content.ClipDescription;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
@@ -10,6 +11,8 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.inputmethodservice.InputMethodService;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -33,6 +36,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.core.content.ContextCompat;
+import androidx.core.view.inputmethod.InputConnectionCompat;
+import androidx.core.view.inputmethod.InputContentInfoCompat;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,14 +47,13 @@ import java.util.Locale;
  * Wispr Flow Professional Extended Android Keyboard (InputMethodService)
  * 
  * Features:
- * 1. Dedicated Top Suggestion Row with Next-Word Prediction & Collocation Learning.
- * 2. Dedicated Action Toolbar Row (🎙️ Voice, 😊 Emoji, 🎞️ GIF, 📋 Clipboard, ⚡ Shortcuts, ✨ Mode, ⚙️ Settings).
- * 3. Dedicated Number Row (1-0) above QWERTY for fast, un-cluttered typing.
- * 4. Full Backspace functionality supporting selected text deletion and repeat delete.
- * 5. Spacebar cursor scrubbing (swipe spacebar left/right to move cursor).
- * 6. System clipboard monitor with instant 1-tap paste chip and pinned history.
- * 7. Continuous spoken digits formatting (OTPs, phone numbers, codes without spaces).
- * 8. Gemini 2.0 Flash AI voice dictation with offline fallback.
+ * 1. Dedicated Top Suggestion Row with Next-Word Prediction, Collocations & Real-Time Spelling Suggestions.
+ * 2. Dedicated Action Toolbar Row (🎙️ Voice, 📇 Scan Card, 🎨 Themes, 😊 Emoji, 🎞️ GIF, 📋 Clipboard, ⚡ Shortcuts, ✨ Mode, ⚙️ Settings).
+ * 3. Clean Separation of Text and Numeric/Symbol Keyboards (with dedicated 10-key PIN Numpad).
+ * 4. Contact Card Scanner: Extracts business card details using Gemini AI and sends text + image.
+ * 5. Dynamic Themes (Midnight Slate, OLED Black, Clean Light, Cyberpunk Neon, Forest Emerald, Sunset Amber).
+ * 6. Single high-visibility microphone button (no duplicates) with continuous digits formatting.
+ * 7. Spacebar cursor scrubbing and selected text backspace deletion.
  */
 public class WisprKeyboardService extends InputMethodService {
 
@@ -61,7 +65,8 @@ public class WisprKeyboardService extends InputMethodService {
         EMOJI,
         GIFS,
         CLIPBOARD,
-        SHORTCUTS
+        SHORTCUTS,
+        THEMES
     }
 
     private KeyboardPreferences prefs;
@@ -78,6 +83,7 @@ public class WisprKeyboardService extends InputMethodService {
     private boolean isShifted = false;
     private boolean isCapsLocked = false;
     private boolean isSymbolMode = false;
+    private boolean isNumpadMode = false;
     private long lastShiftClickTime = 0;
 
     // Typing tracking for Suggestions & Collocations
@@ -126,9 +132,10 @@ public class WisprKeyboardService extends InputMethodService {
 
     @Override
     public View onCreateInputView() {
+        KeyboardTheme theme = KeyboardTheme.getTheme(prefs != null ? prefs.getThemeId() : null);
         keyboardRoot = new LinearLayout(this);
         keyboardRoot.setOrientation(LinearLayout.VERTICAL);
-        keyboardRoot.setBackgroundColor(Color.parseColor("#080b11"));
+        keyboardRoot.setBackgroundColor(theme.backgroundColor);
         keyboardRoot.setPadding(dpToPx(4), dpToPx(2), dpToPx(4), dpToPx(4));
 
         // 1. Two-Tier Header: Tier 1 (Suggestions) + Tier 2 (Action Toolbar)
@@ -141,7 +148,7 @@ public class WisprKeyboardService extends InputMethodService {
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         keyboardRoot.addView(keysContainer);
 
-        // 3. Panel Container for Emojis, GIFs, Clipboard, Shortcuts
+        // 3. Panel Container for Emojis, GIFs, Clipboard, Shortcuts, Themes
         panelContainer = new LinearLayout(this);
         panelContainer.setOrientation(LinearLayout.VERTICAL);
         panelContainer.setLayoutParams(new LinearLayout.LayoutParams(
@@ -166,8 +173,26 @@ public class WisprKeyboardService extends InputMethodService {
         isShifted = false;
         isCapsLocked = false;
         isSymbolMode = false;
-        showPanel(PanelMode.KEYBOARD);
+        isNumpadMode = false;
 
+        // Check if a contact card was scanned by CardScannerActivity and ready for insertion
+        if (ContactCardTransfer.hasPendingCard()) {
+            ContactCardTransfer.CardPayload payload = ContactCardTransfer.consumePendingCard();
+            if (payload != null) {
+                InputConnection ic = getCurrentInputConnection();
+                if (ic != null) {
+                    ic.commitText(payload.text + "\n", 1);
+                    if (payload.imageUri != null) {
+                        sendImageMedia(payload.imageUri, payload.mimeType);
+                    } else {
+                        Toast.makeText(this, "📇 Contact Card text inserted!", Toast.LENGTH_SHORT).show();
+                    }
+                }
+            }
+        }
+
+        applyCurrentTheme();
+        showPanel(PanelMode.KEYBOARD);
         captureSystemClipboard();
         updateEnterKeyAction(info);
         updateSuggestions();
@@ -240,6 +265,26 @@ public class WisprKeyboardService extends InputMethodService {
         btnVoice.setLayoutParams(voiceParams);
         btnVoice.setOnClickListener(v -> toggleVoiceDictation());
         iconRow.addView(btnVoice);
+
+        // 📇 Contact Card Scanner Button
+        Button btnScanCard = new Button(this);
+        btnScanCard.setText("📇 Scan Card");
+        btnScanCard.setTextSize(11);
+        btnScanCard.setTextColor(Color.WHITE);
+        btnScanCard.setAllCaps(false);
+        btnScanCard.setBackground(createChipDrawable("#065f46", "#10b981", 12));
+        btnScanCard.setPadding(dpToPx(10), 0, dpToPx(10), 0);
+        LinearLayout.LayoutParams scanParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, dpToPx(30));
+        scanParams.setMargins(dpToPx(2), 0, dpToPx(4), 0);
+        btnScanCard.setLayoutParams(scanParams);
+        btnScanCard.setOnClickListener(v -> openCardScanner());
+        iconRow.addView(btnScanCard);
+
+        // 🎨 Themes Picker Button
+        Button btnThemes = createToolbarIconButton("🎨", Color.TRANSPARENT);
+        btnThemes.setOnClickListener(v -> togglePanel(PanelMode.THEMES));
+        iconRow.addView(btnThemes);
 
         // 😊 Emojis Toggle
         Button btnEmoji = createToolbarIconButton("😊", Color.TRANSPARENT);
@@ -454,6 +499,9 @@ public class WisprKeyboardService extends InputMethodService {
                     break;
                 case SHORTCUTS:
                     buildShortcutsPanel();
+                    break;
+                case THEMES:
+                    buildThemesPanel();
                     break;
             }
         }
@@ -870,47 +918,49 @@ public class WisprKeyboardService extends InputMethodService {
         return bar;
     }
 
-    // --- MAIN KEYBOARD ROWS WITH DEDICATED NUMBER ROW ---
+    // --- MAIN KEYBOARD ROWS WITH CLEAN TEXT / NUMERIC SEPARATION ---
 
     private void renderKeyRows() {
         if (keysContainer == null) return;
         keysContainer.removeAllViews();
 
-        if (isSymbolMode) {
+        if (isNumpadMode) {
+            renderNumpadRows();
+        } else if (isSymbolMode) {
             renderSymbolRows();
+            renderSpacebarRow();
         } else {
             renderAlphabetRows();
+            renderSpacebarRow();
         }
-
-        renderSpacebarRow();
     }
 
     private void renderAlphabetRows() {
-        // ROW 0: Dedicated Top Number Row (1 2 3 4 5 6 7 8 9 0)
-        String[] numbers = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"};
-        LinearLayout numRow = new LinearLayout(this);
-        numRow.setOrientation(LinearLayout.HORIZONTAL);
-        numRow.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        numRow.setPadding(0, dpToPx(1), 0, dpToPx(1));
+        // Optional Dedicated Top Number Row (only if user explicitly turned it ON in settings)
+        if (prefs != null && prefs.isShowNumberRow()) {
+            String[] numbers = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"};
+            LinearLayout numRow = new LinearLayout(this);
+            numRow.setOrientation(LinearLayout.HORIZONTAL);
+            numRow.setLayoutParams(new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            numRow.setPadding(0, dpToPx(1), 0, dpToPx(1));
 
-        for (final String num : numbers) {
-            Button numBtn = createButton(num, true);
-            numBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
-            numBtn.setTextColor(Color.parseColor("#94a3b8"));
-            numBtn.setBackground(createChipDrawable("#101726", "#1c283d", 6));
-            LinearLayout.LayoutParams p = (LinearLayout.LayoutParams) numBtn.getLayoutParams();
-            p.height = dpToPx(35);
-            numBtn.setLayoutParams(p);
+            for (final String num : numbers) {
+                Button numBtn = createButton(num, true);
+                numBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+                LinearLayout.LayoutParams p = (LinearLayout.LayoutParams) numBtn.getLayoutParams();
+                p.height = dpToPx(34);
+                numBtn.setLayoutParams(p);
 
-            numBtn.setOnClickListener(v -> {
-                insertText(num);
-                currentWordBuffer.append(num);
-                updateSuggestions();
-            });
-            numRow.addView(numBtn);
+                numBtn.setOnClickListener(v -> {
+                    insertText(num);
+                    currentWordBuffer.append(num);
+                    updateSuggestions();
+                });
+                numRow.addView(numBtn);
+            }
+            keysContainer.addView(numRow);
         }
-        keysContainer.addView(numRow);
 
         // Standard QWERTY rows
         String[][] alphaRows = {
@@ -939,6 +989,7 @@ public class WisprKeyboardService extends InputMethodService {
     }
 
     private void renderSymbolRows() {
+        // Dedicated number and symbol rows
         String[][] symRows = {
             {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"},
             {"@", "#", "$", "%", "&", "-", "+", "(", ")", "/"},
@@ -959,6 +1010,88 @@ public class WisprKeyboardService extends InputMethodService {
         }
     }
 
+    /**
+     * Dedicated 10-Key Numpad / PIN Layout for fast numerical, OTP, and calculation input.
+     */
+    private void renderNumpadRows() {
+        String[][] numpad = {
+            {"1", "2", "3"},
+            {"4", "5", "6"},
+            {"7", "8", "9"},
+            {",", "0", "."}
+        };
+
+        for (String[] rowKeys : numpad) {
+            LinearLayout rowLayout = new LinearLayout(this);
+            rowLayout.setOrientation(LinearLayout.HORIZONTAL);
+            rowLayout.setLayoutParams(new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            rowLayout.setPadding(dpToPx(28), dpToPx(2), dpToPx(28), dpToPx(2));
+
+            for (final String key : rowKeys) {
+                Button btn = createButton(key, false);
+                btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 19);
+                btn.setTypeface(null, Typeface.BOLD);
+                LinearLayout.LayoutParams p = (LinearLayout.LayoutParams) btn.getLayoutParams();
+                p.height = dpToPx(46);
+                btn.setLayoutParams(p);
+                btn.setOnClickListener(v -> {
+                    insertText(key);
+                    triggerHaptic(10);
+                });
+                rowLayout.addView(btn);
+            }
+            keysContainer.addView(rowLayout);
+        }
+
+        // Bottom row of numpad: ABC | ?#+ | ⌫ | ⏎
+        LinearLayout bottomRow = new LinearLayout(this);
+        bottomRow.setOrientation(LinearLayout.HORIZONTAL);
+        bottomRow.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        bottomRow.setPadding(dpToPx(14), dpToPx(3), dpToPx(14), dpToPx(3));
+
+        Button abcBtn = createButton("ABC", true);
+        LinearLayout.LayoutParams abcP = (LinearLayout.LayoutParams) abcBtn.getLayoutParams();
+        abcP.weight = 1.2f;
+        abcBtn.setOnClickListener(v -> {
+            isNumpadMode = false;
+            isSymbolMode = false;
+            renderKeyRows();
+            triggerHaptic(15);
+        });
+        bottomRow.addView(abcBtn);
+
+        Button symBtn = createButton("?#+", true);
+        LinearLayout.LayoutParams symP = (LinearLayout.LayoutParams) symBtn.getLayoutParams();
+        symP.weight = 1.0f;
+        symBtn.setOnClickListener(v -> {
+            isNumpadMode = false;
+            isSymbolMode = true;
+            renderKeyRows();
+            triggerHaptic(15);
+        });
+        bottomRow.addView(symBtn);
+
+        Button delBtn = createButton("⌫", true);
+        LinearLayout.LayoutParams delP = (LinearLayout.LayoutParams) delBtn.getLayoutParams();
+        delP.weight = 1.2f;
+        delBtn.setOnClickListener(v -> handleBackspace());
+        bottomRow.addView(delBtn);
+
+        KeyboardTheme theme = KeyboardTheme.getTheme(prefs != null ? prefs.getThemeId() : null);
+        btnEnterKey = createButton("⏎", true);
+        btnEnterKey.setTextColor(Color.WHITE);
+        btnEnterKey.setBackground(createChipDrawable(theme.accentColor, Color.TRANSPARENT, 8));
+        LinearLayout.LayoutParams enterP = (LinearLayout.LayoutParams) btnEnterKey.getLayoutParams();
+        enterP.weight = 1.4f;
+        btnEnterKey.setOnClickListener(v -> handleEnterKey());
+        updateEnterKeyAction(getCurrentInputEditorInfo());
+        bottomRow.addView(btnEnterKey);
+
+        keysContainer.addView(bottomRow);
+    }
+
     private void renderSpacebarRow() {
         LinearLayout bottomRow = new LinearLayout(this);
         bottomRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -972,17 +1105,24 @@ public class WisprKeyboardService extends InputMethodService {
         numParams.weight = 1.3f;
         numBtn.setOnClickListener(v -> {
             isSymbolMode = !isSymbolMode;
+            isNumpadMode = false;
             renderKeyRows();
             triggerHaptic(15);
         });
         bottomRow.addView(numBtn);
 
-        // Emoji Shortcut Key
-        Button emojiBtn = createButton("😊", true);
-        LinearLayout.LayoutParams emParams = (LinearLayout.LayoutParams) emojiBtn.getLayoutParams();
-        emParams.weight = 1.0f;
-        emojiBtn.setOnClickListener(v -> togglePanel(PanelMode.EMOJI));
-        bottomRow.addView(emojiBtn);
+        // If in symbol mode, add 123 PIN button to jump into dedicated PIN Numpad!
+        if (isSymbolMode) {
+            Button pinBtn = createButton("123 PIN", true);
+            LinearLayout.LayoutParams pinParams = (LinearLayout.LayoutParams) pinBtn.getLayoutParams();
+            pinParams.weight = 1.1f;
+            pinBtn.setOnClickListener(v -> {
+                isNumpadMode = true;
+                renderKeyRows();
+                triggerHaptic(15);
+            });
+            bottomRow.addView(pinBtn);
+        }
 
         // Comma
         Button commaBtn = createButton(",", false);
@@ -992,13 +1132,14 @@ public class WisprKeyboardService extends InputMethodService {
         bottomRow.addView(commaBtn);
 
         // NORMAL CLEAN SPACEBAR WITH CURSOR SCRUBBING
+        KeyboardTheme theme = KeyboardTheme.getTheme(prefs != null ? prefs.getThemeId() : null);
         final Button spaceBtn = new Button(this);
         spaceBtn.setText("English • Wispr Flow");
-        spaceBtn.setTextColor(Color.parseColor("#94a3b8"));
+        spaceBtn.setTextColor(theme.subTextColor);
         spaceBtn.setTextSize(13);
         spaceBtn.setAllCaps(false);
-        spaceBtn.setBackground(createChipDrawable("#162032", "#23334d", 8));
-        LinearLayout.LayoutParams spaceParams = new LinearLayout.LayoutParams(0, dpToPx(42), 4.5f);
+        spaceBtn.setBackground(createChipDrawable(theme.keyColor, theme.dividerColor, 8));
+        LinearLayout.LayoutParams spaceParams = new LinearLayout.LayoutParams(0, dpToPx(42), 4.8f);
         spaceParams.setMargins(dpToPx(2), 0, dpToPx(2), 0);
         spaceBtn.setLayoutParams(spaceParams);
 
@@ -1013,7 +1154,7 @@ public class WisprKeyboardService extends InputMethodService {
                     case MotionEvent.ACTION_DOWN:
                         startX = event.getX();
                         isDragging = false;
-                        return false; // let click listener fire if not dragging
+                        return false;
                     case MotionEvent.ACTION_MOVE:
                         float deltaX = event.getX() - startX;
                         if (Math.abs(deltaX) > dpToPx(16)) {
@@ -1053,19 +1194,10 @@ public class WisprKeyboardService extends InputMethodService {
         dotBtn.setOnClickListener(v -> handlePunctuation("."));
         bottomRow.addView(dotBtn);
 
-        // SEPARATE Dedicated Microphone Key in bottom row
-        Button micKey = createButton("🎙️", true);
-        micKey.setTextColor(Color.parseColor("#a5b4fc"));
-        micKey.setBackground(createChipDrawable("#2e1065", "#7c3aed", 8));
-        LinearLayout.LayoutParams micParams = (LinearLayout.LayoutParams) micKey.getLayoutParams();
-        micParams.weight = 1.0f;
-        micKey.setOnClickListener(v -> toggleVoiceDictation());
-        bottomRow.addView(micKey);
-
-        // Enter / Action Key
+        // Enter / Action Key (NO duplicate mic button!)
         btnEnterKey = createButton("⏎", true);
         btnEnterKey.setTextColor(Color.WHITE);
-        btnEnterKey.setBackground(createChipDrawable("#4338ca", "#6366f1", 8));
+        btnEnterKey.setBackground(createChipDrawable(theme.accentColor, Color.TRANSPARENT, 8));
         LinearLayout.LayoutParams enterParams = (LinearLayout.LayoutParams) btnEnterKey.getLayoutParams();
         enterParams.weight = 1.4f;
         btnEnterKey.setOnClickListener(v -> handleEnterKey());
@@ -1170,12 +1302,14 @@ public class WisprKeyboardService extends InputMethodService {
     }
 
     private Button createButton(String text, boolean isFunctionKey) {
+        KeyboardTheme theme = KeyboardTheme.getTheme(prefs != null ? prefs.getThemeId() : null);
         Button btn = new Button(this);
         btn.setText(text);
-        btn.setTextColor(Color.WHITE);
+        btn.setTextColor(theme.textColor);
         btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, isFunctionKey ? 14 : 17);
         btn.setAllCaps(false);
-        btn.setBackground(createChipDrawable(isFunctionKey ? "#1a2538" : "#141d2c", "#243247", 8));
+        int bg = isFunctionKey ? theme.actionKeyColor : theme.keyColor;
+        btn.setBackground(createChipDrawable(bg, theme.dividerColor, 8));
 
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dpToPx(42), 1.0f);
         params.setMargins(dpToPx(2), 0, dpToPx(2), 0);
@@ -1183,15 +1317,21 @@ public class WisprKeyboardService extends InputMethodService {
         return btn;
     }
 
-    private GradientDrawable createChipDrawable(String fillColor, String strokeColor, int radiusDp) {
+    private GradientDrawable createChipDrawable(int fillColor, int strokeColor, int radiusDp) {
         GradientDrawable gd = new GradientDrawable();
         gd.setShape(GradientDrawable.RECTANGLE);
-        gd.setColor(Color.parseColor(fillColor));
-        if (strokeColor != null) {
-            gd.setStroke(dpToPx(1), Color.parseColor(strokeColor));
+        gd.setColor(fillColor);
+        if (strokeColor != Color.TRANSPARENT) {
+            gd.setStroke(dpToPx(1), strokeColor);
         }
         gd.setCornerRadius(dpToPx(radiusDp));
         return gd;
+    }
+
+    private GradientDrawable createChipDrawable(String fillColor, String strokeColor, int radiusDp) {
+        int fill = Color.parseColor(fillColor);
+        int stroke = strokeColor != null ? Color.parseColor(strokeColor) : Color.TRANSPARENT;
+        return createChipDrawable(fill, stroke, radiusDp);
     }
 
     // --- TEXT INSERTION & BACKSPACE (CRITICAL BUG FIX FOR SELECTED TEXT) ---
@@ -1537,6 +1677,167 @@ public class WisprKeyboardService extends InputMethodService {
             try {
                 vibrator.vibrate(pattern, -1);
             } catch (Exception ignored) {}
+        }
+    }
+
+    // --- THEME CHOOSER PANEL & DYNAMIC LIVE THEME APPLICATION ---
+
+    private void buildThemesPanel() {
+        panelContainer.removeAllViews();
+
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(dpToPx(14), dpToPx(8), dpToPx(14), dpToPx(8));
+        header.setBackgroundColor(Color.parseColor("#0e1726"));
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText("🎨 Keyboard Themes");
+        tvTitle.setTextColor(Color.WHITE);
+        tvTitle.setTextSize(14);
+        tvTitle.setTypeface(null, Typeface.BOLD);
+        LinearLayout.LayoutParams tP = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+        tvTitle.setLayoutParams(tP);
+        header.addView(tvTitle);
+
+        Button btnClose = new Button(this);
+        btnClose.setText("✕ Close");
+        btnClose.setTextSize(11);
+        btnClose.setTextColor(Color.parseColor("#94a3b8"));
+        btnClose.setBackgroundColor(Color.TRANSPARENT);
+        btnClose.setOnClickListener(v -> showPanel(PanelMode.KEYBOARD));
+        header.addView(btnClose);
+
+        panelContainer.addView(header);
+
+        ScrollView sv = new ScrollView(this);
+        sv.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
+
+        LinearLayout themesList = new LinearLayout(this);
+        themesList.setOrientation(LinearLayout.VERTICAL);
+        themesList.setPadding(dpToPx(12), dpToPx(8), dpToPx(12), dpToPx(12));
+
+        String currentId = prefs.getThemeId();
+
+        for (final KeyboardTheme t : KeyboardTheme.getAllThemes()) {
+            final boolean isActive = t.id.equalsIgnoreCase(currentId);
+
+            LinearLayout themeCard = new LinearLayout(this);
+            themeCard.setOrientation(LinearLayout.HORIZONTAL);
+            themeCard.setGravity(Gravity.CENTER_VERTICAL);
+            themeCard.setPadding(dpToPx(12), dpToPx(10), dpToPx(12), dpToPx(10));
+
+            GradientDrawable cd = new GradientDrawable();
+            cd.setShape(GradientDrawable.RECTANGLE);
+            cd.setCornerRadius(dpToPx(8));
+            cd.setColor(t.backgroundColor);
+            cd.setStroke(dpToPx(isActive ? 2 : 1), isActive ? t.accentColor : Color.parseColor("#334155"));
+            themeCard.setBackground(cd);
+
+            LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            cardParams.setMargins(0, dpToPx(4), 0, dpToPx(6));
+            themeCard.setLayoutParams(cardParams);
+
+            // Color Swatches
+            LinearLayout swatches = new LinearLayout(this);
+            swatches.setOrientation(LinearLayout.HORIZONTAL);
+            swatches.setGravity(Gravity.CENTER_VERTICAL);
+
+            swatches.addView(createSwatchCircle(t.backgroundColor, t.accentColor));
+            swatches.addView(createSwatchCircle(t.keyColor, Color.TRANSPARENT));
+            swatches.addView(createSwatchCircle(t.accentColor, Color.TRANSPARENT));
+            themeCard.addView(swatches);
+
+            // Name
+            TextView tvName = new TextView(this);
+            tvName.setText(t.icon + "  " + t.name + (isActive ? "  ✓ Active" : ""));
+            tvName.setTextColor(t.textColor);
+            tvName.setTextSize(13);
+            tvName.setTypeface(null, isActive ? Typeface.BOLD : Typeface.NORMAL);
+            LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+            nameParams.setMargins(dpToPx(12), 0, 0, 0);
+            tvName.setLayoutParams(nameParams);
+            themeCard.addView(tvName);
+
+            themeCard.setOnClickListener(v -> {
+                prefs.setThemeId(t.id);
+                applyCurrentTheme();
+                buildThemesPanel();
+                Toast.makeText(WisprKeyboardService.this, "🎨 Applied " + t.name, Toast.LENGTH_SHORT).show();
+            });
+
+            themesList.addView(themeCard);
+        }
+
+        sv.addView(themesList);
+        panelContainer.addView(sv);
+    }
+
+    private View createSwatchCircle(int fillColor, int strokeColor) {
+        View dot = new View(this);
+        GradientDrawable gd = new GradientDrawable();
+        gd.setShape(GradientDrawable.OVAL);
+        gd.setColor(fillColor);
+        if (strokeColor != Color.TRANSPARENT) {
+            gd.setStroke(dpToPx(1), strokeColor);
+        }
+        dot.setBackground(gd);
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(dpToPx(14), dpToPx(14));
+        p.setMargins(0, 0, dpToPx(4), 0);
+        dot.setLayoutParams(p);
+        return dot;
+    }
+
+    private void applyCurrentTheme() {
+        KeyboardTheme theme = KeyboardTheme.getTheme(prefs != null ? prefs.getThemeId() : null);
+        if (keyboardRoot != null) {
+            keyboardRoot.setBackgroundColor(theme.backgroundColor);
+        }
+        if (toolbarContainer != null) {
+            toolbarContainer.setBackgroundColor(theme.toolbarColor);
+        }
+        if (keysContainer != null) {
+            renderKeyRows();
+        }
+    }
+
+    // --- CONTACT CARD SCANNER INTEGRATION & MEDIA INSERTION ---
+
+    private void openCardScanner() {
+        try {
+            Intent intent = new Intent(this, CardScannerActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+        } catch (Exception e) {
+            Toast.makeText(this, "Could not open Card Scanner: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void sendImageMedia(Uri imageUri, String mimeType) {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null || imageUri == null) return;
+        try {
+            InputContentInfoCompat inputContentInfo = new InputContentInfoCompat(
+                    imageUri,
+                    new ClipDescription("Contact Card Image", new String[]{mimeType}),
+                    null
+            );
+            EditorInfo editorInfo = getCurrentInputEditorInfo();
+            int flags = 0;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1) {
+                flags |= InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION;
+            }
+            boolean committed = InputConnectionCompat.commitContent(ic, editorInfo, inputContentInfo, flags, null);
+            if (committed) {
+                Toast.makeText(this, "📇 Contact Card & Image delivered!", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "📇 Card Text inserted! (Image ready on clipboard)", Toast.LENGTH_SHORT).show();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error in sendImageMedia", e);
+            Toast.makeText(this, "📇 Contact card text inserted!", Toast.LENGTH_SHORT).show();
         }
     }
 

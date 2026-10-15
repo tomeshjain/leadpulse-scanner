@@ -236,6 +236,97 @@
                 android:layout_marginBottom="8dp" />
         </LinearLayout>
 
+        <!-- CARD 3.5: THEMES & KEYBOARD LAYOUT -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🎨 Appearance &amp; Layout"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Customize theme colors and layout separation."
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:layout_marginBottom="12dp" />
+
+            <!-- Theme Dropdown -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Select Keyboard Theme:"
+                android:textColor="@color/accent_primary"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="4dp" />
+
+            <Spinner
+                android:id="@+id/spinnerTheme"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:background="@drawable/bg_key"
+                android:padding="10dp"
+                android:layout_marginBottom="14dp" />
+
+            <!-- Number Row Toggle Checkbox -->
+            <CheckBox
+                android:id="@+id/cbShowNumberRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Show permanent Number Row on Text Keyboard (Uncheck to keep Text &amp; Numbers separated)"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- CARD 3.6: CONTACT CARD SCANNER -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📇 Business &amp; Contact Card Scanner"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Extracts contact information using Gemini Vision AI and delivers both structured text and card image with a single tap."
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:layout_marginBottom="12dp" />
+
+            <Button
+                android:id="@+id/btnLaunchScanner"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:text="📸 Launch Contact Card Scanner"
+                android:textColor="@color/text_primary"
+                android:background="@drawable/bg_btn_primary"
+                android:textAllCaps="false"
+                android:textSize="13sp" />
+        </LinearLayout>
+
         <!-- CARD 4: TEXT SHORTCUTS & CUSTOM EXPANSIONS -->
         <LinearLayout
             android:layout_width="match_parent"

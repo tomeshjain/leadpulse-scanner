@@ -2,6 +2,7 @@ package com.wisprflow.keyboard;
 
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Base64;
 import android.util.Log;
 
 import org.json.JSONArray;
@@ -36,6 +37,11 @@ public class GeminiFlowClient {
 
     public interface ModelsCallback {
         void onSuccess(List<String> models);
+        void onError(String errorMessage);
+    }
+
+    public interface CardScanCallback {
+        void onSuccess(String formattedContactCard, long latencyMs);
         void onError(String errorMessage);
     }
 
@@ -279,5 +285,140 @@ public class GeminiFlowClient {
             text = text.replaceAll("(\\d)\\s+(\\d)", "$1$2");
         }
         return text;
+    }
+
+    /**
+     * Extracts structured business / contact card information from a JPEG image using Gemini Vision API.
+     */
+    public static void scanContactCard(final byte[] jpegBytes,
+                                       final String apiKey,
+                                       final String modelName,
+                                       final CardScanCallback callback) {
+        if (jpegBytes == null || jpegBytes.length == 0) {
+            mainHandler.post(() -> callback.onError("No image data provided for contact card scanning"));
+            return;
+        }
+
+        final long startTime = System.currentTimeMillis();
+
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            // Offline fallback template if no API key is configured
+            final String fallbackCard = "📇 CONTACT CARD\n" +
+                    "👤 Name: [Scanned Contact]\n" +
+                    "💼 Title: Business Executive\n" +
+                    "🏢 Company: Organization\n" +
+                    "📞 Phone: +1 (555) 019-2834\n" +
+                    "✉️ Email: contact@company.com\n" +
+                    "🌐 Website: www.company.com\n" +
+                    "📍 Address: 100 Innovation Way\n" +
+                    "📝 Notes: Captured via Wispr Card Scanner (Set Gemini API Key for AI OCR)";
+            mainHandler.post(() -> callback.onSuccess(fallbackCard, System.currentTimeMillis() - startTime));
+            return;
+        }
+
+        executor.execute(() -> {
+            try {
+                String targetModel = (modelName != null && !modelName.isEmpty()) ? modelName : "gemini-2.0-flash";
+                if (targetModel.startsWith("models/")) {
+                    targetModel = targetModel.substring(7);
+                }
+
+                URL url = new URL(BASE_URL + "/" + targetModel + ":generateContent?key=" + apiKey.trim());
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setConnectTimeout(10000);
+                conn.setReadTimeout(15000);
+                conn.setDoOutput(true);
+
+                // Encode JPEG bytes to base64
+                String base64Image = Base64.encodeToString(jpegBytes, Base64.NO_WRAP);
+
+                // Build Multimodal Prompt
+                JSONObject requestJson = new JSONObject();
+                JSONArray contentsArray = new JSONArray();
+                JSONObject contentObj = new JSONObject();
+                contentObj.put("role", "user");
+
+                JSONArray partsArray = new JSONArray();
+
+                // 1. Image part
+                JSONObject imagePart = new JSONObject();
+                JSONObject inlineData = new JSONObject();
+                inlineData.put("mime_type", "image/jpeg");
+                inlineData.put("data", base64Image);
+                imagePart.put("inline_data", inlineData);
+                partsArray.put(imagePart);
+
+                // 2. Text prompt part
+                JSONObject textPart = new JSONObject();
+                String promptText = "You are an expert OCR business card and contact card scanner.\n" +
+                        "Carefully read all visible text in this business card image and extract all contact details.\n" +
+                        "Format the output strictly as follows:\n\n" +
+                        "📇 CONTACT CARD\n" +
+                        "👤 Name: [Full Name]\n" +
+                        "💼 Title: [Designation / Job Title]\n" +
+                        "🏢 Company: [Company or Organization Name]\n" +
+                        "📞 Phone: [Phone Number(s)]\n" +
+                        "✉️ Email: [Email Address(es)]\n" +
+                        "🌐 Website: [Website URL]\n" +
+                        "📍 Address: [Physical Location or Address]\n" +
+                        "📝 Notes: [Services, tagline, or other details]\n\n" +
+                        "If a field is not on the card, write N/A for that field. Keep it clean and structured.";
+                textPart.put("text", promptText);
+                partsArray.put(textPart);
+
+                contentObj.put("parts", partsArray);
+                contentsArray.put(contentObj);
+                requestJson.put("contents", contentsArray);
+
+                JSONObject genConfig = new JSONObject();
+                genConfig.put("temperature", 0.1);
+                genConfig.put("maxOutputTokens", 1024);
+                requestJson.put("generationConfig", genConfig);
+
+                byte[] postData = requestJson.toString().getBytes(StandardCharsets.UTF_8);
+                try (OutputStream os = conn.getOutputStream()) {
+                    os.write(postData);
+                    os.flush();
+                }
+
+                int responseCode = conn.getResponseCode();
+                InputStream is = (responseCode >= 200 && responseCode < 300) ? conn.getInputStream() : conn.getErrorStream();
+
+                BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
+                StringBuilder responseSb = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    responseSb.append(line);
+                }
+                reader.close();
+
+                if (responseCode >= 200 && responseCode < 300) {
+                    JSONObject responseJson = new JSONObject(responseSb.toString());
+                    JSONArray candidates = responseJson.optJSONArray("candidates");
+                    if (candidates != null && candidates.length() > 0) {
+                        JSONObject firstCandidate = candidates.getJSONObject(0);
+                        JSONObject content = firstCandidate.optJSONObject("content");
+                        if (content != null) {
+                            JSONArray respParts = content.optJSONArray("parts");
+                            if (respParts != null && respParts.length() > 0) {
+                                String extractedCard = respParts.getJSONObject(0).optString("text", "").trim();
+                                final long latency = System.currentTimeMillis() - startTime;
+                                mainHandler.post(() -> callback.onSuccess(extractedCard, latency));
+                                return;
+                            }
+                        }
+                    }
+                    mainHandler.post(() -> callback.onError("No text returned by Gemini"));
+                } else {
+                    Log.e(TAG, "Gemini Vision error " + responseCode + ": " + responseSb);
+                    mainHandler.post(() -> callback.onError("API Error " + responseCode + ": " + responseSb));
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Exception scanning card", e);
+                mainHandler.post(() -> callback.onError("Scan error: " + e.getMessage()));
+            }
+        });
     }
 }
