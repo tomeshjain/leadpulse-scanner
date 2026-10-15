@@ -89,8 +89,6 @@ public class WisprKeyboardService extends InputMethodService {
     private LinearLayout suggestionsBar;
     private LinearLayout voiceStatusBanner;
     private TextView tvVoiceStatus;
-    private Button btnVoiceCancel;
-    private FrameLayout contentFrame;
     private LinearLayout keysContainer;
     private LinearLayout panelContainer;
 
