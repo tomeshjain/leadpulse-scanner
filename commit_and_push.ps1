@@ -12,7 +12,7 @@ Write-Host "Adding files..."
 & $gitExe add -A
 
 Write-Host "Committing..."
-& $gitExe commit -m "feat: Add LinkedIn and past work extraction, local ML Kit OCR fallback, Clean Light default theme, dynamic Settings live theming, and bottom-left navigation layout"
+& $gitExe commit -m "feat: True GIF image insertion via commitContent, live and voice GIF search, contextual text-to-GIF suggestions, and expanded curated reaction catalog"
 
 Write-Host "Pushing to origin main..."
 & $gitExe push origin main

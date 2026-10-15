@@ -79,48 +79,35 @@ jobs:
           name: WisprFlowKeyboard-APK
           path: ./WisprFlowKeyboard.apk
 
-      - name: Create or Update GitHub Release (Wispr Keyboard v1.4.0)
+      - name: Create or Update GitHub Release (Wispr Keyboard v1.4.1)
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/heads/main')
         with:
-            tag_name: wispr-keyboard-v1.4.0
-            name: "Wispr Flow - Native Android AI Keyboard Extension (v1.4.0)"
+            tag_name: wispr-keyboard-v1.4.1
+            name: "Wispr Flow - Native Android AI Keyboard Extension (v1.4.1)"
             draft: false
             prerelease: false
             make_latest: true
             body: |
-              ## ⌨️ Wispr Flow - Native Android AI Keyboard Extension (v1.4.0)
+              ## ⌨️ Wispr Flow - Native Android AI Keyboard Extension (v1.4.1)
 
-              **Professional Extended Keyboard Facility for Android with LinkedIn & Past Work Contact Extraction, Two-Tier Local OCR Fallback, Clean Light Default Live Theming, OS Night Mode Adaptation, and Bottom-Left Navigation Philosophy.**
+              **Professional Extended Keyboard Facility for Android with Real Animated GIF Media Insertion, Contextual Text-to-GIF Suggestions, Live & Voice GIF Search, and Rich Curated Reactions Library.**
 
-              ### 🚀 What's New in v1.4.0:
-              - **🔗 LinkedIn Profile & Past Work Storage**:
-                - Business card scanner intelligently extracts LinkedIn profile URLs and past work/experience details.
-                - When saving to phone contacts, details are stored in standard `ContactsContract` fields and combined in the contact notes for universal compatibility across all OEM dialers and contact apps.
-              - **🛡️ Two-Tier OCR Fallback Architecture**:
-                - If Gemini Multimodal Vision AI is unavailable or offline, the app seamlessly falls back to on-device Google ML Kit Text Recognition.
-                - Extracted text is then formatted via Gemini's low-latency text model (`gemini-2.0-flash`), backed by a regex parser for 100% offline situations.
-              - **⚡ Low-Latency Unlimited Model**:
-                - Default AI model is `gemini-2.0-flash` for high-throughput, low-latency dictation polish and card formatting.
-              - **📐 Streamlined Bottom-Left Keyboard Navigation**:
-                - In Alphabet (ABC) mode: bottom-left features `?123` (symbols/punctuations) and `123` (pure numbers PIN pad).
-                - In Symbols (?123) mode: bottom-left features `ABC` and `123`.
-                - In Pure Numbers (123) mode: bottom-left features `ABC` and `?123`.
-              - **☀️ Clean Light Default Theme & Settings UI Redesign**:
-                - Clean Light is now the default theme out of the box for both keyboard and settings.
-                - Complete redesign of the Settings screen with consistent 20dp spacing, 18dp card padding, refined card elevations, and clean typography.
-                - Real-time live theme synchronization: selecting any theme in the settings dropdown immediately reskins the entire settings screen and its dropdown adapters.
-              - **📱 System-Wide OS Theme & RTL Globalization**:
-                - "System Auto" theme dynamically detects OS Dark/Light mode (`UI_MODE_NIGHT_MASK`).
-                - Fully supports Right-to-Left (RTL) locales and `Locale.getDefault()` formatting.
-
-              ### 📲 Quick Setup:
-              1. Download and install **`WisprFlowKeyboard.apk`** below.
-              2. Open the **Wispr Flow** app.
-              3. Tap **"1. Enable Wispr Flow in Settings"** and toggle on the keyboard.
-              4. Tap **"2. Switch Active Keyboard"** and select **Wispr Flow**.
-              5. Tap **"Grant Microphone Permission"** and camera permission for card scanning.
-              6. Configure your **Gemini API Key** in Settings for Gemini Vision card extraction and advanced voice polish.
+              ### 🚀 What's New in v1.4.1:
+              - **🎞️ True GIF Image Insertion (No Raw URLs)**:
+                - Fixed issue where raw web URLs were pasted into chats instead of the actual GIF image.
+                - GIFs are downloaded and cached locally, delivered directly as rich content images via `InputConnectionCompat.commitContent()` (with `FileProvider` permissions) across WhatsApp, Telegram, Google Messages, Discord, Slack, and other supported messengers.
+                - For apps that don't support direct rich content in text fields, the animated GIF is automatically copied to the clipboard as an image clip so it can be pasted with 1 tap.
+              - **🧠 Contextual Text-to-GIF Suggestions**:
+                - Typing common conversational keywords (e.g., "applause", "congrats", "cheers", "haha", "celebrate", "awesome", "lol", "love", "thanks", "wow", "good job") automatically suggests a prominent, glowing GIF chip in the top keyboard suggestion bar (`🎞️ GIF: [Title]`).
+                - Tapping the suggestion immediately sends the matching GIF image without needing to leave the chat.
+              - **🔍 Live Search & Voice Search in GIF Panel**:
+                - Added real-time search bar that filters the catalog as you type with zero latency.
+                - Debounced live online search powered by Giphy/Tenor for unlimited query discovery.
+                - Added **`🎙️ Voice Search`** button to speak any GIF query directly.
+                - 10 Quick-tap category pills: `[🔥 Trending]`, `[👏 Applause]`, `[😂 Laugh & Fun]`, `[🎉 Celebrate]`, `[👍 Agree]`, `[🤔 Thinking]`, `[❤️ Love & Thanks]`, `[💼 Work & Hustle]`, `[🐱 Cute Pets]`, `[✨ Kaomoji]`.
+              - **🌟 Expanded Best-of-the-Best Curated Catalog**:
+                - Over 100 top-rated, high-definition animated reaction GIFs covering all major sentiments and expressions.
             files: |
               ./WisprFlowKeyboard.apk
         env:

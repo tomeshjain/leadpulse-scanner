@@ -29,6 +29,7 @@ import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -36,9 +37,16 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.core.content.ContextCompat;
+import androidx.core.content.FileProvider;
+import androidx.core.view.inputmethod.EditorInfoCompat;
 import androidx.core.view.inputmethod.InputConnectionCompat;
 import androidx.core.view.inputmethod.InputContentInfoCompat;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -427,8 +435,29 @@ public class WisprKeyboardService extends InputMethodService {
             suggestionsBar.addView(clipBtn);
         }
 
-        // 2. Next-Word Prediction / Typing Pattern Suggestions
+        // 2. Contextual GIF Suggestion Chip (based on current/last typed word)
         String currentWord = currentWordBuffer.toString();
+        final GifReactionsData.GifItem contextualGif = GifReactionsData.findContextualGif(lastCommittedWord, currentWord);
+        if (contextualGif != null) {
+            Button gifChip = new Button(this);
+            gifChip.setText(contextualGif.emojiPreview + " GIF: " + contextualGif.title);
+            gifChip.setTextColor(Color.parseColor("#f472b6"));
+            gifChip.setTextSize(11);
+            gifChip.setAllCaps(false);
+            gifChip.setSingleLine(true);
+            gifChip.setBackground(createChipDrawable("#2e1065", "#7c3aed", 8));
+            gifChip.setPadding(dpToPx(8), 0, dpToPx(8), 0);
+
+            LinearLayout.LayoutParams gp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, dpToPx(32));
+            gp.setMargins(dpToPx(2), 0, dpToPx(4), 0);
+            gifChip.setLayoutParams(gp);
+
+            gifChip.setOnClickListener(v -> sendGifMedia(contextualGif));
+            suggestionsBar.addView(gifChip);
+        }
+
+        // 3. Next-Word Prediction / Typing Pattern Suggestions
         List<String> suggestions = suggestionEngine.getSuggestions(lastCommittedWord, currentWord, 4);
 
         for (int i = 0; i < suggestions.size(); i++) {
@@ -502,7 +531,13 @@ public class WisprKeyboardService extends InputMethodService {
                     buildEmojiPanel();
                     break;
                 case GIFS:
-                    buildGifsPanel();
+                    String prefill = "";
+                    if (currentWordBuffer.length() > 0) {
+                        prefill = currentWordBuffer.toString().trim();
+                    } else if (lastCommittedWord != null && !lastCommittedWord.isEmpty()) {
+                        prefill = lastCommittedWord.trim();
+                    }
+                    buildGifsPanel(prefill);
                     break;
                 case CLIPBOARD:
                     buildClipboardPanel();
@@ -602,64 +637,198 @@ public class WisprKeyboardService extends InputMethodService {
 
     // --- GIF & REACTION PANEL ---
 
+    private String currentGifSearchQuery = "";
+
     private void buildGifsPanel() {
+        buildGifsPanel(currentGifSearchQuery);
+    }
+
+    private void buildGifsPanel(String initialQuery) {
+        currentGifSearchQuery = (initialQuery != null) ? initialQuery.trim() : "";
+        KeyboardTheme theme = KeyboardTheme.resolveTheme(this, prefs != null ? prefs.getThemeId() : null);
+
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
 
+        // 1. Search Bar & Voice Search Header
+        LinearLayout searchHeader = new LinearLayout(this);
+        searchHeader.setOrientation(LinearLayout.HORIZONTAL);
+        searchHeader.setGravity(Gravity.CENTER_VERTICAL);
+        searchHeader.setPadding(dpToPx(8), dpToPx(4), dpToPx(8), dpToPx(4));
+
+        final EditText etSearch = new EditText(this);
+        etSearch.setHint("🔍 Search GIFs (e.g. applause, excited)...");
+        etSearch.setHintTextColor(theme.subTextColor);
+        etSearch.setTextColor(theme.textColor);
+        etSearch.setTextSize(12);
+        etSearch.setSingleLine(true);
+        etSearch.setBackground(createChipDrawable(theme.keyColor, theme.dividerColor, 8));
+        etSearch.setPadding(dpToPx(10), dpToPx(6), dpToPx(10), dpToPx(6));
+        if (!currentGifSearchQuery.isEmpty()) {
+            etSearch.setText(currentGifSearchQuery);
+            etSearch.setSelection(currentGifSearchQuery.length());
+        }
+        LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(0, dpToPx(36), 1.0f);
+        etSearch.setLayoutParams(searchParams);
+        searchHeader.addView(etSearch);
+
+        // Clear button
+        final Button btnClear = new Button(this);
+        btnClear.setText("✕");
+        btnClear.setTextSize(12);
+        btnClear.setTextColor(theme.subTextColor);
+        btnClear.setBackgroundColor(Color.TRANSPARENT);
+        btnClear.setVisibility(currentGifSearchQuery.isEmpty() ? View.GONE : View.VISIBLE);
+        LinearLayout.LayoutParams clearParams = new LinearLayout.LayoutParams(dpToPx(36), dpToPx(36));
+        btnClear.setLayoutParams(clearParams);
+        searchHeader.addView(btnClear);
+
+        // Voice Search button
+        Button btnVoiceSearch = new Button(this);
+        btnVoiceSearch.setText("🎙️");
+        btnVoiceSearch.setTextSize(14);
+        btnVoiceSearch.setBackground(createChipDrawable(theme.actionKeyColor, theme.dividerColor, 8));
+        LinearLayout.LayoutParams vsParams = new LinearLayout.LayoutParams(dpToPx(36), dpToPx(36));
+        vsParams.leftMargin = dpToPx(4);
+        btnVoiceSearch.setLayoutParams(vsParams);
+        searchHeader.addView(btnVoiceSearch);
+
+        layout.addView(searchHeader);
+
+        // 2. Horizontal Category Filter Pills
         HorizontalScrollView tabScroll = new HorizontalScrollView(this);
         tabScroll.setHorizontalScrollBarEnabled(false);
         final LinearLayout tabs = new LinearLayout(this);
         tabs.setOrientation(LinearLayout.HORIZONTAL);
+        tabs.setPadding(dpToPx(4), dpToPx(2), dpToPx(4), dpToPx(4));
         tabScroll.addView(tabs);
         layout.addView(tabScroll);
 
+        // 3. Scrollable Results Container
         ScrollView scroll = new ScrollView(this);
         scroll.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.0f));
 
         final LinearLayout gifContent = new LinearLayout(this);
         gifContent.setOrientation(LinearLayout.VERTICAL);
-        gifContent.setPadding(dpToPx(6), dpToPx(6), dpToPx(6), dpToPx(6));
+        gifContent.setPadding(dpToPx(6), dpToPx(4), dpToPx(6), dpToPx(4));
         scroll.addView(gifContent);
         layout.addView(scroll);
 
+        // Category Pills
         final String[] categories = GifReactionsData.getCategoryNames();
         for (int i = 0; i < categories.length; i++) {
             final String cat = categories[i];
             Button catBtn = new Button(this);
             catBtn.setText(cat);
             catBtn.setTextSize(11);
-            catBtn.setTextColor(i == 0 ? Color.parseColor("#a5b4fc") : Color.parseColor("#94a3b8"));
-            catBtn.setBackgroundColor(Color.TRANSPARENT);
+            catBtn.setTextColor(i == 0 && currentGifSearchQuery.isEmpty() ? theme.accentColor : theme.subTextColor);
+            catBtn.setBackground(createChipDrawable(theme.actionKeyColor, theme.dividerColor, 8));
+            catBtn.setPadding(dpToPx(10), 0, dpToPx(10), 0);
             catBtn.setAllCaps(false);
+            LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, dpToPx(30));
+            cp.setMargins(dpToPx(2), 0, dpToPx(2), 0);
+            catBtn.setLayoutParams(cp);
+
             catBtn.setOnClickListener(v -> {
-                renderGifs(gifContent, cat);
+                etSearch.setText("");
+                currentGifSearchQuery = "";
+                renderGifs(gifContent, cat, theme);
                 for (int j = 0; j < tabs.getChildCount(); j++) {
                     View child = tabs.getChildAt(j);
                     if (child instanceof Button) {
-                        ((Button) child).setTextColor(child == v ? Color.parseColor("#a5b4fc") : Color.parseColor("#94a3b8"));
+                        ((Button) child).setTextColor(child == v ? theme.accentColor : theme.subTextColor);
                     }
                 }
             });
             tabs.addView(catBtn);
         }
 
-        renderGifs(gifContent, categories[0]);
+        // Live text search watcher
+        etSearch.addTextChangedListener(new android.text.TextWatcher() {
+            private final Handler searchHandler = new Handler(Looper.getMainLooper());
+            private Runnable searchRunnable;
+
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                final String q = s.toString().trim();
+                currentGifSearchQuery = q;
+                btnClear.setVisibility(q.isEmpty() ? View.GONE : View.VISIBLE);
+
+                // Immediate local keyword match
+                List<GifReactionsData.GifItem> localItems = GifReactionsData.searchLocalGifs(q);
+                displayGifList(gifContent, localItems, theme);
+
+                // Debounce live online search
+                if (searchRunnable != null) {
+                    searchHandler.removeCallbacks(searchRunnable);
+                }
+                if (!q.isEmpty()) {
+                    searchRunnable = () -> {
+                        GifReactionsData.searchOnlineGifs(q, onlineResults -> {
+                            new Handler(Looper.getMainLooper()).post(() -> {
+                                if (currentGifSearchQuery.equalsIgnoreCase(q)) {
+                                    displayGifList(gifContent, onlineResults, theme);
+                                }
+                            });
+                        });
+                    };
+                    searchHandler.postDelayed(searchRunnable, 450);
+                }
+            }
+
+            @Override
+            public void afterTextChanged(android.text.Editable s) {}
+        });
+
+        btnClear.setOnClickListener(v -> {
+            etSearch.setText("");
+            currentGifSearchQuery = "";
+            renderGifs(gifContent, categories[0], theme);
+        });
+
+        btnVoiceSearch.setOnClickListener(v -> startGifVoiceSearch(etSearch));
+
+        // Initial render
+        if (!currentGifSearchQuery.isEmpty()) {
+            displayGifList(gifContent, GifReactionsData.searchLocalGifs(currentGifSearchQuery), theme);
+        } else {
+            renderGifs(gifContent, categories[0], theme);
+        }
+
         layout.addView(createPanelBottomBar());
         panelContainer.addView(layout);
     }
 
-    private void renderGifs(LinearLayout container, String category) {
-        container.removeAllViews();
+    private void renderGifs(LinearLayout container, String category, KeyboardTheme theme) {
         List<GifReactionsData.GifItem> items = GifReactionsData.getItemsForCategory(category);
+        displayGifList(container, items, theme);
+    }
+
+    private void displayGifList(LinearLayout container, List<GifReactionsData.GifItem> items, KeyboardTheme theme) {
+        container.removeAllViews();
+        if (items == null || items.isEmpty()) {
+            TextView empty = new TextView(this);
+            empty.setText("No GIFs found for \"" + currentGifSearchQuery + "\".\nTry another search keyword!");
+            empty.setTextColor(theme.subTextColor);
+            empty.setTextSize(13);
+            empty.setGravity(Gravity.CENTER);
+            empty.setPadding(0, dpToPx(30), 0, 0);
+            container.addView(empty);
+            return;
+        }
 
         for (final GifReactionsData.GifItem item : items) {
             LinearLayout card = new LinearLayout(this);
             card.setOrientation(LinearLayout.HORIZONTAL);
             card.setGravity(Gravity.CENTER_VERTICAL);
-            card.setBackground(createChipDrawable("#141d2c", "#243247", 10));
+            card.setBackground(createChipDrawable(theme.keyColor, theme.dividerColor, 10));
             card.setPadding(dpToPx(12), dpToPx(8), dpToPx(12), dpToPx(8));
             LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -671,22 +840,86 @@ public class WisprKeyboardService extends InputMethodService {
             tvEmoji.setTextSize(18);
             card.addView(tvEmoji);
 
+            LinearLayout textCol = new LinearLayout(this);
+            textCol.setOrientation(LinearLayout.VERTICAL);
+            LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+            tp.leftMargin = dpToPx(12);
+            textCol.setLayoutParams(tp);
+
             TextView tvTitle = new TextView(this);
             tvTitle.setText(item.title);
-            tvTitle.setTextColor(Color.WHITE);
+            tvTitle.setTextColor(theme.textColor);
             tvTitle.setTextSize(13);
-            tvTitle.setPadding(dpToPx(12), 0, 0, 0);
-            LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
-            tvTitle.setLayoutParams(tp);
-            card.addView(tvTitle);
+            tvTitle.setTypeface(null, Typeface.BOLD);
+            textCol.addView(tvTitle);
 
-            card.setOnClickListener(v -> {
-                String toInsert = (!item.gifUrl.isEmpty()) ? item.gifUrl : item.fallbackText;
-                insertText(toInsert + " ");
-                triggerHaptic(18);
-            });
+            TextView tvCat = new TextView(this);
+            tvCat.setText(item.category != null ? item.category : "🎞️ Reaction");
+            tvCat.setTextColor(theme.accentColor);
+            tvCat.setTextSize(10);
+            textCol.addView(tvCat);
+
+            card.addView(textCol);
+
+            // Action button: Send GIF
+            Button btnSend = new Button(this);
+            btnSend.setText("Send");
+            btnSend.setTextSize(11);
+            btnSend.setTextColor(Color.WHITE);
+            btnSend.setBackground(createChipDrawable(theme.accentColor, theme.accentColor, 8));
+            btnSend.setPadding(dpToPx(10), 0, dpToPx(10), 0);
+            LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, dpToPx(30));
+            btnSend.setLayoutParams(bp);
+            btnSend.setOnClickListener(v -> sendGifMedia(item));
+            card.addView(btnSend);
+
+            card.setOnClickListener(v -> sendGifMedia(item));
 
             container.addView(card);
+        }
+    }
+
+    private void startGifVoiceSearch(final EditText etSearch) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, "Microphone permission needed to voice-search GIFs", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Toast.makeText(this, "🎙️ Listening... Speak GIF search query", Toast.LENGTH_SHORT).show();
+
+        try {
+            SpeechRecognizer sr = SpeechRecognizer.createSpeechRecognizer(this);
+            Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+            intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false);
+            intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+
+            sr.setRecognitionListener(new RecognitionListener() {
+                @Override
+                public void onResults(Bundle results) {
+                    ArrayList<String> matches = results != null ? results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) : null;
+                    if (matches != null && !matches.isEmpty()) {
+                        String query = matches.get(0);
+                        etSearch.setText(query);
+                        etSearch.setSelection(query.length());
+                    }
+                    try { sr.destroy(); } catch (Exception ignored) {}
+                }
+                @Override public void onReadyForSpeech(Bundle params) {}
+                @Override public void onBeginningOfSpeech() {}
+                @Override public void onRmsChanged(float rmsdB) {}
+                @Override public void onBufferReceived(byte[] buffer) {}
+                @Override public void onEndOfSpeech() {}
+                @Override public void onError(int error) {
+                    try { sr.destroy(); } catch (Exception ignored) {}
+                }
+                @Override public void onPartialResults(Bundle partialResults) {}
+                @Override public void onEvent(int eventType, Bundle params) {}
+            });
+            sr.startListening(intent);
+        } catch (Exception e) {
+            Toast.makeText(this, "Could not start voice search: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -1873,6 +2106,137 @@ public class WisprKeyboardService extends InputMethodService {
             Log.e(TAG, "Error in sendImageMedia", e);
             Toast.makeText(this, "📇 Contact card text inserted!", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    /**
+     * Downloads/caches the GIF file in a background worker thread and delivers it via commitContent.
+     * Prevents raw URLs from ever being pasted.
+     */
+    private void sendGifMedia(final GifReactionsData.GifItem item) {
+        if (item == null) return;
+
+        // If it's a kaomoji or text sticker (no gifUrl)
+        if (item.gifUrl == null || item.gifUrl.trim().isEmpty()) {
+            insertText(item.fallbackText + " ");
+            triggerHaptic(18);
+            showPanel(PanelMode.KEYBOARD);
+            return;
+        }
+
+        triggerHaptic(18);
+        Toast.makeText(this, "⏳ Preparing " + item.title + " GIF...", Toast.LENGTH_SHORT).show();
+
+        new Thread(() -> {
+            try {
+                File gifDir = new File(getCacheDir(), "gifs");
+                if (!gifDir.exists()) {
+                    gifDir.mkdirs();
+                }
+
+                String safeName = "gif_" + Math.abs(item.gifUrl.hashCode()) + ".gif";
+                File targetFile = new File(gifDir, safeName);
+
+                if (!targetFile.exists() || targetFile.length() < 100) {
+                    URL url = new URL(item.gifUrl);
+                    HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                    conn.setConnectTimeout(8000);
+                    conn.setReadTimeout(12000);
+                    conn.setInstanceFollowRedirects(true);
+                    conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Android; WisprFlow)");
+                    conn.connect();
+
+                    InputStream in = conn.getInputStream();
+                    FileOutputStream out = new FileOutputStream(targetFile);
+                    byte[] buffer = new byte[8192];
+                    int len;
+                    while ((len = in.read(buffer)) != -1) {
+                        out.write(buffer, 0, len);
+                    }
+                    out.flush();
+                    out.close();
+                    in.close();
+                }
+
+                Uri contentUri = FileProvider.getUriForFile(
+                        WisprKeyboardService.this,
+                        "com.wisprflow.keyboard.fileprovider",
+                        targetFile
+                );
+
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    deliverGifToApp(contentUri, item.title, item.fallbackText);
+                });
+
+            } catch (Exception e) {
+                Log.e(TAG, "Failed downloading GIF: " + item.gifUrl, e);
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    insertText(item.fallbackText + " ");
+                    Toast.makeText(WisprKeyboardService.this, "Could not load GIF. Sent: " + item.fallbackText, Toast.LENGTH_SHORT).show();
+                    showPanel(PanelMode.KEYBOARD);
+                });
+            }
+        }).start();
+    }
+
+    private void deliverGifToApp(Uri contentUri, String title, String fallbackText) {
+        InputConnection ic = getCurrentInputConnection();
+        EditorInfo editorInfo = getCurrentInputEditorInfo();
+        if (ic == null || contentUri == null) {
+            insertText(fallbackText + " ");
+            showPanel(PanelMode.KEYBOARD);
+            return;
+        }
+
+        boolean isSupported = false;
+        if (editorInfo != null) {
+            String[] mimeTypes = EditorInfoCompat.getContentMimeTypes(editorInfo);
+            if (mimeTypes != null) {
+                for (String mime : mimeTypes) {
+                    if (mime.equalsIgnoreCase("image/gif") || mime.equalsIgnoreCase("image/*") || mime.startsWith("image/")) {
+                        isSupported = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (isSupported) {
+            try {
+                InputContentInfoCompat contentInfo = new InputContentInfoCompat(
+                        contentUri,
+                        new ClipDescription(title, new String[]{"image/gif"}),
+                        null
+                );
+
+                int flags = 0;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1) {
+                    flags |= InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION;
+                }
+
+                boolean committed = InputConnectionCompat.commitContent(ic, editorInfo, contentInfo, flags, null);
+                if (committed) {
+                    Toast.makeText(this, "✓ GIF delivered!", Toast.LENGTH_SHORT).show();
+                    showPanel(PanelMode.KEYBOARD);
+                    return;
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "commitContent failed: " + e.getMessage());
+            }
+        }
+
+        // Target field does not accept direct commitContent rich image:
+        // Copy the actual GIF image to clipboard so the user can easily paste it as an image,
+        // and insert the clean emoji/title fallback instead of an ugly raw URL!
+        try {
+            ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+            if (cm != null) {
+                ClipData clip = ClipData.newUri(getContentResolver(), title, contentUri);
+                cm.setPrimaryClip(clip);
+                Toast.makeText(this, "GIF image copied to clipboard! Tap Paste to send image.", Toast.LENGTH_LONG).show();
+            }
+        } catch (Exception ignored) {}
+
+        showPanel(PanelMode.KEYBOARD);
     }
 
     private int dpToPx(int dp) {
