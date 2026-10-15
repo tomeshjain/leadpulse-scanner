@@ -75,49 +75,40 @@ jobs:
           name: WisprFlowKeyboard-APK
           path: ./WisprFlowKeyboard.apk
 
-      - name: Create or Update GitHub Release (Wispr Keyboard v1.0.0)
+      - name: Create or Update GitHub Release (Wispr Keyboard v1.1.0)
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/heads/main')
         with:
-          tag_name: wispr-keyboard-v1.0.0
-          name: "Wispr Flow - Native Android AI Keyboard Extension (v1.0.0)"
+          tag_name: wispr-keyboard-v1.1.0
+          name: "Wispr Flow - Native Android AI Keyboard Extension (v1.1.0)"
           draft: false
           prerelease: false
           make_latest: true
           body: |
-            ## ⌨️ Wispr Flow - Native Android AI Keyboard Extension (v1.0.0)
+            ## ⌨️ Wispr Flow - Native Android AI Keyboard Extension (v1.1.0)
 
-            **Extended Keyboard Facility for Android with Integrated Voice Dictation & Gemini AI Polishing.**
-            
-            Replaces mobile keyboard typing across your entire phone (WhatsApp, Gmail, Chrome, Slack, Notes, etc.).
+            **Professional Extended Keyboard Facility for Android with AI Voice Dictation, Smart Predictions, and Text Expansion.**
 
-            ### 🚀 Features & Capabilities:
-            - **100% Pure Native Android IME Keyboard**: No WebView or hybrid wrapper. Launches instantly and functions smoothly as an on-screen keyboard extension.
-            - **Glowing Flow Voice Spacebar**: Tap the central mic spacebar to dictate speech in real-time.
-            - **Google Gemini API Key Setup**: In Settings (or directly via the ⚙️ keyboard button), enter your Gemini API Key.
-            - **Select AI Model to Access**:
-              - `gemini-2.0-flash` (Recommended: Fastest & sub-second response)
-              - `gemini-1.5-flash`
-              - `gemini-1.5-pro`
-              - `gemini-2.0-flash-lite`
-              - Dynamic model fetch from your API key!
-            - **7 Flow Transformation Modes**:
-              - ✨ **Smart Polish**: Strips "um/uh", fixes stutters, adds natural punctuation.
-              - 💬 **Casual Chat**: Natural, friendly, light emojis for WhatsApp and texting.
-              - ✉️ **Executive Email**: Formal greeting, paragraphs, and professional sign-off.
-              - 📝 **Structured Notes**: Markdown bullets and action items.
-              - ⚡ **Raw Dictation**: 1:1 exact spoken words.
-              - 💻 **Code & Dev**: camelCase formatting, SQL uppercase, markdown blocks.
-              - 🪄 **AI Action Prompt**: Executes spoken instructions directly.
-            - **Offline Polisher Fallback**: Works immediately even without an API key using built-in rule-based formatting.
-            - **Direct Input Injection**: Directly commits polished text into whatever app you are currently typing in (`InputConnection.commitText`).
+            ### 🚀 New & Upgraded Features:
+            - **🎙️ Dedicated Separate Microphone Button**: Voice dictation now has its own dedicated mic button in both the top toolbar and bottom key row. Normal spacebar functions strictly as a clean, responsive spacebar!
+            - **🧠 Smart Suggestions & Collocation Learning**: Learns your typing habits dynamically and predicts next collocated words (e.g. *Good ➔ Morning, Afternoon, Luck*; *Thank ➔ you so much*).
+            - **⚡ Text Shortcuts & Custom Expansions**:
+              - Default built-in shortcuts: `GM` ➔ `Good Morning`, `GE` ➔ `Good Evening`, `TY` ➔ `Thank you very much`, `BRB` ➔ `Be right back`, `OMW` ➔ `On my way!`, `NP` ➔ `No problem!`, etc.
+              - **Custom Shortcuts Manager**: Add, edit, or delete any custom shortcut from the Settings screen!
+            - **😊 Categorized Emojis Panel**: Over 150+ categorized emojis (Smileys, Gestures, Hearts, Activities, Food, Work) with 1-tap insertion.
+            - **🎞️ GIFs & Reaction Stickers**: Quick reaction GIFs and kaomoji stickers (`(づ｡◕‿‿◕｡)づ`, `¯\_(ツ)_/¯`, `(╯°□°)╯︵ ┻━┻`).
+            - **📋 Clipboard History & 📌 Pinning Favorites**: Stores recent clipboard history with 1-tap pasting and permanent pin favorites for frequent addresses, messages, or notes.
+            - **⇪ Double-Tap Caps Lock**: Single tap for Shift, double tap for illuminated permanent Caps Lock.
+            - **⚙️ Instant Settings Launcher**: 1-tap access to configure Gemini API Key, select AI Model (`gemini-2.0-flash`, `gemini-1.5-flash`, etc.), and grant microphone permissions.
+            - **🎙️ Microphone Permission Checker**: In-app runtime permission check to ensure flawless voice dictation out of the box.
 
-            ### 📲 Setup Instructions:
+            ### 📲 Quick Setup:
             1. Download and install **`WisprFlowKeyboard.apk`** below.
-            2. Open the **Wispr Flow Keyboard** app icon on your phone.
+            2. Open the **Wispr Flow** app.
             3. Tap **"1. Enable Wispr Flow in Settings"** and toggle on the keyboard.
             4. Tap **"2. Switch Active Keyboard"** and select **Wispr Flow**.
-            5. Enter your **Gemini API Key**, choose your preferred **AI Model**, and test it in the test box!
+            5. Tap **"Grant Microphone Permission"** so speech dictation works smoothly.
+            6. Paste your **Gemini API Key** (optional, offline rule-based polishing works immediately if omitted).
           files: |
             ./WisprFlowKeyboard.apk
         env:
