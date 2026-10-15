@@ -683,7 +683,6 @@ public class WisprKeyboardService extends InputMethodService {
     // --- GIF & REACTION PANEL ---
 
     private String currentGifSearchQuery = "";
-    private boolean isGifTypingActive = false;
     private boolean isKeyboardShortcutsExpanded = false;
 
     private void buildGifsPanel() {

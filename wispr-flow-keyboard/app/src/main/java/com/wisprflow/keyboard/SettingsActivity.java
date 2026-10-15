@@ -71,7 +71,7 @@ public class SettingsActivity extends AppCompatActivity {
     private LinearLayout cardScanner;
     private LinearLayout cardShortcuts;
     private LinearLayout cardPatterns;
-    private LinearLayout cardTesting;
+    private LinearLayout cardHowItWorks;
     private LinearLayout cardAiDiagnostics;
 
     private Button btnEnableKeyboard;
@@ -154,7 +154,7 @@ public class SettingsActivity extends AppCompatActivity {
         cardScanner = findViewById(R.id.cardScanner);
         cardShortcuts = findViewById(R.id.cardShortcuts);
         cardPatterns = findViewById(R.id.cardPatterns);
-        cardTesting = findViewById(R.id.cardTesting);
+        cardHowItWorks = findViewById(R.id.cardHowItWorks);
         cardAiDiagnostics = findViewById(R.id.cardAiDiagnostics);
 
         btnEnableKeyboard = findViewById(R.id.btnEnableKeyboard);
@@ -555,7 +555,7 @@ public class SettingsActivity extends AppCompatActivity {
         // 4. Style all Cards
         LinearLayout[] cards = {
             cardActivation, cardMic, cardGemini, cardAppearance,
-            cardScanner, cardShortcuts, cardPatterns, cardTesting,
+            cardScanner, cardShortcuts, cardPatterns, cardHowItWorks,
             cardAiDiagnostics
         };
         for (LinearLayout card : cards) {
@@ -572,11 +572,6 @@ public class SettingsActivity extends AppCompatActivity {
             etApiKey.setTextColor(theme.textColor);
             etApiKey.setHintTextColor(theme.subTextColor);
         }
-        if (etTestInput != null) {
-            etTestInput.setBackground(createChipDrawable(theme.keyColor, theme.dividerColor, 10));
-            etTestInput.setTextColor(theme.textColor);
-            etTestInput.setHintTextColor(theme.subTextColor);
-        }
 
         // 6. Primary Action Buttons (Executive Indigo & Cyan)
         Button[] primaryButtons = { btnEnableKeyboard, btnSaveApiKey, btnLaunchScanner, btnAddShortcut, btnTestPureAiVoice };
@@ -589,7 +584,7 @@ public class SettingsActivity extends AppCompatActivity {
 
         // 7. Secondary Action Buttons
         int secTextColor = theme.isLight ? theme.textColor : Color.WHITE;
-        Button[] secondaryButtons = { btnSelectKeyboard, btnGrantMicPermission, btnTestSampleVoice, btnResetPatterns, btnTestPureAiCard, btnTestLiveWs };
+        Button[] secondaryButtons = { btnSelectKeyboard, btnGrantMicPermission, btnResetPatterns, btnTestPureAiCard, btnTestLiveWs, btnToggleShortcutsExpander };
         for (Button btn : secondaryButtons) {
             if (btn != null) {
                 btn.setBackground(createChipDrawable(theme.actionKeyColor, theme.dividerColor, 10));
