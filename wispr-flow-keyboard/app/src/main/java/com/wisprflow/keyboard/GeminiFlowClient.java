@@ -72,6 +72,32 @@ public class GeminiFlowClient {
         void onError(String errorMessage);
     }
 
+    public static class ConversationAnalysisResult {
+        public final String executiveSummary;
+        public final String keyPoints;
+        public final String actionItems;
+        public final String fullResponse;
+        public final long latencyMs;
+        public final String modelUsed;
+        public final boolean isFallback;
+
+        public ConversationAnalysisResult(String executiveSummary, String keyPoints, String actionItems,
+                                          String fullResponse, long latencyMs, String modelUsed, boolean isFallback) {
+            this.executiveSummary = executiveSummary != null ? executiveSummary : "";
+            this.keyPoints = keyPoints != null ? keyPoints : "";
+            this.actionItems = actionItems != null ? actionItems : "";
+            this.fullResponse = fullResponse != null ? fullResponse : "";
+            this.latencyMs = latencyMs;
+            this.modelUsed = modelUsed;
+            this.isFallback = isFallback;
+        }
+    }
+
+    public interface ConversationAnalysisCallback {
+        void onSuccess(ConversationAnalysisResult result);
+        void onError(String errorMessage);
+    }
+
     /**
      * Backward-compatible polishSpeech overload.
      */
@@ -694,6 +720,132 @@ public class GeminiFlowClient {
             text = text.replaceAll("(\\d)\\s+(\\d)", "$1$2");
         }
         return text;
+    }
+
+    public static void summarizeConversationWithFallback(final String transcript,
+                                                         final String apiKey,
+                                                         final String preferredModel,
+                                                         final ConversationAnalysisCallback callback) {
+        if (transcript == null || transcript.trim().isEmpty()) {
+            mainHandler.post(() -> callback.onError("No conversation transcript recorded to summarize."));
+            return;
+        }
+
+        final String cleanInput = transcript.trim();
+        final long startTime = System.currentTimeMillis();
+
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            ConversationAnalysisResult offline = generateOfflineConversationSummary(cleanInput, System.currentTimeMillis() - startTime, "Offline Engine", false);
+            mainHandler.post(() -> callback.onSuccess(offline));
+            return;
+        }
+
+        executor.execute(() -> {
+            List<String> chain = buildModelChain(preferredModel);
+            String lastError = "";
+
+            String prompt = "You are Smart AI Keyboard's Executive Meeting Assistant.\n" +
+                    "Analyze the recorded conversation dialogue below and produce a clean, structured executive response.\n" +
+                    "Return strictly in this format with these exact headings:\n\n" +
+                    "📋 EXECUTIVE SUMMARY:\n" +
+                    "- [2-3 concise bullet points summarizing context, decisions, and progress]\n\n" +
+                    "💡 KEY DISCUSSION POINTS:\n" +
+                    "- [Point 1]\n" +
+                    "- [Point 2]\n\n" +
+                    "⏳ PENDING ACTION ITEMS:\n" +
+                    "- [ ] [Action item description] (Owner: [Person/Team if mentioned, else Team], Due: [Timeframe if mentioned, else ASAP])\n\n" +
+                    "Conversation Transcript:\n\"\"\"\n" + cleanInput + "\n\"\"\"";
+
+            for (int i = 0; i < chain.size(); i++) {
+                String currentModel = chain.get(i);
+                boolean isFallback = (i > 0);
+                try {
+                    String response = callGeminiGenerateContent(prompt, apiKey, currentModel);
+                    if (response != null && !response.trim().isEmpty()) {
+                        long latency = System.currentTimeMillis() - startTime;
+                        ConversationAnalysisResult res = parseConversationResponse(response.trim(), latency, currentModel, isFallback);
+                        mainHandler.post(() -> callback.onSuccess(res));
+                        return;
+                    }
+                } catch (Exception e) {
+                    lastError = e.getMessage();
+                    Log.w(TAG, "Conversation summary attempt with " + currentModel + " failed: " + lastError);
+                }
+            }
+
+            // Fallback to offline summary if API models fail
+            ConversationAnalysisResult offline = generateOfflineConversationSummary(cleanInput, System.currentTimeMillis() - startTime, "Offline Fallback", true);
+            mainHandler.post(() -> callback.onSuccess(offline));
+        });
+    }
+
+    private static ConversationAnalysisResult parseConversationResponse(String raw, long latency, String model, boolean isFallback) {
+        String execSummary = "";
+        String keyPoints = "";
+        String actionItems = "";
+
+        try {
+            int summaryIdx = raw.indexOf("EXECUTIVE SUMMARY");
+            int pointsIdx = raw.indexOf("KEY DISCUSSION POINTS");
+            int actionIdx = raw.indexOf("PENDING ACTION ITEMS");
+
+            if (summaryIdx != -1 && pointsIdx != -1) {
+                execSummary = raw.substring(summaryIdx + "EXECUTIVE SUMMARY".length(), pointsIdx).replaceAll("^[\\s:]+", "").trim();
+            }
+            if (pointsIdx != -1 && actionIdx != -1) {
+                keyPoints = raw.substring(pointsIdx + "KEY DISCUSSION POINTS".length(), actionIdx).replaceAll("^[\\s:]+", "").trim();
+            }
+            if (actionIdx != -1) {
+                actionItems = raw.substring(actionIdx + "PENDING ACTION ITEMS".length()).replaceAll("^[\\s:]+", "").trim();
+            }
+        } catch (Exception ignored) {}
+
+        if (execSummary.isEmpty() && keyPoints.isEmpty() && actionItems.isEmpty()) {
+            execSummary = raw;
+        }
+
+        return new ConversationAnalysisResult(execSummary, keyPoints, actionItems, raw, latency, model, isFallback);
+    }
+
+    private static ConversationAnalysisResult generateOfflineConversationSummary(String transcript, long latency, String model, boolean isFallback) {
+        String[] lines = transcript.split("[\\n.?!]+");
+        StringBuilder summarySb = new StringBuilder();
+        StringBuilder pointsSb = new StringBuilder();
+        StringBuilder actionsSb = new StringBuilder();
+
+        int pointCount = 0;
+        int actionCount = 0;
+
+        for (String rawLine : lines) {
+            String line = rawLine.trim();
+            if (line.length() < 6) continue;
+
+            String lower = line.toLowerCase(Locale.ROOT);
+            if (lower.contains("need to") || lower.contains("will ") || lower.contains("must ") ||
+                lower.contains("should ") || lower.contains("follow up") || lower.contains("action") ||
+                lower.contains("send ") || lower.contains("call ") || lower.contains("prepare") ||
+                lower.contains("review") || lower.contains("deadline") || lower.contains("submit")) {
+                actionsSb.append("- [ ] ").append(Character.toUpperCase(line.charAt(0))).append(line.substring(1)).append(" (Owner: Team, Due: ASAP)\n");
+                actionCount++;
+            } else if (pointCount < 4) {
+                pointsSb.append("- ").append(Character.toUpperCase(line.charAt(0))).append(line.substring(1)).append("\n");
+                pointCount++;
+            }
+        }
+
+        summarySb.append("• Recorded meeting covering ").append(Math.max(pointCount + actionCount, 1)).append(" conversation discussion items.\n");
+        summarySb.append("• Core objectives outlined and identified for execution.");
+
+        if (actionsSb.length() == 0) {
+            actionsSb.append("- [ ] Follow up on conversation discussion points (Owner: Team, Due: ASAP)\n");
+        }
+
+        String full = "📋 EXECUTIVE SUMMARY:\n" + summarySb.toString() + "\n\n" +
+                      "💡 KEY DISCUSSION POINTS:\n" + pointsSb.toString() + "\n" +
+                      "⏳ PENDING ACTION ITEMS:\n" + actionsSb.toString();
+
+        return new ConversationAnalysisResult(summarySb.toString().trim(), pointsSb.toString().trim(),
+                actionsSb.toString().trim(), full.trim(), latency, model, isFallback);
     }
 
     private static String readStream(InputStream is) throws Exception {

@@ -69,53 +69,59 @@ jobs:
             find wispr-flow-keyboard/app/build -maxdepth 5 || true
             exit 1
           fi
-          echo "Copying $APK_FILE to ./LeadPulseAIKeyboard.apk"
+          echo "Copying $APK_FILE to ./SmartAIKeyboard.apk"
+          cp "$APK_FILE" ./SmartAIKeyboard.apk
           cp "$APK_FILE" ./LeadPulseAIKeyboard.apk
           cp "$APK_FILE" ./WisprFlowKeyboard.apk
-          ls -lh ./LeadPulseAIKeyboard.apk
+          ls -lh ./SmartAIKeyboard.apk
 
       - name: Upload Keyboard APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: LeadPulseAIKeyboard-APK
-          path: ./LeadPulseAIKeyboard.apk
+          name: SmartAIKeyboard-APK
+          path: ./SmartAIKeyboard.apk
 
-      - name: Create or Update GitHub Release (LeadPulse v1.5.0)
+      - name: Create or Update GitHub Release (Smart AI v1.6.0)
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/heads/main')
         with:
-            tag_name: leadpulse-v1.5.0
-            name: "LeadPulse AI Keyboard & Smart Scanner (v1.5.0)"
+            tag_name: smart-ai-v1.6.0
+            name: "Smart AI Keyboard & Executive Meeting Assistant (v1.6.0)"
             draft: false
             prerelease: false
             make_latest: true
             body: |
-              ## 🚀 LeadPulse AI Keyboard & Smart Scanner (v1.5.0)
+              ## 🚀 Smart AI Keyboard & Executive Meeting Assistant (v1.6.0)
 
-              **Professional Executive AI Keyboard for Android with PulseFlow Voice Dictation, Strict 6-Field LeadPulse Card Scanner, Zero-Touch Automated Contact Saving, Transparent Model Engine Badges, and Pure AI Diagnostics.**
+              **Professional Executive AI Keyboard for Android featuring Glide Animated GIF Engine with Keyboard Typing & Voice Search, Robust Pinned Clipboard History, Meeting & Conversation Mode with Pending Action Items, and Reorganized Compact Toolbar.**
 
-              ### 💎 What's New in v1.5.0:
-              - **🌟 Complete Executive Rebranding**:
-                - Rebranded to **LeadPulse AI Keyboard** with **PulseFlow Voice Dictation** & **LeadPulse Smart Scanner**.
-                - Brand-new commercial 3D soundwave + keycap diamond AI glyph icon rendered across all Android mipmap densities (`mdpi`, `hdpi`, `xhdpi`, `xxhdpi`, `xxxhdpi`).
-              - **📇 Strict 6-Field Contact Card Extraction**:
-                - Output strictly restricted to: `Name`, `Designation`, `Organization`, `Email`, `Phone Number`, `City`.
-                - If any field is missing or not present, it is **omitted completely** (Zero "N/A", "None", or empty lines).
-              - **⚡ 100% Automated Silent Contact Saving (Zero Human Intervention)**:
-                - Tapping "Save Contact" programmatically inserts details directly into the phone's native address book via Android `ContentResolver.applyBatch` (`ContactsContract.RawContacts` & `ContactsContract.Data`).
-                - No confirmation popups, no contact editor screen—saves instantly in the background.
-              - **🧠 Multi-Model Fallback Cascade**:
-                - Primary (`gemini-2.0-flash`) ➔ Secondary (`gemini-1.5-flash`) ➔ Tertiary (`gemini-1.5-pro`) ➔ Offline Engine.
-              - **🟢 Transparent Engine Indicator Badges**:
-                - Real-time badges reveal whether `🟢 Pure AI`, `🟡 Fallback AI`, or `⚪ Offline Local Engine` processed your voice dictation or business card, complete with execution latency in milliseconds.
-              - **🧪 Dedicated Pure AI & Gemini Live WebSocket Diagnostics**:
-                - Test Pure AI Voice Translation (strict no-fallback mode).
-                - Test Pure AI Contact Card Extraction with 6-field schema verification.
-                - Test Gemini Multimodal Live WebSocket handshake (`wss://generativelanguage.googleapis.com/...`).
-                - Dedicated dark monospace diagnostics console.
-              - **🎨 Refined Executive UI & Button Color Palette**:
-                - Upgraded Settings page buttons to Royal Indigo (`#4f46e5`), crisp white typography, and frosted slate secondary pills.
+              ### 💎 What's New in v1.6.0:
+              - **🌟 Executive Rebranding to Smart AI Keyboard**:
+                - Officially branded as **Smart AI Keyboard** with spacebar inscribed `English • Smart AI`.
+                - Global-grade typography, subtle micro-haptics, and responsive OS theme integration.
+              - **📌 Pinned Clipboard History & Multi-Action Fixes**:
+                - **Preserved Pinned Messages**: Clearing history removes *only* unpinned recent clips; pinned favorites are 100% permanently protected.
+                - **Dedicated Access Tabs**: Segmented tabs `[⭐ All]`, `[📌 Pinned]`, and `[🕒 Recent]` for instantaneous 1-tap access to your saved snippets.
+                - **Reliable Pinning & Deletion**: Toggle pin (`📌` / `☆`) and individual delete (`🗑️`) now refresh the interface with zero delay.
+              - **🎞️ Glide Visual Animated GIFs & In-Keyboard Typing Search**:
+                - **Actual Moving GIFs**: Visual GIF cards rendered directly in the keyboard via Glide engine instead of plain text/emoji placeholders.
+                - **Soft-Keyboard Focus Workaround**: Integrated on-screen typing keypad feeds keystrokes directly into search query without IME focus locks.
+                - **🎙️ Instant Voice Search for GIFs**: Tap the mic and speak your query (e.g. "applause", "excited puppy") to search immediately.
+                - **Direct Rich Media Dispatch**: Direct file delivery via `commitContent()` into WhatsApp, Telegram, Slack, Messages, etc.
+              - **🎙️💬 Meeting & Conversation Recording Mode**:
+                - **Manual Start & Stop**: Tap `▶️ Start Conversation` to record continuously; tap `⏹️ Stop & Summarize` when finished.
+                - **Live Dialogue Transcript**: Shows the continuous dialogue accumulating in real time.
+                - **AI Executive Summary & Action Items**: Gemini AI processes the complete transcript to generate:
+                  1. 📋 Executive Summary
+                  2. 💡 Key Discussion Points
+                  3. ⏳ Pending Action Items (`- [ ] Action item... (Owner, Due)`)
+                - **1-Tap Actions**: `📥 Insert All`, `📋 Copy Summary`, and `⏳ Copy Action Items`.
+              - **🎨 Reorganized Toolbar & Compact Small Icons**:
+                - Compact small icon buttons for `🎙️ Voice` and `📇 Scan Card`.
+                - AI Flow Mode selection pill (`✨ Smart Polish ▾`) placed **immediately after** Voice and Scan Card.
+                - Dedicated `🎙️💬 Meeting` button right on the top action row.
             files: |
+              ./SmartAIKeyboard.apk
               ./LeadPulseAIKeyboard.apk
               ./WisprFlowKeyboard.apk
         env:

@@ -116,6 +116,7 @@ public class ClipboardHistoryManager {
         for (ClipItem item : items) {
             if (item.text.equals(target.text)) {
                 item.isPinned = !item.isPinned;
+                target.isPinned = item.isPinned;
                 saveClips();
                 return;
             }
@@ -126,12 +127,29 @@ public class ClipboardHistoryManager {
         if (target == null) return;
         Iterator<ClipItem> it = items.iterator();
         while (it.hasNext()) {
-            if (it.next().text.equals(target.text)) {
+            ClipItem item = it.next();
+            if (item.text.equals(target.text)) {
                 it.remove();
                 saveClips();
                 return;
             }
         }
+    }
+
+    public synchronized int getPinnedCount() {
+        int count = 0;
+        for (ClipItem item : items) {
+            if (item.isPinned) count++;
+        }
+        return count;
+    }
+
+    public synchronized int getRecentCount() {
+        int count = 0;
+        for (ClipItem item : items) {
+            if (!item.isPinned) count++;
+        }
+        return count;
     }
 
     public synchronized void clearUnpinned() {

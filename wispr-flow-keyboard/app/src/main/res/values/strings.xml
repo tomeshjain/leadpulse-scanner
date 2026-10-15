@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">LeadPulse AI Keyboard</string>
-    <string name="keyboard_label">LeadPulse AI Keyboard</string>
+    <string name="app_name">Smart AI Keyboard</string>
+    <string name="keyboard_label">Smart AI Keyboard</string>
     <string name="subtype_en_us">English (US)</string>
 
-    <string name="setup_title">LeadPulse AI Keyboard</string>
-    <string name="setup_subtitle">PulseFlow Voice Dictation &amp; LeadPulse Smart Scanner</string>
+    <string name="setup_title">Smart AI Keyboard</string>
+    <string name="setup_subtitle">PulseFlow Voice Dictation &amp; Smart Scanner</string>
     <string name="step_1_title">1. Enable in System Settings</string>
-    <string name="step_1_desc">Enable LeadPulse AI in Android on-screen keyboards.</string>
-    <string name="btn_enable_keyboard">Enable LeadPulse Keyboard</string>
+    <string name="step_1_desc">Enable Smart AI Keyboard in Android on-screen keyboards.</string>
+    <string name="btn_enable_keyboard">Enable Smart AI Keyboard</string>
 
     <string name="step_2_title">2. Select Active Keyboard</string>
-    <string name="step_2_desc">Switch your current input method to LeadPulse AI.</string>
-    <string name="btn_select_keyboard">Switch to LeadPulse</string>
+    <string name="step_2_desc">Switch your current input method to Smart AI Keyboard.</string>
+    <string name="btn_select_keyboard">Switch to Smart AI Keyboard</string>
 
     <string name="step_3_title">3. Gemini AI Key &amp; Model Selection</string>
     <string name="step_3_desc">Configure your Google Gemini API key and select your preferred model.</string>

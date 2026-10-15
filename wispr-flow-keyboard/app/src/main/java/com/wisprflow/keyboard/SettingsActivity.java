@@ -193,7 +193,7 @@ public class SettingsActivity extends AppCompatActivity {
                     Intent intent = new Intent(Settings.ACTION_INPUT_METHOD_SETTINGS);
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     startActivity(intent);
-                    Toast.makeText(this, "Enable 'LeadPulse AI Keyboard' in the list", Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, "Enable 'Smart AI Keyboard' in the list", Toast.LENGTH_LONG).show();
                 } catch (Exception e) {
                     Toast.makeText(this, "Could not open settings: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 }
@@ -687,13 +687,13 @@ public class SettingsActivity extends AppCompatActivity {
 
         boolean isLight = theme != null && theme.isLight;
         if (isCurrent) {
-            tvActivationStatus.setText("✓ LeadPulse AI Keyboard is currently ENABLED and ACTIVE as your keyboard!");
+            tvActivationStatus.setText("✓ Smart AI Keyboard is currently ENABLED and ACTIVE as your keyboard!");
             tvActivationStatus.setTextColor(isLight ? Color.parseColor("#16a34a") : Color.parseColor("#34d399"));
         } else if (isEnabled) {
-            tvActivationStatus.setText("✓ LeadPulse AI is enabled. Tap '2. Switch to LeadPulse Keyboard' to select it.");
+            tvActivationStatus.setText("✓ Smart AI Keyboard is enabled. Tap '2. Switch to Smart AI Keyboard' to select it.");
             tvActivationStatus.setTextColor(isLight ? Color.parseColor("#d97706") : Color.parseColor("#fbbf24"));
         } else {
-            tvActivationStatus.setText("⚠️ Not yet enabled. Tap '1. Enable LeadPulse in Settings' to begin.");
+            tvActivationStatus.setText("⚠️ Not yet enabled. Tap '1. Enable Smart AI in Settings' to begin.");
             tvActivationStatus.setTextColor(isLight ? Color.parseColor("#dc2626") : Color.parseColor("#f87171"));
         }
     }

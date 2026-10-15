@@ -31,6 +31,7 @@ import android.view.inputmethod.InputConnection;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.HorizontalScrollView;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -42,6 +43,9 @@ import androidx.core.view.inputmethod.EditorInfoCompat;
 import androidx.core.view.inputmethod.InputConnectionCompat;
 import androidx.core.view.inputmethod.InputContentInfoCompat;
 
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
@@ -52,16 +56,17 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Wispr Flow Professional Extended Android Keyboard (InputMethodService)
+ * Smart AI Keyboard Professional Extended Android Keyboard (InputMethodService)
  * 
  * Features:
  * 1. Dedicated Top Suggestion Row with Next-Word Prediction, Collocations & Real-Time Spelling Suggestions.
- * 2. Dedicated Action Toolbar Row (🎙️ Voice, 📇 Scan Card, 🎨 Themes, 😊 Emoji, 🎞️ GIF, 📋 Clipboard, ⚡ Shortcuts, ✨ Mode, ⚙️ Settings).
- * 3. Clean Separation of Text and Numeric/Symbol Keyboards (with dedicated 10-key PIN Numpad).
- * 4. Contact Card Scanner: Extracts business card details using Gemini AI and sends text + image.
- * 5. Dynamic Themes (Midnight Slate, OLED Black, Clean Light, Cyberpunk Neon, Forest Emerald, Sunset Amber).
- * 6. Single high-visibility microphone button (no duplicates) with continuous digits formatting.
- * 7. Spacebar cursor scrubbing and selected text backspace deletion.
+ * 2. Dedicated Action Toolbar Row (🎙️ Voice, 📇 Scan Card, ✨ Mode Selector, 🎙️💬 Meeting, 📋 Clipboard, 🎞️ GIF, 😊 Emoji, ⚡ Shortcuts, 🎨 Themes, ⚙️ Settings).
+ * 3. Meeting & Conversation Recording Mode: Manual Start & Stop with continuous dialogue transcription, generating Executive Summary & Pending Action Items.
+ * 4. Animated GIF Search & Visual Previews: Loaded with Glide, with on-keyboard typing search, instant voice search, and 1-tap direct sending.
+ * 5. Clipboard & Pinned Snippets: Dedicated tabs ([⭐ All], [📌 Pinned], [🕒 Recent]), individual delete, and clear unpinned (pinned preserved).
+ * 6. Clean Separation of Text and Numeric/Symbol Keyboards (with dedicated 10-key PIN Numpad).
+ * 7. Contact Card Scanner: Extracts business card details using Gemini AI and sends text + image.
+ * 8. Dynamic Themes (Clean Light, Midnight Slate, OLED Black, Cyberpunk Neon, Forest Emerald, Sunset Amber).
  */
 public class WisprKeyboardService extends InputMethodService {
 
@@ -74,8 +79,30 @@ public class WisprKeyboardService extends InputMethodService {
         GIFS,
         CLIPBOARD,
         SHORTCUTS,
-        THEMES
+        THEMES,
+        CONVERSATION
     }
+
+    private enum ClipboardTab {
+        ALL,
+        PINNED,
+        RECENT
+    }
+    private ClipboardTab currentClipboardTab = ClipboardTab.ALL;
+
+    // Meeting & Conversation Recording State
+    private boolean isConversationRecordingActive = false;
+    private final StringBuilder conversationTranscript = new StringBuilder();
+    private SpeechRecognizer conversationSpeechRecognizer;
+    private long conversationStartTime = 0;
+    private TextView tvConversationLiveTranscript;
+    private TextView tvConversationStatus;
+    private Button btnConversationRecordToggle;
+    private final Handler conversationTimerHandler = new Handler(Looper.getMainLooper());
+    private Runnable conversationTimerRunnable;
+
+    // GIF Typing & Search State
+    private boolean isGifTypingActive = false;
 
     private KeyboardPreferences prefs;
     private ShortcutsManager shortcutsManager;
@@ -269,62 +296,37 @@ public class WisprKeyboardService extends InputMethodService {
         iconRow.setGravity(Gravity.CENTER_VERTICAL);
         hsv.addView(iconRow);
 
-        // 🎙️ SEPARATE Dedicated Microphone Button with text
+        // 🎙️ Voice Dictation Button (Compact Icon Pill)
         Button btnVoice = new Button(this);
         btnVoice.setText("🎙️ Voice");
         btnVoice.setTextSize(11);
         btnVoice.setTextColor(Color.WHITE);
         btnVoice.setAllCaps(false);
         btnVoice.setBackground(createChipDrawable("#4338ca", "#6366f1", 12));
-        btnVoice.setPadding(dpToPx(10), 0, dpToPx(10), 0);
+        btnVoice.setPadding(dpToPx(8), 0, dpToPx(8), 0);
         LinearLayout.LayoutParams voiceParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, dpToPx(30));
-        voiceParams.setMargins(dpToPx(2), 0, dpToPx(4), 0);
+        voiceParams.setMargins(dpToPx(2), 0, dpToPx(2), 0);
         btnVoice.setLayoutParams(voiceParams);
         btnVoice.setOnClickListener(v -> toggleVoiceDictation());
         iconRow.addView(btnVoice);
 
-        // 📇 Contact Card Scanner Button
+        // 📇 Contact Card Scanner Button (Compact Icon Pill)
         Button btnScanCard = new Button(this);
-        btnScanCard.setText("📇 Scan Card");
+        btnScanCard.setText("📇 Scan");
         btnScanCard.setTextSize(11);
         btnScanCard.setTextColor(Color.WHITE);
         btnScanCard.setAllCaps(false);
         btnScanCard.setBackground(createChipDrawable("#065f46", "#10b981", 12));
-        btnScanCard.setPadding(dpToPx(10), 0, dpToPx(10), 0);
+        btnScanCard.setPadding(dpToPx(8), 0, dpToPx(8), 0);
         LinearLayout.LayoutParams scanParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, dpToPx(30));
-        scanParams.setMargins(dpToPx(2), 0, dpToPx(4), 0);
+        scanParams.setMargins(dpToPx(2), 0, dpToPx(2), 0);
         btnScanCard.setLayoutParams(scanParams);
         btnScanCard.setOnClickListener(v -> openCardScanner());
         iconRow.addView(btnScanCard);
 
-        // 🎨 Themes Picker Button
-        Button btnThemes = createToolbarIconButton("🎨", Color.TRANSPARENT);
-        btnThemes.setOnClickListener(v -> togglePanel(PanelMode.THEMES));
-        iconRow.addView(btnThemes);
-
-        // 😊 Emojis Toggle
-        Button btnEmoji = createToolbarIconButton("😊", Color.TRANSPARENT);
-        btnEmoji.setOnClickListener(v -> togglePanel(PanelMode.EMOJI));
-        iconRow.addView(btnEmoji);
-
-        // 🎞️ GIFs & Reactions Toggle
-        Button btnGifs = createToolbarIconButton("🎞️", Color.TRANSPARENT);
-        btnGifs.setOnClickListener(v -> togglePanel(PanelMode.GIFS));
-        iconRow.addView(btnGifs);
-
-        // 📋 Clipboard & Pinned Favorites Toggle
-        Button btnClip = createToolbarIconButton("📋", Color.TRANSPARENT);
-        btnClip.setOnClickListener(v -> togglePanel(PanelMode.CLIPBOARD));
-        iconRow.addView(btnClip);
-
-        // ⚡ Shortcuts Toggle (GM, GE, etc.)
-        Button btnShortcuts = createToolbarIconButton("⚡", Color.TRANSPARENT);
-        btnShortcuts.setOnClickListener(v -> togglePanel(PanelMode.SHORTCUTS));
-        iconRow.addView(btnShortcuts);
-
-        // ✨ AI Flow Mode Chip
+        // ✨ AI Flow Mode Chip (Placed IMMEDIATELY AFTER Voice & Scan Card!)
         modeChipButton = new Button(this);
         updateModeChipText();
         modeChipButton.setTextSize(10);
@@ -334,10 +336,50 @@ public class WisprKeyboardService extends InputMethodService {
         modeChipButton.setPadding(dpToPx(8), 0, dpToPx(8), 0);
         LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, dpToPx(30));
-        chipParams.setMargins(dpToPx(4), 0, dpToPx(4), 0);
+        chipParams.setMargins(dpToPx(2), 0, dpToPx(4), 0);
         modeChipButton.setLayoutParams(chipParams);
         modeChipButton.setOnClickListener(v -> cycleNextMode());
         iconRow.addView(modeChipButton);
+
+        // 🎙️💬 Dedicated Meeting & Conversation Recording Mode Button
+        Button btnMeeting = new Button(this);
+        btnMeeting.setText("🎙️💬 Meeting");
+        btnMeeting.setTextSize(10);
+        btnMeeting.setTextColor(Color.parseColor("#fef08a"));
+        btnMeeting.setAllCaps(false);
+        btnMeeting.setBackground(createChipDrawable("#451a03", "#d97706", 12));
+        btnMeeting.setPadding(dpToPx(8), 0, dpToPx(8), 0);
+        LinearLayout.LayoutParams meetParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, dpToPx(30));
+        meetParams.setMargins(dpToPx(2), 0, dpToPx(4), 0);
+        btnMeeting.setLayoutParams(meetParams);
+        btnMeeting.setOnClickListener(v -> togglePanel(PanelMode.CONVERSATION));
+        iconRow.addView(btnMeeting);
+
+        // 📋 Clipboard & Pinned Favorites Toggle
+        Button btnClip = createToolbarIconButton("📋", Color.TRANSPARENT);
+        btnClip.setOnClickListener(v -> togglePanel(PanelMode.CLIPBOARD));
+        iconRow.addView(btnClip);
+
+        // 🎞️ GIFs & Reactions Toggle
+        Button btnGifs = createToolbarIconButton("🎞️", Color.TRANSPARENT);
+        btnGifs.setOnClickListener(v -> togglePanel(PanelMode.GIFS));
+        iconRow.addView(btnGifs);
+
+        // 😊 Emojis Toggle
+        Button btnEmoji = createToolbarIconButton("😊", Color.TRANSPARENT);
+        btnEmoji.setOnClickListener(v -> togglePanel(PanelMode.EMOJI));
+        iconRow.addView(btnEmoji);
+
+        // ⚡ Shortcuts Toggle (GM, GE, etc.)
+        Button btnShortcuts = createToolbarIconButton("⚡", Color.TRANSPARENT);
+        btnShortcuts.setOnClickListener(v -> togglePanel(PanelMode.SHORTCUTS));
+        iconRow.addView(btnShortcuts);
+
+        // 🎨 Themes Picker Button
+        Button btnThemes = createToolbarIconButton("🎨", Color.TRANSPARENT);
+        btnThemes.setOnClickListener(v -> togglePanel(PanelMode.THEMES));
+        iconRow.addView(btnThemes);
 
         // ⚙️ Settings Button
         Button btnSettings = createToolbarIconButton("⚙️", Color.TRANSPARENT);
@@ -548,6 +590,9 @@ public class WisprKeyboardService extends InputMethodService {
                 case THEMES:
                     buildThemesPanel();
                     break;
+                case CONVERSATION:
+                    buildConversationPanel();
+                    break;
             }
         }
         triggerHaptic(18);
@@ -644,6 +689,7 @@ public class WisprKeyboardService extends InputMethodService {
     }
 
     private void buildGifsPanel(String initialQuery) {
+        panelContainer.removeAllViews();
         currentGifSearchQuery = (initialQuery != null) ? initialQuery.trim() : "";
         KeyboardTheme theme = KeyboardTheme.resolveTheme(this, prefs != null ? prefs.getThemeId() : null);
 
@@ -651,6 +697,7 @@ public class WisprKeyboardService extends InputMethodService {
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
+        layout.setBackgroundColor(theme.backgroundColor);
 
         // 1. Search Bar & Voice Search Header
         LinearLayout searchHeader = new LinearLayout(this);
@@ -658,32 +705,40 @@ public class WisprKeyboardService extends InputMethodService {
         searchHeader.setGravity(Gravity.CENTER_VERTICAL);
         searchHeader.setPadding(dpToPx(8), dpToPx(4), dpToPx(8), dpToPx(4));
 
-        final EditText etSearch = new EditText(this);
-        etSearch.setHint("🔍 Search GIFs (e.g. applause, excited)...");
-        etSearch.setHintTextColor(theme.subTextColor);
-        etSearch.setTextColor(theme.textColor);
-        etSearch.setTextSize(12);
-        etSearch.setSingleLine(true);
-        etSearch.setBackground(createChipDrawable(theme.keyColor, theme.dividerColor, 8));
-        etSearch.setPadding(dpToPx(10), dpToPx(6), dpToPx(10), dpToPx(6));
-        if (!currentGifSearchQuery.isEmpty()) {
-            etSearch.setText(currentGifSearchQuery);
-            etSearch.setSelection(currentGifSearchQuery.length());
+        final TextView tvSearchBox = new TextView(this);
+        if (currentGifSearchQuery.isEmpty()) {
+            tvSearchBox.setText("🔍 Tap to type or speak GIF search...");
+            tvSearchBox.setTextColor(theme.subTextColor);
+        } else {
+            tvSearchBox.setText("🔍 " + currentGifSearchQuery);
+            tvSearchBox.setTextColor(theme.textColor);
         }
+        tvSearchBox.setTextSize(12);
+        tvSearchBox.setBackground(createChipDrawable(theme.keyColor, theme.dividerColor, 8));
+        tvSearchBox.setPadding(dpToPx(10), dpToPx(8), dpToPx(10), dpToPx(8));
         LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(0, dpToPx(36), 1.0f);
-        etSearch.setLayoutParams(searchParams);
-        searchHeader.addView(etSearch);
+        tvSearchBox.setLayoutParams(searchParams);
+        tvSearchBox.setOnClickListener(v -> {
+            isGifTypingActive = !isGifTypingActive;
+            buildGifsPanel(currentGifSearchQuery);
+        });
+        searchHeader.addView(tvSearchBox);
 
         // Clear button
-        final Button btnClear = new Button(this);
-        btnClear.setText("✕");
-        btnClear.setTextSize(12);
-        btnClear.setTextColor(theme.subTextColor);
-        btnClear.setBackgroundColor(Color.TRANSPARENT);
-        btnClear.setVisibility(currentGifSearchQuery.isEmpty() ? View.GONE : View.VISIBLE);
-        LinearLayout.LayoutParams clearParams = new LinearLayout.LayoutParams(dpToPx(36), dpToPx(36));
-        btnClear.setLayoutParams(clearParams);
-        searchHeader.addView(btnClear);
+        if (!currentGifSearchQuery.isEmpty()) {
+            final Button btnClear = new Button(this);
+            btnClear.setText("✕");
+            btnClear.setTextSize(12);
+            btnClear.setTextColor(theme.subTextColor);
+            btnClear.setBackgroundColor(Color.TRANSPARENT);
+            LinearLayout.LayoutParams clearParams = new LinearLayout.LayoutParams(dpToPx(36), dpToPx(36));
+            btnClear.setLayoutParams(clearParams);
+            btnClear.setOnClickListener(v -> {
+                currentGifSearchQuery = "";
+                buildGifsPanel("");
+            });
+            searchHeader.addView(btnClear);
+        }
 
         // Voice Search button
         Button btnVoiceSearch = new Button(this);
@@ -693,7 +748,24 @@ public class WisprKeyboardService extends InputMethodService {
         LinearLayout.LayoutParams vsParams = new LinearLayout.LayoutParams(dpToPx(36), dpToPx(36));
         vsParams.leftMargin = dpToPx(4);
         btnVoiceSearch.setLayoutParams(vsParams);
+        btnVoiceSearch.setOnClickListener(v -> startGifVoiceSearch());
         searchHeader.addView(btnVoiceSearch);
+
+        // Toggle Type / Grid button
+        Button btnToggleType = new Button(this);
+        btnToggleType.setText(isGifTypingActive ? "🖼️ Grid" : "⌨️ Type");
+        btnToggleType.setTextSize(11);
+        btnToggleType.setTextColor(isGifTypingActive ? theme.accentColor : Color.WHITE);
+        btnToggleType.setAllCaps(false);
+        btnToggleType.setBackground(createChipDrawable(isGifTypingActive ? theme.actionKeyColor : theme.accentColor, theme.dividerColor, 8));
+        LinearLayout.LayoutParams ttParams = new LinearLayout.LayoutParams(dpToPx(62), dpToPx(36));
+        ttParams.leftMargin = dpToPx(4);
+        btnToggleType.setLayoutParams(ttParams);
+        btnToggleType.setOnClickListener(v -> {
+            isGifTypingActive = !isGifTypingActive;
+            buildGifsPanel(currentGifSearchQuery);
+        });
+        searchHeader.addView(btnToggleType);
 
         layout.addView(searchHeader);
 
@@ -706,26 +778,15 @@ public class WisprKeyboardService extends InputMethodService {
         tabScroll.addView(tabs);
         layout.addView(tabScroll);
 
-        // 3. Scrollable Results Container
-        ScrollView scroll = new ScrollView(this);
-        scroll.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.0f));
-
-        final LinearLayout gifContent = new LinearLayout(this);
-        gifContent.setOrientation(LinearLayout.VERTICAL);
-        gifContent.setPadding(dpToPx(6), dpToPx(4), dpToPx(6), dpToPx(4));
-        scroll.addView(gifContent);
-        layout.addView(scroll);
-
-        // Category Pills
         final String[] categories = GifReactionsData.getCategoryNames();
         for (int i = 0; i < categories.length; i++) {
             final String cat = categories[i];
             Button catBtn = new Button(this);
             catBtn.setText(cat);
             catBtn.setTextSize(11);
-            catBtn.setTextColor(i == 0 && currentGifSearchQuery.isEmpty() ? theme.accentColor : theme.subTextColor);
-            catBtn.setBackground(createChipDrawable(theme.actionKeyColor, theme.dividerColor, 8));
+            boolean isSelected = cat.equalsIgnoreCase(currentGifSearchQuery) || (i == 0 && currentGifSearchQuery.isEmpty());
+            catBtn.setTextColor(isSelected ? theme.accentColor : theme.subTextColor);
+            catBtn.setBackground(createChipDrawable(isSelected ? theme.actionKeyColor : theme.keyColor, theme.dividerColor, 8));
             catBtn.setPadding(dpToPx(10), 0, dpToPx(10), 0);
             catBtn.setAllCaps(false);
             LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(
@@ -734,88 +795,61 @@ public class WisprKeyboardService extends InputMethodService {
             catBtn.setLayoutParams(cp);
 
             catBtn.setOnClickListener(v -> {
-                etSearch.setText("");
-                currentGifSearchQuery = "";
-                renderGifs(gifContent, cat, theme);
-                for (int j = 0; j < tabs.getChildCount(); j++) {
-                    View child = tabs.getChildAt(j);
-                    if (child instanceof Button) {
-                        ((Button) child).setTextColor(child == v ? theme.accentColor : theme.subTextColor);
-                    }
-                }
+                isGifTypingActive = false;
+                currentGifSearchQuery = cat;
+                buildGifsPanel(cat);
             });
             tabs.addView(catBtn);
         }
 
-        // Live text search watcher
-        etSearch.addTextChangedListener(new android.text.TextWatcher() {
-            private final Handler searchHandler = new Handler(Looper.getMainLooper());
-            private Runnable searchRunnable;
+        // 3. Scrollable Results Container
+        ScrollView scroll = new ScrollView(this);
+        scroll.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.0f));
 
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+        final LinearLayout gifContent = new LinearLayout(this);
+        gifContent.setOrientation(LinearLayout.VERTICAL);
+        gifContent.setPadding(dpToPx(4), dpToPx(2), dpToPx(4), dpToPx(4));
+        scroll.addView(gifContent);
+        layout.addView(scroll);
 
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
-                final String q = s.toString().trim();
-                currentGifSearchQuery = q;
-                btnClear.setVisibility(q.isEmpty() ? View.GONE : View.VISIBLE);
-
-                // Immediate local keyword match
-                List<GifReactionsData.GifItem> localItems = GifReactionsData.searchLocalGifs(q);
-                displayGifList(gifContent, localItems, theme);
-
-                // Debounce live online search
-                if (searchRunnable != null) {
-                    searchHandler.removeCallbacks(searchRunnable);
-                }
-                if (!q.isEmpty()) {
-                    searchRunnable = () -> {
-                        GifReactionsData.searchOnlineGifs(q, onlineResults -> {
-                            new Handler(Looper.getMainLooper()).post(() -> {
-                                if (currentGifSearchQuery.equalsIgnoreCase(q)) {
-                                    displayGifList(gifContent, onlineResults, theme);
-                                }
-                            });
-                        });
-                    };
-                    searchHandler.postDelayed(searchRunnable, 450);
-                }
-            }
-
-            @Override
-            public void afterTextChanged(android.text.Editable s) {}
-        });
-
-        btnClear.setOnClickListener(v -> {
-            etSearch.setText("");
-            currentGifSearchQuery = "";
-            renderGifs(gifContent, categories[0], theme);
-        });
-
-        btnVoiceSearch.setOnClickListener(v -> startGifVoiceSearch(etSearch));
-
-        // Initial render
+        // Populate GIFs based on query or default category
+        List<GifReactionsData.GifItem> items;
         if (!currentGifSearchQuery.isEmpty()) {
-            displayGifList(gifContent, GifReactionsData.searchLocalGifs(currentGifSearchQuery), theme);
+            items = GifReactionsData.searchLocalGifs(currentGifSearchQuery);
         } else {
-            renderGifs(gifContent, categories[0], theme);
+            items = GifReactionsData.getItemsForCategory(categories[0]);
+        }
+        displayGifGrid(gifContent, items, theme);
+
+        // If online search has results, query in background
+        if (!currentGifSearchQuery.isEmpty()) {
+            final String q = currentGifSearchQuery;
+            GifReactionsData.searchOnlineGifs(q, onlineResults -> {
+                if (onlineResults != null && !onlineResults.isEmpty()) {
+                    new Handler(Looper.getMainLooper()).post(() -> {
+                        if (currentGifSearchQuery.equalsIgnoreCase(q)) {
+                            displayGifGrid(gifContent, onlineResults, theme);
+                        }
+                    });
+                }
+            });
+        }
+
+        // 4. In-Keyboard Typing Keys (when Type mode is active)
+        if (isGifTypingActive) {
+            layout.addView(createGifTypingKeyboardRow(theme));
         }
 
         layout.addView(createPanelBottomBar());
         panelContainer.addView(layout);
     }
 
-    private void renderGifs(LinearLayout container, String category, KeyboardTheme theme) {
-        List<GifReactionsData.GifItem> items = GifReactionsData.getItemsForCategory(category);
-        displayGifList(container, items, theme);
-    }
-
-    private void displayGifList(LinearLayout container, List<GifReactionsData.GifItem> items, KeyboardTheme theme) {
+    private void displayGifGrid(LinearLayout container, List<GifReactionsData.GifItem> items, KeyboardTheme theme) {
         container.removeAllViews();
         if (items == null || items.isEmpty()) {
             TextView empty = new TextView(this);
-            empty.setText("No GIFs found for \"" + currentGifSearchQuery + "\".\nTry another search keyword!");
+            empty.setText("No GIFs found for \"" + currentGifSearchQuery + "\".\nTry another search keyword or tap a category pill!");
             empty.setTextColor(theme.subTextColor);
             empty.setTextSize(13);
             empty.setGravity(Gravity.CENTER);
@@ -824,63 +858,178 @@ public class WisprKeyboardService extends InputMethodService {
             return;
         }
 
-        for (final GifReactionsData.GifItem item : items) {
-            LinearLayout card = new LinearLayout(this);
-            card.setOrientation(LinearLayout.HORIZONTAL);
-            card.setGravity(Gravity.CENTER_VERTICAL);
-            card.setBackground(createChipDrawable(theme.keyColor, theme.dividerColor, 10));
-            card.setPadding(dpToPx(12), dpToPx(8), dpToPx(12), dpToPx(8));
-            LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            cp.bottomMargin = dpToPx(6);
-            card.setLayoutParams(cp);
+        for (int i = 0; i < items.size(); i += 2) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setLayoutParams(new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-            TextView tvEmoji = new TextView(this);
-            tvEmoji.setText(item.emojiPreview);
-            tvEmoji.setTextSize(18);
-            card.addView(tvEmoji);
+            for (int col = 0; col < 2; col++) {
+                int idx = i + col;
+                if (idx < items.size()) {
+                    final GifReactionsData.GifItem item = items.get(idx);
+                    LinearLayout card = new LinearLayout(this);
+                    card.setOrientation(LinearLayout.VERTICAL);
+                    card.setBackground(createChipDrawable(theme.keyColor, theme.dividerColor, 10));
+                    LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+                    cp.setMargins(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4));
+                    card.setLayoutParams(cp);
+                    card.setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4));
 
-            LinearLayout textCol = new LinearLayout(this);
-            textCol.setOrientation(LinearLayout.VERTICAL);
-            LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
-            tp.leftMargin = dpToPx(12);
-            textCol.setLayoutParams(tp);
+                    ImageView ivGif = new ImageView(this);
+                    ivGif.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                    LinearLayout.LayoutParams ivParams = new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(95));
+                    ivGif.setLayoutParams(ivParams);
 
-            TextView tvTitle = new TextView(this);
-            tvTitle.setText(item.title);
-            tvTitle.setTextColor(theme.textColor);
-            tvTitle.setTextSize(13);
-            tvTitle.setTypeface(null, Typeface.BOLD);
-            textCol.addView(tvTitle);
+                    try {
+                        Glide.with(WisprKeyboardService.this)
+                                .asGif()
+                                .load(item.gifUrl)
+                                .diskCacheStrategy(DiskCacheStrategy.ALL)
+                                .placeholder(android.R.drawable.progress_indeterminate_horizontal)
+                                .error(android.R.drawable.ic_menu_gallery)
+                                .into(ivGif);
+                    } catch (Throwable ignored) {}
 
-            TextView tvCat = new TextView(this);
-            tvCat.setText(item.category != null ? item.category : "🎞️ Reaction");
-            tvCat.setTextColor(theme.accentColor);
-            tvCat.setTextSize(10);
-            textCol.addView(tvCat);
+                    card.addView(ivGif);
 
-            card.addView(textCol);
+                    TextView tvTitle = new TextView(this);
+                    tvTitle.setText(item.emojiPreview + " " + item.title);
+                    tvTitle.setTextColor(theme.textColor);
+                    tvTitle.setTextSize(11);
+                    tvTitle.setMaxLines(1);
+                    tvTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                    tvTitle.setGravity(Gravity.CENTER);
+                    tvTitle.setPadding(dpToPx(2), dpToPx(4), dpToPx(2), dpToPx(2));
+                    card.addView(tvTitle);
 
-            // Action button: Send GIF
-            Button btnSend = new Button(this);
-            btnSend.setText("Send");
-            btnSend.setTextSize(11);
-            btnSend.setTextColor(Color.WHITE);
-            btnSend.setBackground(createChipDrawable(theme.accentColor, theme.accentColor, 8));
-            btnSend.setPadding(dpToPx(10), 0, dpToPx(10), 0);
-            LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT, dpToPx(30));
-            btnSend.setLayoutParams(bp);
-            btnSend.setOnClickListener(v -> sendGifMedia(item));
-            card.addView(btnSend);
-
-            card.setOnClickListener(v -> sendGifMedia(item));
-
-            container.addView(card);
+                    card.setOnClickListener(v -> sendGifMedia(item));
+                    row.addView(card);
+                } else {
+                    View spacer = new View(this);
+                    spacer.setLayoutParams(new LinearLayout.LayoutParams(0, 1, 1.0f));
+                    row.addView(spacer);
+                }
+            }
+            container.addView(row);
         }
     }
 
-    private void startGifVoiceSearch(final EditText etSearch) {
+    private View createGifTypingKeyboardRow(final KeyboardTheme theme) {
+        LinearLayout kb = new LinearLayout(this);
+        kb.setOrientation(LinearLayout.VERTICAL);
+        kb.setPadding(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2));
+        kb.setBackgroundColor(theme.backgroundColor);
+
+        String[] row1 = {"Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"};
+        String[] row2 = {"A", "S", "D", "F", "G", "H", "J", "K", "L"};
+        String[] row3 = {"Z", "X", "C", "V", "B", "N", "M"};
+
+        kb.addView(createMiniKeyRow(row1, theme));
+        kb.addView(createMiniKeyRow(row2, theme));
+
+        LinearLayout r3 = new LinearLayout(this);
+        r3.setOrientation(LinearLayout.HORIZONTAL);
+        r3.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(32)));
+
+        for (final String k : row3) {
+            Button b = createMiniKeyButton(k, theme);
+            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f);
+            p.setMargins(dpToPx(1), dpToPx(1), dpToPx(1), dpToPx(1));
+            b.setLayoutParams(p);
+            b.setOnClickListener(v -> appendGifSearchChar(k.toLowerCase(Locale.ROOT)));
+            r3.addView(b);
+        }
+
+        // Backspace button
+        Button btnBack = new Button(this);
+        btnBack.setText("⌫");
+        btnBack.setTextSize(13);
+        btnBack.setTextColor(theme.textColor);
+        btnBack.setBackground(createChipDrawable(theme.actionKeyColor, theme.dividerColor, 6));
+        LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.3f);
+        bp.setMargins(dpToPx(1), dpToPx(1), dpToPx(1), dpToPx(1));
+        btnBack.setLayoutParams(bp);
+        btnBack.setOnClickListener(v -> deleteGifSearchChar());
+        r3.addView(btnBack);
+
+        // Space button
+        Button btnSpace = new Button(this);
+        btnSpace.setText("Space");
+        btnSpace.setTextSize(11);
+        btnSpace.setAllCaps(false);
+        btnSpace.setTextColor(theme.subTextColor);
+        btnSpace.setBackground(createChipDrawable(theme.keyColor, theme.dividerColor, 6));
+        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.8f);
+        sp.setMargins(dpToPx(1), dpToPx(1), dpToPx(1), dpToPx(1));
+        btnSpace.setLayoutParams(sp);
+        btnSpace.setOnClickListener(v -> appendGifSearchChar(" "));
+        r3.addView(btnSpace);
+
+        // Done button
+        Button btnDone = new Button(this);
+        btnDone.setText("✓ Done");
+        btnDone.setTextSize(11);
+        btnDone.setAllCaps(false);
+        btnDone.setTextColor(Color.WHITE);
+        btnDone.setBackground(createChipDrawable(theme.accentColor, theme.accentColor, 6));
+        LinearLayout.LayoutParams dp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.5f);
+        dp.setMargins(dpToPx(1), dpToPx(1), dpToPx(1), dpToPx(1));
+        btnDone.setLayoutParams(dp);
+        btnDone.setOnClickListener(v -> {
+            isGifTypingActive = false;
+            buildGifsPanel(currentGifSearchQuery);
+        });
+        r3.addView(btnDone);
+
+        kb.addView(r3);
+        return kb;
+    }
+
+    private LinearLayout createMiniKeyRow(String[] keys, KeyboardTheme theme) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(32)));
+
+        for (final String k : keys) {
+            Button b = createMiniKeyButton(k, theme);
+            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f);
+            p.setMargins(dpToPx(1), dpToPx(1), dpToPx(1), dpToPx(1));
+            b.setLayoutParams(p);
+            b.setOnClickListener(v -> appendGifSearchChar(k.toLowerCase(Locale.ROOT)));
+            row.addView(b);
+        }
+        return row;
+    }
+
+    private Button createMiniKeyButton(String text, KeyboardTheme theme) {
+        Button b = new Button(this);
+        b.setText(text);
+        b.setTextSize(12);
+        b.setTextColor(theme.textColor);
+        b.setBackground(createChipDrawable(theme.keyColor, theme.dividerColor, 6));
+        b.setPadding(0, 0, 0, 0);
+        return b;
+    }
+
+    private void appendGifSearchChar(String ch) {
+        currentGifSearchQuery += ch;
+        triggerHaptic(10);
+        buildGifsPanel(currentGifSearchQuery);
+    }
+
+    private void deleteGifSearchChar() {
+        if (!currentGifSearchQuery.isEmpty()) {
+            currentGifSearchQuery = currentGifSearchQuery.substring(0, currentGifSearchQuery.length() - 1);
+            triggerHaptic(12);
+            buildGifsPanel(currentGifSearchQuery);
+        }
+    }
+
+    private void startGifVoiceSearch() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             Toast.makeText(this, "Microphone permission needed to voice-search GIFs", Toast.LENGTH_SHORT).show();
             return;
@@ -901,8 +1050,9 @@ public class WisprKeyboardService extends InputMethodService {
                     ArrayList<String> matches = results != null ? results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) : null;
                     if (matches != null && !matches.isEmpty()) {
                         String query = matches.get(0);
-                        etSearch.setText(query);
-                        etSearch.setSelection(query.length());
+                        currentGifSearchQuery = query;
+                        isGifTypingActive = false;
+                        buildGifsPanel(query);
                     }
                     try { sr.destroy(); } catch (Exception ignored) {}
                 }
@@ -926,20 +1076,25 @@ public class WisprKeyboardService extends InputMethodService {
     // --- CLIPBOARD & PINNED FAVORITES PANEL ---
 
     private void buildClipboardPanel() {
+        panelContainer.removeAllViews();
+        KeyboardTheme theme = KeyboardTheme.resolveTheme(this, prefs != null ? prefs.getThemeId() : null);
+
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
+        layout.setBackgroundColor(theme.backgroundColor);
 
+        // 1. Header Row
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(dpToPx(8), dpToPx(4), dpToPx(8), dpToPx(4));
+        header.setPadding(dpToPx(10), dpToPx(6), dpToPx(10), dpToPx(4));
 
         TextView tvTitle = new TextView(this);
         tvTitle.setText("📋 Clipboard History & Pinned Snippets");
-        tvTitle.setTextColor(Color.parseColor("#818cf8"));
-        tvTitle.setTextSize(12);
+        tvTitle.setTextColor(theme.accentColor);
+        tvTitle.setTextSize(13);
         tvTitle.setTypeface(null, Typeface.BOLD);
         LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
         tvTitle.setLayoutParams(tp);
@@ -951,32 +1106,63 @@ public class WisprKeyboardService extends InputMethodService {
         btnClear.setTextColor(Color.parseColor("#ef4444"));
         btnClear.setBackgroundColor(Color.TRANSPARENT);
         btnClear.setAllCaps(false);
+        btnClear.setPadding(dpToPx(8), 0, dpToPx(8), 0);
         btnClear.setOnClickListener(v -> {
             clipboardManager.clearUnpinned();
+            triggerHaptic(18);
             buildClipboardPanel();
-            Toast.makeText(this, "Cleared unpinned clipboard history", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Cleared recent history. Pinned messages preserved! 📌", Toast.LENGTH_SHORT).show();
         });
         header.addView(btnClear);
         layout.addView(header);
 
+        // 2. Segmented Filter Tabs: [⭐ All (N)] | [📌 Pinned (N)] | [🕒 Recent (N)]
+        LinearLayout tabRow = new LinearLayout(this);
+        tabRow.setOrientation(LinearLayout.HORIZONTAL);
+        tabRow.setPadding(dpToPx(8), dpToPx(2), dpToPx(8), dpToPx(6));
+
+        final int pinnedCount = clipboardManager.getPinnedCount();
+        final int recentCount = clipboardManager.getRecentCount();
+        final int allCount = pinnedCount + recentCount;
+
+        tabRow.addView(createClipboardTabButton("⭐ All (" + allCount + ")", ClipboardTab.ALL, theme));
+        tabRow.addView(createClipboardTabButton("📌 Pinned (" + pinnedCount + ")", ClipboardTab.PINNED, theme));
+        tabRow.addView(createClipboardTabButton("🕒 Recent (" + recentCount + ")", ClipboardTab.RECENT, theme));
+        layout.addView(tabRow);
+
+        // 3. Scrollable Clips List
         ScrollView scroll = new ScrollView(this);
         scroll.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.0f));
 
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dpToPx(6), dpToPx(4), dpToPx(6), dpToPx(4));
+        content.setPadding(dpToPx(8), dpToPx(4), dpToPx(8), dpToPx(4));
         scroll.addView(content);
         layout.addView(scroll);
 
-        List<ClipboardHistoryManager.ClipItem> clips = clipboardManager.getAllClips();
+        List<ClipboardHistoryManager.ClipItem> clips;
+        if (currentClipboardTab == ClipboardTab.PINNED) {
+            clips = clipboardManager.getPinnedClips();
+        } else if (currentClipboardTab == ClipboardTab.RECENT) {
+            clips = clipboardManager.getRecentClips();
+        } else {
+            clips = clipboardManager.getAllClips();
+        }
+
         if (clips.isEmpty()) {
             TextView empty = new TextView(this);
-            empty.setText("Clipboard is empty.\nCopy any text or pin snippets here!");
-            empty.setTextColor(Color.parseColor("#64748b"));
+            if (currentClipboardTab == ClipboardTab.PINNED) {
+                empty.setText("📌 No pinned messages yet.\nTap '☆ Pin' on any message to pin it forever!");
+            } else if (currentClipboardTab == ClipboardTab.RECENT) {
+                empty.setText("🕒 Recent clipboard history is clear.\nCopy any text to store it here!");
+            } else {
+                empty.setText("Clipboard is empty.\nCopy any text to store it here!");
+            }
+            empty.setTextColor(theme.subTextColor);
             empty.setTextSize(13);
             empty.setGravity(Gravity.CENTER);
-            empty.setPadding(0, dpToPx(40), 0, 0);
+            empty.setPadding(0, dpToPx(35), 0, 0);
             content.addView(empty);
         } else {
             for (final ClipboardHistoryManager.ClipItem clip : clips) {
@@ -984,41 +1170,61 @@ public class WisprKeyboardService extends InputMethodService {
                 card.setOrientation(LinearLayout.HORIZONTAL);
                 card.setGravity(Gravity.CENTER_VERTICAL);
                 card.setBackground(createChipDrawable(
-                        clip.isPinned ? "#22194d" : "#141d2c",
-                        clip.isPinned ? "#818cf8" : "#243247",
+                        clip.isPinned ? (theme.isLight ? "#e0e7ff" : "#1e1b4b") : theme.keyColor,
+                        clip.isPinned ? theme.accentColor : theme.dividerColor,
                         10));
-                card.setPadding(dpToPx(10), dpToPx(8), dpToPx(6), dpToPx(8));
+                card.setPadding(dpToPx(12), dpToPx(8), dpToPx(8), dpToPx(8));
                 LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
                 cp.bottomMargin = dpToPx(6);
                 card.setLayoutParams(cp);
 
+                if (clip.isPinned) {
+                    TextView pinBadge = new TextView(this);
+                    pinBadge.setText("📌 ");
+                    pinBadge.setTextSize(12);
+                    card.addView(pinBadge);
+                }
+
                 TextView tv = new TextView(this);
                 tv.setText(clip.text);
-                tv.setTextColor(Color.WHITE);
-                tv.setTextSize(12);
-                tv.setMaxLines(2);
+                tv.setTextColor(theme.textColor);
+                tv.setTextSize(13);
+                tv.setMaxLines(3);
                 LinearLayout.LayoutParams txtParam = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
                 tv.setLayoutParams(txtParam);
                 card.addView(tv);
 
+                // Pin / Unpin Button
                 Button btnPin = new Button(this);
-                btnPin.setText(clip.isPinned ? "📌" : "☆");
-                btnPin.setTextSize(14);
-                btnPin.setBackgroundColor(Color.TRANSPARENT);
+                btnPin.setText(clip.isPinned ? "📌 Pinned" : "☆ Pin");
+                btnPin.setTextSize(11);
+                btnPin.setAllCaps(false);
+                btnPin.setTextColor(clip.isPinned ? theme.accentColor : theme.subTextColor);
+                btnPin.setBackground(createChipDrawable(theme.actionKeyColor, theme.dividerColor, 8));
+                btnPin.setPadding(dpToPx(8), 0, dpToPx(8), 0);
+                LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT, dpToPx(28));
+                pp.leftMargin = dpToPx(4);
+                btnPin.setLayoutParams(pp);
                 btnPin.setOnClickListener(v -> {
                     clipboardManager.togglePin(clip);
+                    triggerHaptic(18);
                     buildClipboardPanel();
                 });
                 card.addView(btnPin);
 
+                // Delete Button
                 Button btnDel = new Button(this);
-                btnDel.setText("✕");
-                btnDel.setTextSize(12);
-                btnDel.setTextColor(Color.parseColor("#94a3b8"));
+                btnDel.setText("🗑️");
+                btnDel.setTextSize(13);
                 btnDel.setBackgroundColor(Color.TRANSPARENT);
+                LinearLayout.LayoutParams dp = new LinearLayout.LayoutParams(dpToPx(34), dpToPx(34));
+                dp.leftMargin = dpToPx(4);
+                btnDel.setLayoutParams(dp);
                 btnDel.setOnClickListener(v -> {
                     clipboardManager.deleteClip(clip);
+                    triggerHaptic(18);
                     buildClipboardPanel();
                 });
                 card.addView(btnDel);
@@ -1033,6 +1239,506 @@ public class WisprKeyboardService extends InputMethodService {
             }
         }
 
+        layout.addView(createPanelBottomBar());
+        panelContainer.addView(layout);
+    }
+
+    private View createClipboardTabButton(String label, final ClipboardTab tab, KeyboardTheme theme) {
+        Button btn = new Button(this);
+        btn.setText(label);
+        btn.setTextSize(11);
+        btn.setAllCaps(false);
+        boolean isSelected = (currentClipboardTab == tab);
+        btn.setTextColor(isSelected ? theme.accentColor : theme.subTextColor);
+        btn.setBackground(createChipDrawable(
+                isSelected ? (theme.isLight ? "#e0e7ff" : "#1e1b4b") : theme.actionKeyColor,
+                isSelected ? theme.accentColor : theme.dividerColor,
+                8));
+        btn.setPadding(dpToPx(10), 0, dpToPx(10), 0);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dpToPx(32), 1.0f);
+        lp.setMargins(dpToPx(2), 0, dpToPx(2), 0);
+        btn.setLayoutParams(lp);
+        btn.setOnClickListener(v -> {
+            currentClipboardTab = tab;
+            triggerHaptic(12);
+            buildClipboardPanel();
+        });
+        return btn;
+    }
+
+    // --- MEETING & CONVERSATION RECORDING MODE ---
+
+    private void buildConversationPanel() {
+        panelContainer.removeAllViews();
+        KeyboardTheme theme = KeyboardTheme.resolveTheme(this, prefs != null ? prefs.getThemeId() : null);
+
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
+        layout.setBackgroundColor(theme.backgroundColor);
+
+        // 1. Header
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(dpToPx(10), dpToPx(6), dpToPx(10), dpToPx(4));
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText("🎙️💬 Meeting & Conversation Mode");
+        tvTitle.setTextColor(Color.parseColor("#f59e0b")); // amber
+        tvTitle.setTextSize(13);
+        tvTitle.setTypeface(null, Typeface.BOLD);
+        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+        tvTitle.setLayoutParams(tp);
+        header.addView(tvTitle);
+
+        tvConversationStatus = new TextView(this);
+        if (isConversationRecordingActive) {
+            long elapsedSec = (System.currentTimeMillis() - conversationStartTime) / 1000;
+            long mins = elapsedSec / 60;
+            long secs = elapsedSec % 60;
+            tvConversationStatus.setText(String.format(Locale.US, "🔴 (%02d:%02d)", mins, secs));
+            tvConversationStatus.setTextColor(Color.parseColor("#ef4444"));
+        } else {
+            tvConversationStatus.setText("⚪ Ready");
+            tvConversationStatus.setTextColor(theme.subTextColor);
+        }
+        tvConversationStatus.setTextSize(11);
+        tvConversationStatus.setTypeface(null, Typeface.BOLD);
+        header.addView(tvConversationStatus);
+
+        Button btnClose = new Button(this);
+        btnClose.setText("✕");
+        btnClose.setTextSize(14);
+        btnClose.setTextColor(theme.subTextColor);
+        btnClose.setBackgroundColor(Color.TRANSPARENT);
+        btnClose.setOnClickListener(v -> {
+            if (isConversationRecordingActive) {
+                stopConversationRecording();
+            }
+            showPanel(PanelMode.KEYBOARD);
+        });
+        header.addView(btnClose);
+        layout.addView(header);
+
+        // 2. Info / Instructions Pill
+        TextView tvInfo = new TextView(this);
+        tvInfo.setText("Press 'Start Conversation' to record dialogue. Press 'Stop & Summarize' to get an AI Executive Summary & Action Items.");
+        tvInfo.setTextColor(theme.subTextColor);
+        tvInfo.setTextSize(10);
+        tvInfo.setPadding(dpToPx(10), 0, dpToPx(10), dpToPx(4));
+        layout.addView(tvInfo);
+
+        // 3. Live Transcript Area
+        ScrollView scroll = new ScrollView(this);
+        scroll.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.0f));
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dpToPx(10), dpToPx(4), dpToPx(10), dpToPx(4));
+
+        tvConversationLiveTranscript = new TextView(this);
+        String transcript = conversationTranscript.toString().trim();
+        if (transcript.isEmpty()) {
+            tvConversationLiveTranscript.setText("Press '▶️ Start Conversation' when ready.\n\nAs participants speak, the continuous transcript will appear here.\n\nWhen finished, press '⏹️ Stop & Summarize'.");
+            tvConversationLiveTranscript.setTextColor(theme.subTextColor);
+        } else {
+            tvConversationLiveTranscript.setText(transcript);
+            tvConversationLiveTranscript.setTextColor(theme.textColor);
+        }
+        tvConversationLiveTranscript.setTextSize(12);
+        tvConversationLiveTranscript.setBackground(createChipDrawable(theme.keyColor, theme.dividerColor, 10));
+        tvConversationLiveTranscript.setPadding(dpToPx(10), dpToPx(10), dpToPx(10), dpToPx(10));
+        tvConversationLiveTranscript.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        content.addView(tvConversationLiveTranscript);
+        scroll.addView(content);
+        layout.addView(scroll);
+
+        // 4. Control Bar (Start / Stop)
+        LinearLayout controlBar = new LinearLayout(this);
+        controlBar.setOrientation(LinearLayout.HORIZONTAL);
+        controlBar.setGravity(Gravity.CENTER_VERTICAL);
+        controlBar.setPadding(dpToPx(8), dpToPx(4), dpToPx(8), dpToPx(6));
+
+        btnConversationRecordToggle = new Button(this);
+        if (isConversationRecordingActive) {
+            btnConversationRecordToggle.setText("⏹️ Stop & Summarize");
+            btnConversationRecordToggle.setBackground(createChipDrawable("#7f1d1d", "#ef4444", 12));
+            btnConversationRecordToggle.setTextColor(Color.WHITE);
+        } else {
+            btnConversationRecordToggle.setText("▶️ Start Conversation");
+            btnConversationRecordToggle.setBackground(createChipDrawable("#064e3b", "#10b981", 12));
+            btnConversationRecordToggle.setTextColor(Color.WHITE);
+        }
+        btnConversationRecordToggle.setTextSize(12);
+        btnConversationRecordToggle.setTypeface(null, Typeface.BOLD);
+        btnConversationRecordToggle.setAllCaps(false);
+        LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(0, dpToPx(38), 1.0f);
+        btnConversationRecordToggle.setLayoutParams(btnParams);
+        btnConversationRecordToggle.setOnClickListener(v -> {
+            if (isConversationRecordingActive) {
+                stopConversationRecordingAndSummarize();
+            } else {
+                startConversationRecording();
+            }
+        });
+        controlBar.addView(btnConversationRecordToggle);
+
+        if (!isConversationRecordingActive && conversationTranscript.length() > 0) {
+            Button btnClear = new Button(this);
+            btnClear.setText("🗑️ Clear");
+            btnClear.setTextSize(11);
+            btnClear.setTextColor(theme.subTextColor);
+            btnClear.setBackground(createChipDrawable(theme.actionKeyColor, theme.dividerColor, 10));
+            btnClear.setAllCaps(false);
+            LinearLayout.LayoutParams clrParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, dpToPx(38));
+            clrParams.leftMargin = dpToPx(6);
+            btnClear.setLayoutParams(clrParams);
+            btnClear.setOnClickListener(v -> {
+                conversationTranscript.setLength(0);
+                buildConversationPanel();
+            });
+            controlBar.addView(btnClear);
+        }
+
+        layout.addView(controlBar);
+        layout.addView(createPanelBottomBar());
+        panelContainer.addView(layout);
+    }
+
+    private void startConversationRecording() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, "Microphone permission required for conversation recording", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        isConversationRecordingActive = true;
+        conversationStartTime = System.currentTimeMillis();
+        triggerHaptic(20);
+        buildConversationPanel();
+
+        conversationTimerRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (isConversationRecordingActive) {
+                    if (tvConversationStatus != null) {
+                        long elapsedSec = (System.currentTimeMillis() - conversationStartTime) / 1000;
+                        long mins = elapsedSec / 60;
+                        long secs = elapsedSec % 60;
+                        tvConversationStatus.setText(String.format(Locale.US, "🔴 (%02d:%02d)", mins, secs));
+                    }
+                    conversationTimerHandler.postDelayed(this, 1000);
+                }
+            }
+        };
+        conversationTimerHandler.postDelayed(conversationTimerRunnable, 1000);
+
+        initContinuousConversationSpeechRecognizer();
+    }
+
+    private void stopConversationRecording() {
+        isConversationRecordingActive = false;
+        conversationTimerHandler.removeCallbacksAndMessages(null);
+        if (conversationSpeechRecognizer != null) {
+            try {
+                conversationSpeechRecognizer.stopListening();
+                conversationSpeechRecognizer.destroy();
+                conversationSpeechRecognizer = null;
+            } catch (Exception ignored) {}
+        }
+    }
+
+    private void initContinuousConversationSpeechRecognizer() {
+        if (conversationSpeechRecognizer != null) {
+            try {
+                conversationSpeechRecognizer.destroy();
+            } catch (Exception ignored) {}
+        }
+
+        try {
+            conversationSpeechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
+            final Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+            intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
+            intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+
+            conversationSpeechRecognizer.setRecognitionListener(new RecognitionListener() {
+                @Override public void onReadyForSpeech(Bundle params) {}
+                @Override public void onBeginningOfSpeech() {}
+                @Override public void onRmsChanged(float rmsdB) {}
+                @Override public void onBufferReceived(byte[] buffer) {}
+                @Override public void onEndOfSpeech() {}
+
+                @Override
+                public void onError(int error) {
+                    if (isConversationRecordingActive) {
+                        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                            if (isConversationRecordingActive) {
+                                initContinuousConversationSpeechRecognizer();
+                            }
+                        }, 250);
+                    }
+                }
+
+                @Override
+                public void onResults(Bundle results) {
+                    if (results != null) {
+                        ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                        if (matches != null && !matches.isEmpty()) {
+                            String phrase = matches.get(0).trim();
+                            if (!phrase.isEmpty()) {
+                                if (conversationTranscript.length() > 0) {
+                                    conversationTranscript.append(" ");
+                                }
+                                conversationTranscript.append(phrase).append(".");
+                                if (tvConversationLiveTranscript != null) {
+                                    tvConversationLiveTranscript.setText(conversationTranscript.toString());
+                                    tvConversationLiveTranscript.setTextColor(Color.WHITE);
+                                }
+                            }
+                        }
+                    }
+                    if (isConversationRecordingActive) {
+                        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                            if (isConversationRecordingActive) {
+                                initContinuousConversationSpeechRecognizer();
+                            }
+                        }, 200);
+                    }
+                }
+
+                @Override
+                public void onPartialResults(Bundle partialResults) {
+                    if (partialResults != null && tvConversationLiveTranscript != null) {
+                        ArrayList<String> matches = partialResults.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                        if (matches != null && !matches.isEmpty()) {
+                            String live = conversationTranscript.toString() + " " + matches.get(0) + "...";
+                            tvConversationLiveTranscript.setText(live);
+                        }
+                    }
+                }
+
+                @Override public void onEvent(int eventType, Bundle params) {}
+            });
+
+            conversationSpeechRecognizer.startListening(intent);
+        } catch (Exception e) {
+            Toast.makeText(this, "Could not start audio listener: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            isConversationRecordingActive = false;
+            buildConversationPanel();
+        }
+    }
+
+    private void stopConversationRecordingAndSummarize() {
+        stopConversationRecording();
+        triggerHaptic(20);
+
+        final String recorded = conversationTranscript.toString().trim();
+        if (recorded.isEmpty()) {
+            Toast.makeText(this, "No conversation dialogue captured to summarize.", Toast.LENGTH_SHORT).show();
+            buildConversationPanel();
+            return;
+        }
+
+        showConversationGeneratingState();
+
+        GeminiFlowClient.summarizeConversationWithFallback(
+                recorded,
+                prefs != null ? prefs.getApiKey() : "",
+                prefs != null ? prefs.getSelectedModel() : KeyboardPreferences.DEFAULT_MODEL,
+                new GeminiFlowClient.ConversationAnalysisCallback() {
+                    @Override
+                    public void onSuccess(GeminiFlowClient.ConversationAnalysisResult result) {
+                        displayConversationSummaryResult(result);
+                    }
+
+                    @Override
+                    public void onError(String errorMessage) {
+                        Toast.makeText(WisprKeyboardService.this, "Summary error: " + errorMessage, Toast.LENGTH_LONG).show();
+                        buildConversationPanel();
+                    }
+                }
+        );
+    }
+
+    private void showConversationGeneratingState() {
+        panelContainer.removeAllViews();
+        KeyboardTheme theme = KeyboardTheme.resolveTheme(this, prefs != null ? prefs.getThemeId() : null);
+
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setGravity(Gravity.CENTER);
+        layout.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
+        layout.setBackgroundColor(theme.backgroundColor);
+
+        TextView tv = new TextView(this);
+        tv.setText("✨ Processing Conversation with Smart AI...\nExtracting Executive Summary & Action Items");
+        tv.setTextColor(theme.accentColor);
+        tv.setTextSize(13);
+        tv.setGravity(Gravity.CENTER);
+        layout.addView(tv);
+
+        panelContainer.addView(layout);
+    }
+
+    private void displayConversationSummaryResult(final GeminiFlowClient.ConversationAnalysisResult result) {
+        panelContainer.removeAllViews();
+        KeyboardTheme theme = KeyboardTheme.resolveTheme(this, prefs != null ? prefs.getThemeId() : null);
+
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
+        layout.setBackgroundColor(theme.backgroundColor);
+
+        // Header
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(dpToPx(10), dpToPx(6), dpToPx(10), dpToPx(4));
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText("✨ Meeting Summary & Action Items");
+        tvTitle.setTextColor(theme.accentColor);
+        tvTitle.setTextSize(13);
+        tvTitle.setTypeface(null, Typeface.BOLD);
+        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+        tvTitle.setLayoutParams(tp);
+        header.addView(tvTitle);
+
+        TextView tvBadge = new TextView(this);
+        tvBadge.setText((result.isFallback ? "🔄 " : "⚡ ") + result.modelUsed + " (" + result.latencyMs + "ms)");
+        tvBadge.setTextColor(theme.subTextColor);
+        tvBadge.setTextSize(10);
+        header.addView(tvBadge);
+        layout.addView(header);
+
+        // Scrollable Results
+        ScrollView scroll = new ScrollView(this);
+        scroll.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.0f));
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dpToPx(10), dpToPx(4), dpToPx(10), dpToPx(4));
+
+        // 1. Executive Summary Card
+        if (!result.executiveSummary.isEmpty()) {
+            TextView lbl1 = new TextView(this);
+            lbl1.setText("📋 EXECUTIVE SUMMARY");
+            lbl1.setTextColor(Color.parseColor("#38bdf8"));
+            lbl1.setTextSize(11);
+            lbl1.setTypeface(null, Typeface.BOLD);
+            content.addView(lbl1);
+
+            TextView tvSummary = new TextView(this);
+            tvSummary.setText(result.executiveSummary);
+            tvSummary.setTextColor(theme.textColor);
+            tvSummary.setTextSize(12);
+            tvSummary.setBackground(createChipDrawable(theme.keyColor, theme.dividerColor, 8));
+            tvSummary.setPadding(dpToPx(8), dpToPx(8), dpToPx(8), dpToPx(8));
+            content.addView(tvSummary);
+        }
+
+        // 2. Key Discussion Points Card
+        if (!result.keyPoints.isEmpty()) {
+            TextView lbl2 = new TextView(this);
+            lbl2.setText("\n💡 KEY DISCUSSION POINTS");
+            lbl2.setTextColor(Color.parseColor("#a78bfa"));
+            lbl2.setTextSize(11);
+            lbl2.setTypeface(null, Typeface.BOLD);
+            content.addView(lbl2);
+
+            TextView tvPoints = new TextView(this);
+            tvPoints.setText(result.keyPoints);
+            tvPoints.setTextColor(theme.textColor);
+            tvPoints.setTextSize(12);
+            tvPoints.setBackground(createChipDrawable(theme.keyColor, theme.dividerColor, 8));
+            tvPoints.setPadding(dpToPx(8), dpToPx(8), dpToPx(8), dpToPx(8));
+            content.addView(tvPoints);
+        }
+
+        // 3. Pending Action Items Card
+        if (!result.actionItems.isEmpty()) {
+            TextView lbl3 = new TextView(this);
+            lbl3.setText("\n⏳ PENDING ACTION ITEMS");
+            lbl3.setTextColor(Color.parseColor("#34d399"));
+            lbl3.setTextSize(11);
+            lbl3.setTypeface(null, Typeface.BOLD);
+            content.addView(lbl3);
+
+            TextView tvActions = new TextView(this);
+            tvActions.setText(result.actionItems);
+            tvActions.setTextColor(theme.textColor);
+            tvActions.setTextSize(12);
+            tvActions.setBackground(createChipDrawable(theme.keyColor, "#059669", 8));
+            tvActions.setPadding(dpToPx(8), dpToPx(8), dpToPx(8), dpToPx(8));
+            content.addView(tvActions);
+        }
+
+        scroll.addView(content);
+        layout.addView(scroll);
+
+        // Action Buttons Bar
+        LinearLayout btnBar = new LinearLayout(this);
+        btnBar.setOrientation(LinearLayout.HORIZONTAL);
+        btnBar.setPadding(dpToPx(8), dpToPx(4), dpToPx(8), dpToPx(6));
+
+        Button btnInsert = new Button(this);
+        btnInsert.setText("📥 Insert All");
+        btnInsert.setTextSize(11);
+        btnInsert.setTextColor(Color.WHITE);
+        btnInsert.setBackground(createChipDrawable("#065f46", "#10b981", 8));
+        btnInsert.setAllCaps(false);
+        LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(0, dpToPx(36), 1.2f);
+        ip.setMargins(dpToPx(2), 0, dpToPx(2), 0);
+        btnInsert.setLayoutParams(ip);
+        btnInsert.setOnClickListener(v -> {
+            insertText(result.fullResponse + "\n");
+            triggerHaptic(20);
+            showPanel(PanelMode.KEYBOARD);
+        });
+        btnBar.addView(btnInsert);
+
+        Button btnCopy = new Button(this);
+        btnCopy.setText("📋 Copy");
+        btnCopy.setTextSize(11);
+        btnCopy.setTextColor(Color.WHITE);
+        btnCopy.setBackground(createChipDrawable("#1e293b", "#3b82f6", 8));
+        btnCopy.setAllCaps(false);
+        LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, dpToPx(36), 1.0f);
+        cp.setMargins(dpToPx(2), 0, dpToPx(2), 0);
+        btnCopy.setLayoutParams(cp);
+        btnCopy.setOnClickListener(v -> {
+            ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+            if (cm != null) {
+                cm.setPrimaryClip(ClipData.newPlainText("Meeting Summary", result.fullResponse));
+                Toast.makeText(WisprKeyboardService.this, "Meeting summary copied to clipboard!", Toast.LENGTH_SHORT).show();
+            }
+        });
+        btnBar.addView(btnCopy);
+
+        Button btnNew = new Button(this);
+        btnNew.setText("🔄 New");
+        btnNew.setTextSize(11);
+        btnNew.setTextColor(theme.subTextColor);
+        btnNew.setBackground(createChipDrawable(theme.actionKeyColor, theme.dividerColor, 8));
+        btnNew.setAllCaps(false);
+        LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(0, dpToPx(36), 0.9f);
+        np.setMargins(dpToPx(2), 0, dpToPx(2), 0);
+        btnNew.setLayoutParams(np);
+        btnNew.setOnClickListener(v -> {
+            conversationTranscript.setLength(0);
+            buildConversationPanel();
+        });
+        btnBar.addView(btnNew);
+
+        layout.addView(btnBar);
         layout.addView(createPanelBottomBar());
         panelContainer.addView(layout);
     }
@@ -1401,7 +2107,7 @@ public class WisprKeyboardService extends InputMethodService {
         // NORMAL CLEAN SPACEBAR WITH CURSOR SCRUBBING
         KeyboardTheme theme = KeyboardTheme.resolveTheme(this, prefs != null ? prefs.getThemeId() : null);
         final Button spaceBtn = new Button(this);
-        spaceBtn.setText("English • LeadPulse AI");
+        spaceBtn.setText("English • Smart AI");
         spaceBtn.setTextColor(theme.subTextColor);
         spaceBtn.setTextSize(13);
         spaceBtn.setAllCaps(false);

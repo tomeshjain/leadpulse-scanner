@@ -120,7 +120,7 @@ public class CardScannerActivity extends AppCompatActivity {
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
         TextView tvTitle = new TextView(this);
-        tvTitle.setText("📇 LeadPulse Smart Scanner");
+        tvTitle.setText("📇 Smart AI Card Scanner");
         tvTitle.setTextColor(isLight ? Color.parseColor("#0f172a") : Color.WHITE);
         tvTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
         tvTitle.setTypeface(null, Typeface.BOLD);
@@ -651,10 +651,10 @@ public class CardScannerActivity extends AppCompatActivity {
             if (cm != null) {
                 ClipData clip;
                 if (capturedPhotoUri != null) {
-                    clip = ClipData.newUri(getContentResolver(), "LeadPulse Contact Card", capturedPhotoUri);
+                    clip = ClipData.newUri(getContentResolver(), "Smart AI Contact Card", capturedPhotoUri);
                     clip.addItem(new ClipData.Item(cardText));
                 } else {
-                    clip = ClipData.newPlainText("LeadPulse Contact Card", cardText);
+                    clip = ClipData.newPlainText("Smart AI Contact Card", cardText);
                 }
                 cm.setPrimaryClip(clip);
             }
