@@ -33,6 +33,16 @@ public class SuggestionEngine {
     private final SharedPreferences prefs;
     private final ShortcutsManager shortcutsManager;
 
+    private static class ScoredWord {
+        final String word;
+        final int score;
+
+        ScoredWord(String word, int score) {
+            this.word = word;
+            this.score = score;
+        }
+    }
+
     // Word frequencies: word -> count
     private final Map<String, Integer> wordFrequency = new HashMap<>();
 
@@ -234,10 +244,10 @@ public class SuggestionEngine {
             boolean isCapitalized = Character.isUpperCase(cleanPrefix.charAt(0));
 
             // Candidate matching words
-            List<Map.Entry<String, Integer>> candidates = new ArrayList<>();
+            List<ScoredWord> candidates = new ArrayList<>();
             for (Map.Entry<String, Integer> entry : wordFrequency.entrySet()) {
                 if (entry.getKey().startsWith(lowerPrefix)) {
-                    candidates.add(entry);
+                    candidates.add(new ScoredWord(entry.getKey(), entry.getValue()));
                 }
             }
 
@@ -246,17 +256,17 @@ public class SuggestionEngine {
                 Map<String, Integer> colMap = collocations.get(cleanPrev);
                 for (Map.Entry<String, Integer> ce : colMap.entrySet()) {
                     if (ce.getKey().toLowerCase(Locale.US).startsWith(lowerPrefix)) {
-                        candidates.add(new HashMap.SimpleEntry<>(ce.getKey(), ce.getValue() * 2));
+                        candidates.add(new ScoredWord(ce.getKey(), ce.getValue() * 2));
                     }
                 }
             }
 
             // Sort by frequency descending
-            Collections.sort(candidates, (a, b) -> b.getValue().compareTo(a.getValue()));
+            Collections.sort(candidates, (a, b) -> Integer.compare(b.score, a.score));
 
-            for (Map.Entry<String, Integer> c : candidates) {
+            for (ScoredWord c : candidates) {
                 if (results.size() >= maxCount) break;
-                String word = c.getKey();
+                String word = c.word;
                 if (isCapitalized && word.length() > 0) {
                     word = Character.toUpperCase(word.charAt(0)) + word.substring(1);
                 }
