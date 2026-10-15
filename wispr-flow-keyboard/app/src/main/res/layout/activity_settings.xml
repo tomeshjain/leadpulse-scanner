@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_dark"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="VERTICAL"
+        android:padding="20dp">
+
+        <!-- Header Brand Block -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="HORIZONTAL"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="24dp">
+
+            <ImageView
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@mipmap/ic_launcher"
+                android:contentDescription="Wispr Flow Logo" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="VERTICAL"
+                android:layout_marginStart="14dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Wispr Flow"
+                    android:textColor="@color/text_primary"
+                    android:textSize="22sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Extended AI Voice Keyboard"
+                    android:textColor="@color/accent_primary"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- CARD 1: SYSTEM SETUP & ENABLING -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="VERTICAL"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🚀 Keyboard Activation"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="12dp" />
+
+            <!-- Step 1 Button -->
+            <Button
+                android:id="@+id/btnEnableKeyboard"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:text="1. Enable Wispr Flow in Settings"
+                android:textColor="@color/text_primary"
+                android:background="@drawable/bg_btn_primary"
+                android:textAllCaps="false"
+                android:textSize="13sp"
+                android:layout_marginBottom="10dp" />
+
+            <!-- Step 2 Button -->
+            <Button
+                android:id="@+id/btnSelectKeyboard"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:text="2. Switch Active Keyboard"
+                android:textColor="@color/text_primary"
+                android:background="@drawable/bg_btn_secondary"
+                android:textAllCaps="false"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/tvActivationStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Status: Checking setup..."
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:layout_marginTop="10dp" />
+        </LinearLayout>
+
+        <!-- CARD 2: GEMINI API KEY & MODEL SELECTION -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="VERTICAL"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⚡ Google Gemini AI Configuration"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Configure your API key to access Gemini models, or use offline mode."
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:layout_marginBottom="14dp" />
+
+            <!-- API Key Input -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Gemini API Key:"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:layout_marginBottom="4dp" />
+
+            <EditText
+                android:id="@+id/etApiKey"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:hint="Paste AIzaSy... key from Google AI Studio"
+                android:textColorHint="@color/text_muted"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp"
+                android:inputType="textPassword"
+                android:background="@drawable/bg_key"
+                android:padding="12dp"
+                android:layout_marginBottom="10dp" />
+
+            <!-- Save & Validate Key Button -->
+            <Button
+                android:id="@+id/btnSaveApiKey"
+                android:layout_width="match_parent"
+                android:layout_height="42dp"
+                android:text="Save Key &amp; Fetch Models"
+                android:textColor="@color/text_primary"
+                android:background="@drawable/bg_btn_secondary"
+                android:textAllCaps="false"
+                android:textSize="12sp"
+                android:layout_marginBottom="16dp" />
+
+            <!-- Model Selection Dropdown -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Selected AI Model:"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:layout_marginBottom="4dp" />
+
+            <Spinner
+                android:id="@+id/spinnerModel"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:background="@drawable/bg_key"
+                android:padding="10dp"
+                android:layout_marginBottom="16dp" />
+
+            <!-- Default Flow Mode Dropdown -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Default Flow Style:"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:layout_marginBottom="4dp" />
+
+            <Spinner
+                android:id="@+id/spinnerMode"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:background="@drawable/bg_key"
+                android:padding="10dp"
+                android:layout_marginBottom="10dp" />
+        </LinearLayout>
+
+        <!-- CARD 3: INTERACTIVE TEST ARENA -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="VERTICAL"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginBottom="24dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⌨️ Keyboard Live Test"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Tap below to test typing and speaking with the Flow Mic spacebar:"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:layout_marginBottom="12dp" />
+
+            <EditText
+                android:id="@+id/etTestInput"
+                android:layout_width="match_parent"
+                android:layout_height="90dp"
+                android:hint="Tap here to bring up Wispr Flow Keyboard..."
+                android:textColorHint="@color/text_muted"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:gravity="top|start"
+                android:background="@drawable/bg_key"
+                android:padding="12dp"
+                android:layout_marginBottom="10dp" />
+
+            <Button
+                android:id="@+id/btnTestSampleVoice"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:text="💡 Test Sample Speech Polish (Offline / AI)"
+                android:textColor="@color/accent_primary"
+                android:background="@drawable/bg_key_fn"
+                android:textAllCaps="false"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>

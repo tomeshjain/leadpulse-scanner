@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg_dark">#07090e</color>
+    <color name="bg_card">#0e131d</color>
+    <color name="bg_card_stroke">#1e293b</color>
+    <color name="accent_primary">#6366f1</color>
+    <color name="accent_primary_dark">#4f46e5</color>
+    <color name="accent_pink">#ec4899</color>
+    <color name="accent_cyan">#06b6d4</color>
+    <color name="accent_emerald">#10b981</color>
+    <color name="accent_red">#ef4444</color>
+    <color name="text_primary">#ffffff</color>
+    <color name="text_secondary">#94a3b8</color>
+    <color name="text_muted">#64748b</color>
+    
+    <!-- Keyboard Palette -->
+    <color name="kb_bg">#07090e</color>
+    <color name="kb_bar_bg">#0b0f17</color>
+    <color name="key_bg">#141b27</color>
+    <color name="key_fn_bg">#1a2332</color>
+    <color name="key_text">#ffffff</color>
+    <color name="key_mic_bg">#1e1b4b</color>
+    <color name="key_mic_stroke">#818cf8</color>
+    <color name="key_mic_listening">#dc2626</color>
+    <color name="key_pressed">#2e3b52</color>
+</resources>

@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Wispr Flow Keyboard APK
 
 on:
   push:
@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  build-apk:
+  build-keyboard-apk:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -30,8 +30,8 @@ jobs:
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Build Standard APK with Gradle
-        working-directory: android
+      - name: Build Wispr Flow Keyboard APK with Gradle
+        working-directory: wispr-flow-keyboard
         run: |
           set -o pipefail
           gradle assembleDebug --stacktrace --no-daemon 2>&1 | tee ../build.log
@@ -55,54 +55,70 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Prepare Standard APK Output
+      - name: Prepare Keyboard APK Output
         run: |
           echo "=== Locating APK Files ==="
-          find . -name "*.apk" -ls
-          APK_FILE=$(find . -name "*debug.apk" -o -name "*.apk" | head -n 1)
+          find wispr-flow-keyboard -name "*.apk" -ls
+          APK_FILE=$(find wispr-flow-keyboard -name "*debug.apk" -o -name "*.apk" | head -n 1)
           if [ -z "$APK_FILE" ]; then
             echo "Error: No APK file found in build outputs!"
-            find android/app/build -maxdepth 5 || true
+            find wispr-flow-keyboard/app/build -maxdepth 5 || true
             exit 1
           fi
-          echo "Copying $APK_FILE to ./WisprFlow.apk"
-          cp "$APK_FILE" ./WisprFlow.apk
-          ls -lh ./WisprFlow.apk
+          echo "Copying $APK_FILE to ./WisprFlowKeyboard.apk"
+          cp "$APK_FILE" ./WisprFlowKeyboard.apk
+          ls -lh ./WisprFlowKeyboard.apk
 
-      - name: Upload APK Build Artifact
+      - name: Upload Keyboard APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: WisprFlow-Standard-APK
-          path: ./WisprFlow.apk
+          name: WisprFlowKeyboard-APK
+          path: ./WisprFlowKeyboard.apk
 
-      - name: Create or Update GitHub Release (v1.0.1)
+      - name: Create or Update GitHub Release (Wispr Keyboard v1.0.0)
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/heads/main')
         with:
-          tag_name: wispr-flow-v1.0.1
-          name: "Wispr Flow - Standard Installation APK (v1.0.1)"
+          tag_name: wispr-keyboard-v1.0.0
+          name: "Wispr Flow - Native Android AI Keyboard Extension (v1.0.0)"
           draft: false
           prerelease: false
           make_latest: true
           body: |
-            ## 🎙️ Wispr Flow - Standard Installation APK (v1.0.1)
+            ## ⌨️ Wispr Flow - Native Android AI Keyboard Extension (v1.0.0)
 
-            **Standard, ready-to-install Android APK with full voice recognition and Gemini AI polishing.**
+            **Extended Keyboard Facility for Android with Integrated Voice Dictation & Gemini AI Polishing.**
+            
+            Replaces mobile keyboard typing across your entire phone (WhatsApp, Gmail, Chrome, Slack, Notes, etc.).
 
-            ### 🚀 Updates in v1.0.1:
-            - **Standard Android Voice Dialog Integration**: Integrated `RecognizerIntent.ACTION_RECOGNIZE_SPEECH` fallback that works on 100% of Android phones with system voice typing.
-            - **Android 11+ (API 30+) Package Visibility Queries**: Added `<queries>` declarations in AndroidManifest so Android OS grants voice recognition permissions.
-            - **No More Silent Freezes**: All speech errors, timeouts, or permission requests now give immediate visible feedback and reset the UI cleanly.
-            - **Live Speech & AI Output Box**: Output card is always visible with live placeholder so you can see your text stream in real time.
-            - **Quick Demo Voice Test**: 1-tap testing button to test instant AI formatting without needing microphone access.
-            - **System-Wide Replacement**: Floating Voice HUD + Custom Android Keyboard with Flow AI Mic Spacebar.
+            ### 🚀 Features & Capabilities:
+            - **100% Pure Native Android IME Keyboard**: No WebView or hybrid wrapper. Launches instantly and functions smoothly as an on-screen keyboard extension.
+            - **Glowing Flow Voice Spacebar**: Tap the central mic spacebar to dictate speech in real-time.
+            - **Google Gemini API Key Setup**: In Settings (or directly via the ⚙️ keyboard button), enter your Gemini API Key.
+            - **Select AI Model to Access**:
+              - `gemini-2.0-flash` (Recommended: Fastest & sub-second response)
+              - `gemini-1.5-flash`
+              - `gemini-1.5-pro`
+              - `gemini-2.0-flash-lite`
+              - Dynamic model fetch from your API key!
+            - **7 Flow Transformation Modes**:
+              - ✨ **Smart Polish**: Strips "um/uh", fixes stutters, adds natural punctuation.
+              - 💬 **Casual Chat**: Natural, friendly, light emojis for WhatsApp and texting.
+              - ✉️ **Executive Email**: Formal greeting, paragraphs, and professional sign-off.
+              - 📝 **Structured Notes**: Markdown bullets and action items.
+              - ⚡ **Raw Dictation**: 1:1 exact spoken words.
+              - 💻 **Code & Dev**: camelCase formatting, SQL uppercase, markdown blocks.
+              - 🪄 **AI Action Prompt**: Executes spoken instructions directly.
+            - **Offline Polisher Fallback**: Works immediately even without an API key using built-in rule-based formatting.
+            - **Direct Input Injection**: Directly commits polished text into whatever app you are currently typing in (`InputConnection.commitText`).
 
-            ### 📲 Installation Instructions:
-            1. Download **`WisprFlow.apk`** below.
-            2. If you have an older version installed, uninstall it first to avoid signature conflicts.
-            3. Tap the downloaded APK to install. If prompted by Play Protect, tap **"More details"** -> **"Install anyway"**.
-            4. Open Wispr Flow, tap the mic, and speak!
+            ### 📲 Setup Instructions:
+            1. Download and install **`WisprFlowKeyboard.apk`** below.
+            2. Open the **Wispr Flow Keyboard** app icon on your phone.
+            3. Tap **"1. Enable Wispr Flow in Settings"** and toggle on the keyboard.
+            4. Tap **"2. Switch Active Keyboard"** and select **Wispr Flow**.
+            5. Enter your **Gemini API Key**, choose your preferred **AI Model**, and test it in the test box!
           files: |
-            ./WisprFlow.apk
+            ./WisprFlowKeyboard.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
