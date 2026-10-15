@@ -9,14 +9,14 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="VERTICAL"
+        android:orientation="vertical"
         android:padding="20dp">
 
         <!-- Header Brand Block -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="HORIZONTAL"
+            android:orientation="horizontal"
             android:gravity="center_vertical"
             android:layout_marginBottom="24dp">
 
@@ -29,7 +29,7 @@
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="VERTICAL"
+                android:orientation="vertical"
                 android:layout_marginStart="14dp">
 
                 <TextView
@@ -53,7 +53,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="VERTICAL"
+            android:orientation="vertical"
             android:background="@drawable/bg_card"
             android:padding="16dp"
             android:layout_marginBottom="16dp">
@@ -104,7 +104,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="VERTICAL"
+            android:orientation="vertical"
             android:background="@drawable/bg_card"
             android:padding="16dp"
             android:layout_marginBottom="16dp">
@@ -199,7 +199,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="VERTICAL"
+            android:orientation="vertical"
             android:background="@drawable/bg_card"
             android:padding="16dp"
             android:layout_marginBottom="24dp">
