@@ -79,38 +79,40 @@ jobs:
           name: WisprFlowKeyboard-APK
           path: ./WisprFlowKeyboard.apk
 
-      - name: Create or Update GitHub Release (Wispr Keyboard v1.3.1)
+      - name: Create or Update GitHub Release (Wispr Keyboard v1.4.0)
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/heads/main')
         with:
-            tag_name: wispr-keyboard-v1.3.1
-            name: "Wispr Flow - Native Android AI Keyboard Extension (v1.3.1)"
+            tag_name: wispr-keyboard-v1.4.0
+            name: "Wispr Flow - Native Android AI Keyboard Extension (v1.4.0)"
             draft: false
             prerelease: false
             make_latest: true
             body: |
-              ## ⌨️ Wispr Flow - Native Android AI Keyboard Extension (v1.3.1)
+              ## ⌨️ Wispr Flow - Native Android AI Keyboard Extension (v1.4.0)
 
-              **Professional Extended Keyboard Facility for Android with Instant Camera Contact Card Scanner, Voice Note Attachments, Native Phone Contacts Integration, and Direct Return to Caller Screen.**
+              **Professional Extended Keyboard Facility for Android with LinkedIn & Past Work Contact Extraction, Two-Tier Local OCR Fallback, Clean Light Default Live Theming, OS Night Mode Adaptation, and Bottom-Left Navigation Philosophy.**
 
-              ### 🚀 What's New in v1.3.1:
-              - **🔙 Fixed Navigation - Returns to Caller Screen**:
-                - Tapping Close or sending/saving from the Contact Card Scanner now returns directly to the screen where the scanner was clicked (e.g. WhatsApp, Slack, Browser, SMS), rather than returning to SettingsActivity.
-                - Implemented isolated task affinity (`com.wisprflow.keyboard.scanner`) with `finishAndRemoveTask()`.
-              - **📸 Direct Camera First Experience**:
-                - The scanner screen no longer forces you to choose between two large buttons.
-                - The camera immediately activates to capture the card right away.
-                - A subtle **"🖼️ Gallery"** button is readily accessible in the top header if picking an existing card image.
-                - Clean card preview with **"📸 Retake Photo"** option.
-              - **📝 Extracted Text Editor**:
-                - Live editable display showing all extracted business card details (Name, Title, Company, Phone, Email, Website, Address, Notes).
-              - **🎙️ Voice Note Facility for Contact Cards**:
-                - Dedicated **"🎙️ Add Voice Note"** button in the extracted information header.
-                - Speak quick notes, meeting memos, or follow-up tasks—automatically transcribed and appended into the contact card details (`🎙️ Voice Note: ...`).
-              - **💾 Save Contact & Send Card cum Text**:
-                - **"💾 Save to Phone Contacts & Send"**: Pre-fills Android's native Contacts app with Name, Phone, Email, Company, Job Title, Address, and Notes/Voice Note with one tap, while simultaneously sending the card text and image into the active chat/field!
-                - **"📤 Send Card & Text"**: Directly sends the structured text and image into the chat without saving to phone contacts.
-                - **"💾 Save Contact to Phone Only"**: Saves contact into your phone book without inserting into the chat.
+              ### 🚀 What's New in v1.4.0:
+              - **🔗 LinkedIn Profile & Past Work Storage**:
+                - Business card scanner intelligently extracts LinkedIn profile URLs and past work/experience details.
+                - When saving to phone contacts, details are stored in standard `ContactsContract` fields and combined in the contact notes for universal compatibility across all OEM dialers and contact apps.
+              - **🛡️ Two-Tier OCR Fallback Architecture**:
+                - If Gemini Multimodal Vision AI is unavailable or offline, the app seamlessly falls back to on-device Google ML Kit Text Recognition.
+                - Extracted text is then formatted via Gemini's low-latency text model (`gemini-2.0-flash`), backed by a regex parser for 100% offline situations.
+              - **⚡ Low-Latency Unlimited Model**:
+                - Default AI model is `gemini-2.0-flash` for high-throughput, low-latency dictation polish and card formatting.
+              - **📐 Streamlined Bottom-Left Keyboard Navigation**:
+                - In Alphabet (ABC) mode: bottom-left features `?123` (symbols/punctuations) and `123` (pure numbers PIN pad).
+                - In Symbols (?123) mode: bottom-left features `ABC` and `123`.
+                - In Pure Numbers (123) mode: bottom-left features `ABC` and `?123`.
+              - **☀️ Clean Light Default Theme & Settings UI Redesign**:
+                - Clean Light is now the default theme out of the box for both keyboard and settings.
+                - Complete redesign of the Settings screen with consistent 20dp spacing, 18dp card padding, refined card elevations, and clean typography.
+                - Real-time live theme synchronization: selecting any theme in the settings dropdown immediately reskins the entire settings screen and its dropdown adapters.
+              - **📱 System-Wide OS Theme & RTL Globalization**:
+                - "System Auto" theme dynamically detects OS Dark/Light mode (`UI_MODE_NIGHT_MASK`).
+                - Fully supports Right-to-Left (RTL) locales and `Locale.getDefault()` formatting.
 
               ### 📲 Quick Setup:
               1. Download and install **`WisprFlowKeyboard.apk`** below.

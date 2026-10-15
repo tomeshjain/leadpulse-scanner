@@ -45,12 +45,32 @@ public class KeyboardTheme {
         this.isLight = isLight;
     }
 
-    public static final String DEFAULT_THEME_ID = "midnight_slate";
+    public static final String DEFAULT_THEME_ID = "clean_light";
 
     public static List<KeyboardTheme> getAllThemes() {
         List<KeyboardTheme> list = new ArrayList<>();
 
-        // 1. Midnight Slate (Default)
+        // 1. Clean Light / Silver (Default)
+        list.add(new KeyboardTheme(
+                "clean_light", "Clean Light", "☀️",
+                Color.parseColor("#f1f5f9"), Color.parseColor("#f8fafc"),
+                Color.parseColor("#ffffff"), Color.parseColor("#cbd5e1"),
+                Color.parseColor("#e2e8f0"), Color.parseColor("#2563eb"),
+                Color.parseColor("#0f172a"), Color.parseColor("#64748b"),
+                Color.parseColor("#e2e8f0"), true
+        ));
+
+        // 2. System Auto (Adapts to OS Light/Dark Mode)
+        list.add(new KeyboardTheme(
+                "system_auto", "System Auto (OS)", "📱",
+                Color.parseColor("#f1f5f9"), Color.parseColor("#f8fafc"),
+                Color.parseColor("#ffffff"), Color.parseColor("#cbd5e1"),
+                Color.parseColor("#e2e8f0"), Color.parseColor("#2563eb"),
+                Color.parseColor("#0f172a"), Color.parseColor("#64748b"),
+                Color.parseColor("#e2e8f0"), true
+        ));
+
+        // 3. Midnight Slate
         list.add(new KeyboardTheme(
                 "midnight_slate", "Midnight Slate", "🌌",
                 Color.parseColor("#080b11"), Color.parseColor("#0c121e"),
@@ -60,7 +80,7 @@ public class KeyboardTheme {
                 Color.parseColor("#1a2638"), false
         ));
 
-        // 2. OLED Pure Black
+        // 4. OLED Pure Black
         list.add(new KeyboardTheme(
                 "oled_black", "OLED Black", "🖤",
                 Color.parseColor("#000000"), Color.parseColor("#0a0a0a"),
@@ -70,17 +90,7 @@ public class KeyboardTheme {
                 Color.parseColor("#222222"), false
         ));
 
-        // 3. Clean Light / Silver
-        list.add(new KeyboardTheme(
-                "clean_light", "Clean Light", "☀️",
-                Color.parseColor("#e2e8f0"), Color.parseColor("#f1f5f9"),
-                Color.parseColor("#ffffff"), Color.parseColor("#cbd5e1"),
-                Color.parseColor("#d8e2ec"), Color.parseColor("#2563eb"),
-                Color.parseColor("#0f172a"), Color.parseColor("#64748b"),
-                Color.parseColor("#cbd5e1"), true
-        ));
-
-        // 4. Cyberpunk Neon
+        // 5. Cyberpunk Neon
         list.add(new KeyboardTheme(
                 "cyberpunk_neon", "Cyberpunk Neon", "🔮",
                 Color.parseColor("#0d0517"), Color.parseColor("#150926"),
@@ -90,7 +100,7 @@ public class KeyboardTheme {
                 Color.parseColor("#381c5f"), false
         ));
 
-        // 5. Forest Emerald
+        // 6. Forest Emerald
         list.add(new KeyboardTheme(
                 "forest_emerald", "Forest Emerald", "🌲",
                 Color.parseColor("#04130d"), Color.parseColor("#071e15"),
@@ -100,7 +110,7 @@ public class KeyboardTheme {
                 Color.parseColor("#134430"), false
         ));
 
-        // 6. Sunset Amber
+        // 7. Sunset Amber
         list.add(new KeyboardTheme(
                 "sunset_amber", "Sunset Amber", "🌅",
                 Color.parseColor("#140a04"), Color.parseColor("#1e1107"),
@@ -121,6 +131,21 @@ public class KeyboardTheme {
             }
         }
         return getDefaultTheme();
+    }
+
+    public static KeyboardTheme resolveTheme(android.content.Context context, String id) {
+        if (id != null && id.equalsIgnoreCase("system_auto")) {
+            if (context != null) {
+                int nightMode = context.getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
+                if (nightMode == android.content.res.Configuration.UI_MODE_NIGHT_YES) {
+                    return getTheme("midnight_slate");
+                } else {
+                    return getTheme("clean_light");
+                }
+            }
+            return getTheme("clean_light");
+        }
+        return getTheme(id);
     }
 
     public static KeyboardTheme getDefaultTheme() {

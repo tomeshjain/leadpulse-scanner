@@ -132,7 +132,7 @@ public class WisprKeyboardService extends InputMethodService {
 
     @Override
     public View onCreateInputView() {
-        KeyboardTheme theme = KeyboardTheme.getTheme(prefs != null ? prefs.getThemeId() : null);
+        KeyboardTheme theme = KeyboardTheme.resolveTheme(this, prefs != null ? prefs.getThemeId() : null);
         keyboardRoot = new LinearLayout(this);
         keyboardRoot.setOrientation(LinearLayout.VERTICAL);
         keyboardRoot.setBackgroundColor(theme.backgroundColor);
@@ -1063,7 +1063,7 @@ public class WisprKeyboardService extends InputMethodService {
 
         Button abcBtn = createButton("ABC", true);
         LinearLayout.LayoutParams abcP = (LinearLayout.LayoutParams) abcBtn.getLayoutParams();
-        abcP.weight = 1.2f;
+        abcP.weight = 1.15f;
         abcBtn.setOnClickListener(v -> {
             isNumpadMode = false;
             isSymbolMode = false;
@@ -1072,9 +1072,9 @@ public class WisprKeyboardService extends InputMethodService {
         });
         bottomRow.addView(abcBtn);
 
-        Button symBtn = createButton("?#+", true);
+        Button symBtn = createButton("?123", true);
         LinearLayout.LayoutParams symP = (LinearLayout.LayoutParams) symBtn.getLayoutParams();
-        symP.weight = 1.0f;
+        symP.weight = 1.05f;
         symBtn.setOnClickListener(v -> {
             isNumpadMode = false;
             isSymbolMode = true;
@@ -1089,7 +1089,7 @@ public class WisprKeyboardService extends InputMethodService {
         delBtn.setOnClickListener(v -> handleBackspace());
         bottomRow.addView(delBtn);
 
-        KeyboardTheme theme = KeyboardTheme.getTheme(prefs != null ? prefs.getThemeId() : null);
+        KeyboardTheme theme = KeyboardTheme.resolveTheme(this, prefs != null ? prefs.getThemeId() : null);
         btnEnterKey = createButton("⏎", true);
         btnEnterKey.setTextColor(Color.WHITE);
         btnEnterKey.setBackground(createChipDrawable(theme.accentColor, Color.TRANSPARENT, 8));
@@ -1109,29 +1109,53 @@ public class WisprKeyboardService extends InputMethodService {
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         bottomRow.setPadding(0, dpToPx(3), 0, dpToPx(3));
 
-        // ?123 / ABC Mode Toggle
-        Button numBtn = createButton(isSymbolMode ? "ABC" : "?123", true);
-        LinearLayout.LayoutParams numParams = (LinearLayout.LayoutParams) numBtn.getLayoutParams();
-        numParams.weight = 1.3f;
-        numBtn.setOnClickListener(v -> {
-            isSymbolMode = !isSymbolMode;
-            isNumpadMode = false;
-            renderKeyRows();
-            triggerHaptic(15);
-        });
-        bottomRow.addView(numBtn);
-
-        // If in symbol mode, add 123 PIN button to jump into dedicated PIN Numpad!
-        if (isSymbolMode) {
-            Button pinBtn = createButton("123 PIN", true);
-            LinearLayout.LayoutParams pinParams = (LinearLayout.LayoutParams) pinBtn.getLayoutParams();
-            pinParams.weight = 1.1f;
-            pinBtn.setOnClickListener(v -> {
-                isNumpadMode = true;
+        // Bottom-left corner: Only numbers, numbers or punctuations, and ABC options
+        if (!isSymbolMode) {
+            // ABC mode -> offers ?123 (numbers/punctuations) and 123 (pure numbers)
+            Button numPuncBtn = createButton("?123", true);
+            LinearLayout.LayoutParams p1 = (LinearLayout.LayoutParams) numPuncBtn.getLayoutParams();
+            p1.weight = 1.15f;
+            numPuncBtn.setOnClickListener(v -> {
+                isSymbolMode = true;
+                isNumpadMode = false;
                 renderKeyRows();
                 triggerHaptic(15);
             });
-            bottomRow.addView(pinBtn);
+            bottomRow.addView(numPuncBtn);
+
+            Button numpadBtn = createButton("123", true);
+            LinearLayout.LayoutParams p2 = (LinearLayout.LayoutParams) numpadBtn.getLayoutParams();
+            p2.weight = 1.05f;
+            numpadBtn.setOnClickListener(v -> {
+                isNumpadMode = true;
+                isSymbolMode = false;
+                renderKeyRows();
+                triggerHaptic(15);
+            });
+            bottomRow.addView(numpadBtn);
+        } else {
+            // ?123 mode -> offers ABC and 123 (pure numbers)
+            Button abcBtn = createButton("ABC", true);
+            LinearLayout.LayoutParams p1 = (LinearLayout.LayoutParams) abcBtn.getLayoutParams();
+            p1.weight = 1.15f;
+            abcBtn.setOnClickListener(v -> {
+                isSymbolMode = false;
+                isNumpadMode = false;
+                renderKeyRows();
+                triggerHaptic(15);
+            });
+            bottomRow.addView(abcBtn);
+
+            Button numpadBtn = createButton("123", true);
+            LinearLayout.LayoutParams p2 = (LinearLayout.LayoutParams) numpadBtn.getLayoutParams();
+            p2.weight = 1.05f;
+            numpadBtn.setOnClickListener(v -> {
+                isNumpadMode = true;
+                isSymbolMode = false;
+                renderKeyRows();
+                triggerHaptic(15);
+            });
+            bottomRow.addView(numpadBtn);
         }
 
         // Comma
@@ -1142,14 +1166,14 @@ public class WisprKeyboardService extends InputMethodService {
         bottomRow.addView(commaBtn);
 
         // NORMAL CLEAN SPACEBAR WITH CURSOR SCRUBBING
-        KeyboardTheme theme = KeyboardTheme.getTheme(prefs != null ? prefs.getThemeId() : null);
+        KeyboardTheme theme = KeyboardTheme.resolveTheme(this, prefs != null ? prefs.getThemeId() : null);
         final Button spaceBtn = new Button(this);
         spaceBtn.setText("English • Wispr Flow");
         spaceBtn.setTextColor(theme.subTextColor);
         spaceBtn.setTextSize(13);
         spaceBtn.setAllCaps(false);
         spaceBtn.setBackground(createChipDrawable(theme.keyColor, theme.dividerColor, 8));
-        LinearLayout.LayoutParams spaceParams = new LinearLayout.LayoutParams(0, dpToPx(42), 4.8f);
+        LinearLayout.LayoutParams spaceParams = new LinearLayout.LayoutParams(0, dpToPx(42), 4.2f);
         spaceParams.setMargins(dpToPx(2), 0, dpToPx(2), 0);
         spaceBtn.setLayoutParams(spaceParams);
 
@@ -1801,7 +1825,7 @@ public class WisprKeyboardService extends InputMethodService {
     }
 
     private void applyCurrentTheme() {
-        KeyboardTheme theme = KeyboardTheme.getTheme(prefs != null ? prefs.getThemeId() : null);
+        KeyboardTheme theme = KeyboardTheme.resolveTheme(this, prefs != null ? prefs.getThemeId() : null);
         if (keyboardRoot != null) {
             keyboardRoot.setBackgroundColor(theme.backgroundColor);
         }

@@ -1,30 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="bg_dark">#07090e</color>
-    <color name="bg_card">#0e131d</color>
-    <color name="bg_card_stroke">#1e293b</color>
-    <color name="accent_primary">#6366f1</color>
-    <color name="accent_primary_dark">#4f46e5</color>
+    <!-- Modern Clean Light (Default) Core Palette -->
+    <color name="bg_dark">#f8fafc</color>
+    <color name="bg_card">#ffffff</color>
+    <color name="bg_card_stroke">#e2e8f0</color>
+    <color name="accent_primary">#2563eb</color>
+    <color name="accent_primary_dark">#1d4ed8</color>
     <color name="accent_pink">#ec4899</color>
-    <color name="accent_cyan">#06b6d4</color>
-    <color name="accent_emerald">#10b981</color>
-    <color name="accent_red">#ef4444</color>
-    <color name="accent_amber">#f59e0b</color>
-    <color name="text_primary">#ffffff</color>
-    <color name="text_secondary">#94a3b8</color>
-    <color name="text_muted">#64748b</color>
+    <color name="accent_cyan">#0284c7</color>
+    <color name="accent_emerald">#16a34a</color>
+    <color name="accent_red">#dc2626</color>
+    <color name="accent_amber">#d97706</color>
+    <color name="text_primary">#0f172a</color>
+    <color name="text_secondary">#475569</color>
+    <color name="text_muted">#94a3b8</color>
+    
+    <!-- Secondary & Key Components -->
+    <color name="btn_secondary_bg">#f1f5f9</color>
+    <color name="btn_secondary_stroke">#cbd5e1</color>
+    <color name="btn_secondary_text">#1e293b</color>
     
     <!-- Keyboard Palette -->
-    <color name="kb_bg">#090d16</color>
-    <color name="kb_bar_bg">#0d1424</color>
-    <color name="key_bg">#151f30</color>
-    <color name="key_fn_bg">#1c283d</color>
-    <color name="key_text">#ffffff</color>
-    <color name="key_mic_bg">#312e81</color>
-    <color name="key_mic_stroke">#818cf8</color>
+    <color name="kb_bg">#f1f5f9</color>
+    <color name="kb_bar_bg">#f8fafc</color>
+    <color name="key_bg">#ffffff</color>
+    <color name="key_fn_bg">#e2e8f0</color>
+    <color name="key_text">#0f172a</color>
+    <color name="key_mic_bg">#2563eb</color>
+    <color name="key_mic_stroke">#1d4ed8</color>
     <color name="key_mic_listening">#dc2626</color>
-    <color name="key_pressed">#334155</color>
-    <color name="suggestion_bg">#1e293b</color>
-    <color name="suggestion_highlight">#4338ca</color>
-    <color name="pinned_star">#fbbf24</color>
+    <color name="key_pressed">#e2e8f0</color>
+    <color name="suggestion_bg">#ffffff</color>
+    <color name="suggestion_highlight">#2563eb</color>
+    <color name="pinned_star">#d97706</color>
 </resources>

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/settingsScrollView"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/bg_dark"
@@ -9,19 +10,20 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="18dp">
+        android:padding="20dp">
 
         <!-- Header Brand Block -->
         <LinearLayout
+            android:id="@+id/headerBrand"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginBottom="20dp">
+            android:layout_marginBottom="24dp">
 
             <ImageView
-                android:layout_width="48dp"
-                android:layout_height="48dp"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
                 android:src="@mipmap/ic_launcher"
                 android:contentDescription="Wispr Flow Logo" />
 
@@ -29,32 +31,37 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:layout_marginStart="14dp">
+                android:layout_marginStart="16dp">
 
                 <TextView
+                    android:id="@+id/tvBrandTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Wispr Flow"
                     android:textColor="@color/text_primary"
-                    android:textSize="22sp"
+                    android:textSize="24sp"
                     android:textStyle="bold" />
 
                 <TextView
+                    android:id="@+id/tvBrandSubtitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Extended AI Voice Keyboard &amp; Typing Assistant"
                     android:textColor="@color/accent_primary"
-                    android:textSize="12sp" />
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:layout_marginTop="2dp" />
             </LinearLayout>
         </LinearLayout>
 
         <!-- CARD 1: SYSTEM SETUP & ENABLING -->
         <LinearLayout
+            android:id="@+id/cardActivation"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:background="@drawable/bg_card"
-            android:padding="16dp"
+            android:padding="18dp"
             android:layout_marginBottom="16dp">
 
             <TextView
@@ -62,9 +69,17 @@
                 android:layout_height="wrap_content"
                 android:text="🚀 Step 1 &amp; 2: Keyboard Activation"
                 android:textColor="@color/text_primary"
-                android:textSize="15sp"
+                android:textSize="16sp"
                 android:textStyle="bold"
-                android:layout_marginBottom="12dp" />
+                android:layout_marginBottom="6dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Activate Wispr Flow in Android system settings and select it as your default input method:"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:layout_marginBottom="14dp" />
 
             <!-- Step 1 Button -->
             <Button
@@ -72,10 +87,11 @@
                 android:layout_width="match_parent"
                 android:layout_height="46dp"
                 android:text="1. Enable Wispr Flow in Settings"
-                android:textColor="@color/text_primary"
+                android:textColor="#ffffff"
                 android:background="@drawable/bg_btn_primary"
                 android:textAllCaps="false"
                 android:textSize="13sp"
+                android:textStyle="bold"
                 android:layout_marginBottom="10dp" />
 
             <!-- Step 2 Button -->
@@ -84,10 +100,11 @@
                 android:layout_width="match_parent"
                 android:layout_height="46dp"
                 android:text="2. Switch Active Keyboard"
-                android:textColor="@color/text_primary"
+                android:textColor="@color/btn_secondary_text"
                 android:background="@drawable/bg_btn_secondary"
                 android:textAllCaps="false"
-                android:textSize="13sp" />
+                android:textSize="13sp"
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tvActivationStatus"
@@ -96,16 +113,17 @@
                 android:text="Status: Checking setup..."
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp"
-                android:layout_marginTop="10dp" />
+                android:layout_marginTop="12dp" />
         </LinearLayout>
 
         <!-- CARD 2: MICROPHONE PERMISSION -->
         <LinearLayout
+            android:id="@+id/cardMic"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:background="@drawable/bg_card"
-            android:padding="16dp"
+            android:padding="18dp"
             android:layout_marginBottom="16dp">
 
             <TextView
@@ -113,7 +131,7 @@
                 android:layout_height="wrap_content"
                 android:text="🎙️ Microphone Dictation Permission"
                 android:textColor="@color/text_primary"
-                android:textSize="15sp"
+                android:textSize="16sp"
                 android:textStyle="bold"
                 android:layout_marginBottom="4dp" />
 
@@ -124,26 +142,28 @@
                 android:text="Status: Checking microphone permission..."
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp"
-                android:layout_marginBottom="12dp" />
+                android:layout_marginBottom="14dp" />
 
             <Button
                 android:id="@+id/btnGrantMicPermission"
                 android:layout_width="match_parent"
-                android:layout_height="44dp"
+                android:layout_height="46dp"
                 android:text="Grant Microphone Permission"
-                android:textColor="@color/text_primary"
+                android:textColor="@color/btn_secondary_text"
                 android:background="@drawable/bg_btn_secondary"
                 android:textAllCaps="false"
-                android:textSize="13sp" />
+                android:textSize="13sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- CARD 3: GEMINI API KEY & MODEL SELECTION -->
+        <!-- CARD 3: GEMINI AI CONFIGURATION -->
         <LinearLayout
+            android:id="@+id/cardGemini"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:background="@drawable/bg_card"
-            android:padding="16dp"
+            android:padding="18dp"
             android:layout_marginBottom="16dp">
 
             <TextView
@@ -151,17 +171,17 @@
                 android:layout_height="wrap_content"
                 android:text="⚡ Google Gemini AI Configuration"
                 android:textColor="@color/text_primary"
-                android:textSize="15sp"
+                android:textSize="16sp"
                 android:textStyle="bold"
                 android:layout_marginBottom="4dp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Enter your Gemini API key and select the AI model for real-time dictation polishing:"
+                android:text="Enter your Gemini API key and select the AI model for low-latency dictation polish and contact scanning:"
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp"
-                android:layout_marginBottom="12dp" />
+                android:layout_marginBottom="14dp" />
 
             <!-- API Key Input -->
             <TextView
@@ -171,50 +191,51 @@
                 android:textColor="@color/accent_primary"
                 android:textSize="12sp"
                 android:textStyle="bold"
-                android:layout_marginBottom="4dp" />
+                android:layout_marginBottom="6dp" />
 
             <EditText
                 android:id="@+id/etApiKey"
                 android:layout_width="match_parent"
-                android:layout_height="44dp"
+                android:layout_height="46dp"
                 android:hint="Paste AIzaSy... (leave blank for offline rule mode)"
                 android:textColorHint="@color/text_muted"
                 android:textColor="@color/text_primary"
                 android:textSize="13sp"
                 android:background="@drawable/bg_key"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
                 android:inputType="textPassword"
-                android:layout_marginBottom="10dp" />
+                android:layout_marginBottom="12dp" />
 
             <!-- Save Key Button -->
             <Button
                 android:id="@+id/btnSaveApiKey"
                 android:layout_width="match_parent"
-                android:layout_height="44dp"
+                android:layout_height="46dp"
                 android:text="Save API Key &amp; Fetch Available Models"
-                android:textColor="@color/text_primary"
+                android:textColor="#ffffff"
                 android:background="@drawable/bg_btn_primary"
                 android:textAllCaps="false"
                 android:textSize="13sp"
+                android:textStyle="bold"
                 android:layout_marginBottom="16dp" />
 
             <!-- Model Selection Dropdown -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Select AI Model to Access:"
+                android:text="Select AI Model to Access (Default: gemini-2.0-flash low latency):"
                 android:textColor="@color/accent_primary"
                 android:textSize="12sp"
                 android:textStyle="bold"
-                android:layout_marginBottom="4dp" />
+                android:layout_marginBottom="6dp" />
 
             <Spinner
                 android:id="@+id/spinnerModel"
                 android:layout_width="match_parent"
                 android:layout_height="46dp"
                 android:background="@drawable/bg_key"
-                android:padding="10dp"
+                android:padding="6dp"
                 android:layout_marginBottom="16dp" />
 
             <!-- Default Flow Transformation Mode Dropdown -->
@@ -225,24 +246,25 @@
                 android:textColor="@color/accent_primary"
                 android:textSize="12sp"
                 android:textStyle="bold"
-                android:layout_marginBottom="4dp" />
+                android:layout_marginBottom="6dp" />
 
             <Spinner
                 android:id="@+id/spinnerMode"
                 android:layout_width="match_parent"
                 android:layout_height="46dp"
                 android:background="@drawable/bg_key"
-                android:padding="10dp"
-                android:layout_marginBottom="8dp" />
+                android:padding="6dp"
+                android:layout_marginBottom="4dp" />
         </LinearLayout>
 
-        <!-- CARD 3.5: THEMES & KEYBOARD LAYOUT -->
+        <!-- CARD 4: THEMES & KEYBOARD LAYOUT -->
         <LinearLayout
+            android:id="@+id/cardAppearance"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:background="@drawable/bg_card"
-            android:padding="16dp"
+            android:padding="18dp"
             android:layout_marginBottom="16dp">
 
             <TextView
@@ -250,35 +272,35 @@
                 android:layout_height="wrap_content"
                 android:text="🎨 Appearance &amp; Layout"
                 android:textColor="@color/text_primary"
-                android:textSize="15sp"
+                android:textSize="16sp"
                 android:textStyle="bold"
                 android:layout_marginBottom="4dp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Customize theme colors and layout separation."
+                android:text="Clean Light theme is active by default. Selecting a theme instantly updates the keyboard and this settings screen:"
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp"
-                android:layout_marginBottom="12dp" />
+                android:layout_marginBottom="14dp" />
 
             <!-- Theme Dropdown -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Select Keyboard Theme:"
+                android:text="Select Theme (Live Preview):"
                 android:textColor="@color/accent_primary"
                 android:textSize="12sp"
                 android:textStyle="bold"
-                android:layout_marginBottom="4dp" />
+                android:layout_marginBottom="6dp" />
 
             <Spinner
                 android:id="@+id/spinnerTheme"
                 android:layout_width="match_parent"
                 android:layout_height="46dp"
                 android:background="@drawable/bg_key"
-                android:padding="10dp"
-                android:layout_marginBottom="14dp" />
+                android:padding="6dp"
+                android:layout_marginBottom="16dp" />
 
             <!-- Number Row Toggle Checkbox -->
             <CheckBox
@@ -287,16 +309,17 @@
                 android:layout_height="wrap_content"
                 android:text="Show permanent Number Row on Text Keyboard (Uncheck to keep Text &amp; Numbers separated)"
                 android:textColor="@color/text_primary"
-                android:textSize="12sp" />
+                android:textSize="13sp" />
         </LinearLayout>
 
-        <!-- CARD 3.6: CONTACT CARD SCANNER -->
+        <!-- CARD 5: CONTACT CARD SCANNER -->
         <LinearLayout
+            android:id="@+id/cardScanner"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:background="@drawable/bg_card"
-            android:padding="16dp"
+            android:padding="18dp"
             android:layout_marginBottom="16dp">
 
             <TextView
@@ -304,36 +327,38 @@
                 android:layout_height="wrap_content"
                 android:text="📇 Business &amp; Contact Card Scanner"
                 android:textColor="@color/text_primary"
-                android:textSize="15sp"
+                android:textSize="16sp"
                 android:textStyle="bold"
                 android:layout_marginBottom="4dp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Extracts contact information using Gemini Vision AI and delivers both structured text and card image with a single tap."
+                android:text="Captures business cards directly with camera, extracts details including LinkedIn &amp; Past Work, supports Voice Notes, and saves to phone contacts before sending:"
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp"
-                android:layout_marginBottom="12dp" />
+                android:layout_marginBottom="14dp" />
 
             <Button
                 android:id="@+id/btnLaunchScanner"
                 android:layout_width="match_parent"
                 android:layout_height="46dp"
                 android:text="📸 Launch Contact Card Scanner"
-                android:textColor="@color/text_primary"
+                android:textColor="#ffffff"
                 android:background="@drawable/bg_btn_primary"
                 android:textAllCaps="false"
-                android:textSize="13sp" />
+                android:textSize="13sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- CARD 4: TEXT SHORTCUTS & CUSTOM EXPANSIONS -->
+        <!-- CARD 6: TEXT SHORTCUTS & CUSTOM EXPANSIONS -->
         <LinearLayout
+            android:id="@+id/cardShortcuts"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:background="@drawable/bg_card"
-            android:padding="16dp"
+            android:padding="18dp"
             android:layout_marginBottom="16dp">
 
             <LinearLayout
@@ -349,18 +374,19 @@
                     android:layout_weight="1"
                     android:text="⚡ Text Shortcuts (e.g., GM ➔ Good Morning)"
                     android:textColor="@color/text_primary"
-                    android:textSize="15sp"
+                    android:textSize="16sp"
                     android:textStyle="bold" />
 
                 <Button
                     android:id="@+id/btnAddShortcut"
                     android:layout_width="wrap_content"
-                    android:layout_height="36dp"
+                    android:layout_height="38dp"
                     android:text="+ Add"
-                    android:textColor="@color/text_primary"
+                    android:textColor="#ffffff"
                     android:background="@drawable/bg_btn_primary"
                     android:textAllCaps="false"
-                    android:textSize="12sp" />
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <TextView
@@ -369,7 +395,7 @@
                 android:text="Type short codes on the keyboard to automatically expand full phrases:"
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp"
-                android:layout_marginBottom="12dp" />
+                android:layout_marginBottom="14dp" />
 
             <!-- Shortcuts Container List -->
             <LinearLayout
@@ -379,13 +405,14 @@
                 android:orientation="vertical" />
         </LinearLayout>
 
-        <!-- CARD 5: TYPING PATTERN & COLLOCATION STATS -->
+        <!-- CARD 7: TYPING PATTERN & COLLOCATION STATS -->
         <LinearLayout
+            android:id="@+id/cardPatterns"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:background="@drawable/bg_card"
-            android:padding="16dp"
+            android:padding="18dp"
             android:layout_marginBottom="16dp">
 
             <TextView
@@ -393,7 +420,7 @@
                 android:layout_height="wrap_content"
                 android:text="🧠 Typing Patterns &amp; Collocations"
                 android:textColor="@color/text_primary"
-                android:textSize="15sp"
+                android:textSize="16sp"
                 android:textStyle="bold"
                 android:layout_marginBottom="4dp" />
 
@@ -404,26 +431,28 @@
                 android:text="Learned Words: 0 | Learned Collocations: 0"
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp"
-                android:layout_marginBottom="12dp" />
+                android:layout_marginBottom="14dp" />
 
             <Button
                 android:id="@+id/btnResetPatterns"
                 android:layout_width="match_parent"
-                android:layout_height="40dp"
+                android:layout_height="44dp"
                 android:text="Reset Learned Word &amp; Collocation History"
                 android:textColor="@color/accent_red"
                 android:background="@drawable/bg_btn_secondary"
                 android:textAllCaps="false"
-                android:textSize="12sp" />
+                android:textSize="12sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- CARD 6: INTERACTIVE TEST ARENA -->
+        <!-- CARD 8: INTERACTIVE TEST ARENA -->
         <LinearLayout
+            android:id="@+id/cardTesting"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:background="@drawable/bg_card"
-            android:padding="16dp"
+            android:padding="18dp"
             android:layout_marginBottom="24dp">
 
             <TextView
@@ -431,41 +460,42 @@
                 android:layout_height="wrap_content"
                 android:text="⌨️ Keyboard Live Test Playground"
                 android:textColor="@color/text_primary"
-                android:textSize="15sp"
+                android:textSize="16sp"
                 android:textStyle="bold"
                 android:layout_marginBottom="4dp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Tap below to bring up Wispr Flow. Try typing 'GM', testing suggestions, emojis, or pressing the 🎙️ mic button:"
+                android:text="Tap below to bring up Wispr Flow. Try typing, testing suggestions, emojis, or pressing the 🎙️ mic button:"
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp"
-                android:layout_marginBottom="12dp" />
+                android:layout_marginBottom="14dp" />
 
             <EditText
                 android:id="@+id/etTestInput"
                 android:layout_width="match_parent"
-                android:layout_height="90dp"
+                android:layout_height="100dp"
                 android:hint="Tap here to bring up Wispr Flow Keyboard..."
                 android:textColorHint="@color/text_muted"
                 android:textColor="@color/text_primary"
                 android:textSize="14sp"
                 android:background="@drawable/bg_key"
                 android:gravity="top|start"
-                android:padding="12dp"
+                android:padding="14dp"
                 android:inputType="textMultiLine"
-                android:layout_marginBottom="12dp" />
+                android:layout_marginBottom="14dp" />
 
             <Button
                 android:id="@+id/btnTestSampleVoice"
                 android:layout_width="match_parent"
-                android:layout_height="44dp"
+                android:layout_height="46dp"
                 android:text="🧪 Test AI Polishing Engine (Simulate Speech)"
-                android:textColor="@color/text_primary"
+                android:textColor="@color/btn_secondary_text"
                 android:background="@drawable/bg_btn_secondary"
                 android:textAllCaps="false"
-                android:textSize="13sp" />
+                android:textSize="13sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
     </LinearLayout>

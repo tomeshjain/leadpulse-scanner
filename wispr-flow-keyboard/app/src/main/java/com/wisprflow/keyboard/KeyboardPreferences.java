@@ -23,7 +23,7 @@ public class KeyboardPreferences {
 
     public static final String DEFAULT_MODEL = "gemini-2.0-flash";
     public static final String DEFAULT_MODE = "polish";
-    public static final String DEFAULT_THEME = "midnight_slate";
+    public static final String DEFAULT_THEME = "clean_light";
 
     private final SharedPreferences prefs;
 

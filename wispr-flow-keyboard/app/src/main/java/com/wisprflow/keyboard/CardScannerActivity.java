@@ -38,6 +38,11 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 
+import com.google.mlkit.vision.common.InputImage;
+import com.google.mlkit.vision.text.TextRecognition;
+import com.google.mlkit.vision.text.TextRecognizer;
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -82,6 +87,8 @@ public class CardScannerActivity extends AppCompatActivity {
         public String company = "";
         public String phone = "";
         public String email = "";
+        public String linkedin = "";
+        public String pastWork = "";
         public String website = "";
         public String address = "";
         public String notes = "";
@@ -91,10 +98,12 @@ public class CardScannerActivity extends AppCompatActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         prefs = new KeyboardPreferences(this);
+        KeyboardTheme activeTheme = KeyboardTheme.resolveTheme(this, prefs.getThemeId());
+        boolean isLight = activeTheme.isLight;
 
-        // Build Clean Modern Dark UI Programmatically
+        // Build Adaptive Clean UI Programmatically
         ScrollView scrollView = new ScrollView(this);
-        scrollView.setBackgroundColor(Color.parseColor("#080b11"));
+        scrollView.setBackgroundColor(isLight ? Color.parseColor("#f8fafc") : Color.parseColor("#080b11"));
         scrollView.setFillViewport(true);
 
         LinearLayout root = new LinearLayout(this);
@@ -110,7 +119,7 @@ public class CardScannerActivity extends AppCompatActivity {
 
         TextView tvTitle = new TextView(this);
         tvTitle.setText("📇 Contact Card Scanner");
-        tvTitle.setTextColor(Color.WHITE);
+        tvTitle.setTextColor(isLight ? Color.parseColor("#0f172a") : Color.WHITE);
         tvTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
         tvTitle.setTypeface(null, Typeface.BOLD);
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
@@ -121,8 +130,8 @@ public class CardScannerActivity extends AppCompatActivity {
         Button btnGalleryHeader = new Button(this);
         btnGalleryHeader.setText("🖼️ Gallery");
         btnGalleryHeader.setTextSize(11);
-        btnGalleryHeader.setTextColor(Color.parseColor("#a5b4fc"));
-        btnGalleryHeader.setBackground(createBoxDrawable("#1e1b4b", "#4338ca", 8));
+        btnGalleryHeader.setTextColor(isLight ? Color.parseColor("#1d4ed8") : Color.parseColor("#a5b4fc"));
+        btnGalleryHeader.setBackground(createBoxDrawable(isLight ? "#e2e8f0" : "#1e1b4b", isLight ? "#cbd5e1" : "#4338ca", 8));
         btnGalleryHeader.setPadding(dpToPx(8), 0, dpToPx(8), 0);
         LinearLayout.LayoutParams galParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, dpToPx(32));
@@ -135,7 +144,7 @@ public class CardScannerActivity extends AppCompatActivity {
         Button btnClose = new Button(this);
         btnClose.setText("✕");
         btnClose.setTextSize(16);
-        btnClose.setTextColor(Color.parseColor("#94a3b8"));
+        btnClose.setTextColor(isLight ? Color.parseColor("#64748b") : Color.parseColor("#94a3b8"));
         btnClose.setBackgroundColor(Color.TRANSPARENT);
         btnClose.setOnClickListener(v -> closeScanner());
         header.addView(btnClose);
@@ -146,7 +155,7 @@ public class CardScannerActivity extends AppCompatActivity {
         cameraPlaceholderLayout = new LinearLayout(this);
         cameraPlaceholderLayout.setOrientation(LinearLayout.VERTICAL);
         cameraPlaceholderLayout.setGravity(Gravity.CENTER);
-        cameraPlaceholderLayout.setBackground(createBoxDrawable("#0f1624", "#1e293b", 12));
+        cameraPlaceholderLayout.setBackground(createBoxDrawable(isLight ? "#ffffff" : "#0f1624", isLight ? "#cbd5e1" : "#1e293b", 12));
         cameraPlaceholderLayout.setPadding(dpToPx(16), dpToPx(24), dpToPx(16), dpToPx(24));
         LinearLayout.LayoutParams placeParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(150));
@@ -155,12 +164,12 @@ public class CardScannerActivity extends AppCompatActivity {
 
         TextView tvPrompt = new TextView(this);
         tvPrompt.setText("📷 Ready to Scan Contact Card");
-        tvPrompt.setTextColor(Color.WHITE);
+        tvPrompt.setTextColor(isLight ? Color.parseColor("#0f172a") : Color.WHITE);
         tvPrompt.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
         tvPrompt.setTypeface(null, Typeface.BOLD);
         cameraPlaceholderLayout.addView(tvPrompt);
 
-        Button btnSnap = createActionButton("📸 Open Camera", "#4338ca", "#6366f1");
+        Button btnSnap = createActionButton("📸 Open Camera", isLight ? "#2563eb" : "#4338ca", isLight ? "#1d4ed8" : "#6366f1");
         LinearLayout.LayoutParams snapParams = new LinearLayout.LayoutParams(
                 dpToPx(160), dpToPx(40));
         snapParams.setMargins(0, dpToPx(12), 0, 0);
@@ -177,12 +186,13 @@ public class CardScannerActivity extends AppCompatActivity {
         imgParams.setMargins(0, dpToPx(10), 0, dpToPx(8));
         imgCardPreview.setLayoutParams(imgParams);
         imgCardPreview.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        imgCardPreview.setBackground(createBoxDrawable("#0d131f", "#1e293b", 12));
+        imgCardPreview.setBackground(createBoxDrawable(isLight ? "#ffffff" : "#0d131f", isLight ? "#cbd5e1" : "#1e293b", 12));
         imgCardPreview.setVisibility(View.GONE);
         root.addView(imgCardPreview);
 
         // Retake Button (below preview)
-        btnRetake = createActionButton("📸 Retake Photo", "#1e293b", "#334155");
+        btnRetake = createActionButton("📸 Retake Photo", isLight ? "#f1f5f9" : "#1e293b", isLight ? "#cbd5e1" : "#334155");
+        btnRetake.setTextColor(isLight ? Color.parseColor("#0f172a") : Color.WHITE);
         LinearLayout.LayoutParams retakeParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, dpToPx(34));
         retakeParams.gravity = Gravity.CENTER_HORIZONTAL;
@@ -196,7 +206,7 @@ public class CardScannerActivity extends AppCompatActivity {
         progressContainer = new LinearLayout(this);
         progressContainer.setOrientation(LinearLayout.HORIZONTAL);
         progressContainer.setGravity(Gravity.CENTER_VERTICAL);
-        progressContainer.setBackground(createBoxDrawable("#1e1b4b", "#4338ca", 8));
+        progressContainer.setBackground(createBoxDrawable(isLight ? "#eff6ff" : "#1e1b4b", isLight ? "#3b82f6" : "#4338ca", 8));
         progressContainer.setPadding(dpToPx(12), dpToPx(8), dpToPx(12), dpToPx(8));
         progressContainer.setVisibility(View.GONE);
 
@@ -208,7 +218,7 @@ public class CardScannerActivity extends AppCompatActivity {
 
         tvStatusMessage = new TextView(this);
         tvStatusMessage.setText("✨ Scanning contact card with Gemini AI...");
-        tvStatusMessage.setTextColor(Color.parseColor("#e0e7ff"));
+        tvStatusMessage.setTextColor(isLight ? Color.parseColor("#1e40af") : Color.parseColor("#e0e7ff"));
         tvStatusMessage.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
         progressContainer.addView(tvStatusMessage);
 
@@ -226,7 +236,7 @@ public class CardScannerActivity extends AppCompatActivity {
 
         TextView tvEditLabel = new TextView(this);
         tvEditLabel.setText("Extracted Contact Information:");
-        tvEditLabel.setTextColor(Color.parseColor("#cbd5e1"));
+        tvEditLabel.setTextColor(isLight ? Color.parseColor("#334155") : Color.parseColor("#cbd5e1"));
         tvEditLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
         tvEditLabel.setTypeface(null, Typeface.BOLD);
         LinearLayout.LayoutParams lblParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
@@ -237,7 +247,7 @@ public class CardScannerActivity extends AppCompatActivity {
         btnAddVoiceNote.setText("🎙️ Add Voice Note");
         btnAddVoiceNote.setTextSize(11);
         btnAddVoiceNote.setTextColor(Color.WHITE);
-        btnAddVoiceNote.setBackground(createBoxDrawable("#065f46", "#10b981", 8));
+        btnAddVoiceNote.setBackground(createBoxDrawable("#059669", "#10b981", 8));
         btnAddVoiceNote.setPadding(dpToPx(10), 0, dpToPx(10), 0);
         LinearLayout.LayoutParams vnParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, dpToPx(32));
@@ -249,15 +259,15 @@ public class CardScannerActivity extends AppCompatActivity {
 
         // Extracted Text Result Editor
         etExtractedText = new EditText(this);
-        etExtractedText.setTextColor(Color.WHITE);
+        etExtractedText.setTextColor(isLight ? Color.parseColor("#0f172a") : Color.WHITE);
         etExtractedText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
         etExtractedText.setLineSpacing(dpToPx(2), 1.15f);
-        etExtractedText.setBackground(createBoxDrawable("#0f1624", "#1e293b", 8));
+        etExtractedText.setBackground(createBoxDrawable(isLight ? "#ffffff" : "#0f1624", isLight ? "#cbd5e1" : "#1e293b", 8));
         etExtractedText.setPadding(dpToPx(12), dpToPx(12), dpToPx(12), dpToPx(12));
         etExtractedText.setGravity(Gravity.TOP | Gravity.START);
         etExtractedText.setMinLines(6);
         etExtractedText.setHint("Take photo of card. Extracted information will appear here.");
-        etExtractedText.setHintTextColor(Color.parseColor("#475569"));
+        etExtractedText.setHintTextColor(isLight ? Color.parseColor("#94a3b8") : Color.parseColor("#475569"));
         LinearLayout.LayoutParams etParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         etParams.setMargins(0, dpToPx(4), 0, dpToPx(14));
@@ -286,14 +296,14 @@ public class CardScannerActivity extends AppCompatActivity {
         });
 
         // Option 1: Save Contact & Send
-        Button btnSaveAndSend = createActionButton("💾 Save to Phone Contacts & Send", "#15803d", "#22c55e");
+        Button btnSaveAndSend = createActionButton("💾 Save to Phone Contacts & Send", "#16a34a", "#22c55e");
         btnSaveAndSend.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(46)));
         btnSaveAndSend.setOnClickListener(v -> handleSaveAndSend(true));
         actionButtonsLayout.addView(btnSaveAndSend);
 
         // Option 2: Send Card & Text
-        Button btnSendOnly = createActionButton("📤 Send Card & Text", "#4338ca", "#6366f1");
+        Button btnSendOnly = createActionButton("📤 Send Card & Text", isLight ? "#2563eb" : "#4338ca", isLight ? "#3b82f6" : "#6366f1");
         LinearLayout.LayoutParams pSendOnly = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(44));
         pSendOnly.setMargins(0, dpToPx(8), 0, 0);
@@ -302,7 +312,8 @@ public class CardScannerActivity extends AppCompatActivity {
         actionButtonsLayout.addView(btnSendOnly);
 
         // Option 3: Save Contact Only
-        Button btnSaveOnly = createActionButton("💾 Save Contact to Phone Only", "#1e293b", "#334155");
+        Button btnSaveOnly = createActionButton("💾 Save Contact to Phone Only", isLight ? "#f1f5f9" : "#1e293b", isLight ? "#cbd5e1" : "#334155");
+        btnSaveOnly.setTextColor(isLight ? Color.parseColor("#1e293b") : Color.WHITE);
         LinearLayout.LayoutParams pSaveOnly = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(40));
         pSaveOnly.setMargins(0, dpToPx(8), 0, 0);
@@ -475,21 +486,69 @@ public class CardScannerActivity extends AppCompatActivity {
 
             @Override
             public void onError(String errorMessage) {
-                progressContainer.setVisibility(View.GONE);
-                actionButtonsLayout.setVisibility(View.VISIBLE);
-                String fallback = "📇 CONTACT CARD\n" +
-                        "👤 Name: [Scanned Contact]\n" +
-                        "💼 Title: [Title]\n" +
-                        "🏢 Company: [Company]\n" +
-                        "📞 Phone: \n" +
-                        "✉️ Email: \n" +
-                        "🌐 Website: \n" +
-                        "📍 Address: \n" +
-                        "📝 Notes: (Configure Gemini API Key in Settings for AI OCR)";
-                etExtractedText.setText(fallback);
-                Toast.makeText(CardScannerActivity.this, errorMessage, Toast.LENGTH_LONG).show();
+                // If Gemini Multimodal Vision API is busy/offline, fall back to on-device ML Kit OCR!
+                runLocalOcrFallback(bitmap);
             }
         });
+    }
+
+    private void runLocalOcrFallback(Bitmap bitmap) {
+        if (bitmap == null) {
+            fallbackToRuleBasedExtraction("No image");
+            return;
+        }
+
+        tvStatusMessage.setText("📷 AI busy/offline - Reading card with on-device local OCR...");
+        progressContainer.setVisibility(View.VISIBLE);
+
+        try {
+            InputImage image = InputImage.fromBitmap(bitmap, 0);
+            TextRecognizer recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
+
+            recognizer.process(image)
+                    .addOnSuccessListener(visionText -> {
+                        String rawOcrText = visionText.getText();
+                        if (rawOcrText != null && !rawOcrText.trim().isEmpty()) {
+                            tvStatusMessage.setText("⚡ Structuring with Gemini AI (Unlimited Fast Tier)...");
+                            String apiKey = prefs.getApiKey();
+                            String model = prefs.getSelectedModel();
+
+                            GeminiFlowClient.formatExtractedCardText(rawOcrText, apiKey, model, new GeminiFlowClient.CardScanCallback() {
+                                @Override
+                                public void onSuccess(String formattedCard, long latencyMs) {
+                                    progressContainer.setVisibility(View.GONE);
+                                    etExtractedText.setText(formattedCard);
+                                    actionButtonsLayout.setVisibility(View.VISIBLE);
+                                    Toast.makeText(CardScannerActivity.this, "✓ Extracted via Local OCR + Gemini (" + latencyMs + "ms)", Toast.LENGTH_SHORT).show();
+                                }
+
+                                @Override
+                                public void onError(String error) {
+                                    progressContainer.setVisibility(View.GONE);
+                                    String localParsed = GeminiFlowClient.parseRawOcrLocal(rawOcrText);
+                                    etExtractedText.setText(localParsed);
+                                    actionButtonsLayout.setVisibility(View.VISIBLE);
+                                    Toast.makeText(CardScannerActivity.this, "✓ Extracted via On-Device Local OCR", Toast.LENGTH_SHORT).show();
+                                }
+                            });
+                        } else {
+                            fallbackToRuleBasedExtraction("No text found on card");
+                        }
+                    })
+                    .addOnFailureListener(e -> {
+                        fallbackToRuleBasedExtraction(e.getMessage());
+                    });
+        } catch (Exception e) {
+            fallbackToRuleBasedExtraction(e.getMessage());
+        }
+    }
+
+    private void fallbackToRuleBasedExtraction(String errorReason) {
+        progressContainer.setVisibility(View.GONE);
+        actionButtonsLayout.setVisibility(View.VISIBLE);
+        String fallback = GeminiFlowClient.parseRawOcrLocal("");
+        etExtractedText.setText(fallback);
+        Toast.makeText(this, "Local OCR fallback: " + (errorReason != null ? errorReason : "Ready"), Toast.LENGTH_SHORT).show();
     }
 
     private ContactInfo parseContactInfo(String text) {
@@ -508,6 +567,12 @@ public class CardScannerActivity extends AppCompatActivity {
                 c.phone = cleanField(l, "Phone:");
             } else if (l.contains("Email:")) {
                 c.email = cleanField(l, "Email:");
+            } else if (l.contains("LinkedIn:")) {
+                c.linkedin = cleanField(l, "LinkedIn:");
+            } else if (l.contains("Past Work / Experience:") || l.contains("Past Work:") || l.contains("Experience:")) {
+                c.pastWork = cleanField(l, "Past Work / Experience:");
+                if (c.pastWork.isEmpty()) c.pastWork = cleanField(l, "Past Work:");
+                if (c.pastWork.isEmpty()) c.pastWork = cleanField(l, "Experience:");
             } else if (l.contains("Website:")) {
                 c.website = cleanField(l, "Website:");
             } else if (l.contains("Address:")) {
@@ -570,7 +635,29 @@ public class CardScannerActivity extends AppCompatActivity {
                 if (!info.company.isEmpty()) insertIntent.putExtra(ContactsContract.Intents.Insert.COMPANY, info.company);
                 if (!info.title.isEmpty()) insertIntent.putExtra(ContactsContract.Intents.Insert.JOB_TITLE, info.title);
                 if (!info.address.isEmpty()) insertIntent.putExtra(ContactsContract.Intents.Insert.POSTAL, info.address);
-                if (!info.notes.isEmpty()) insertIntent.putExtra(ContactsContract.Intents.Insert.NOTES, info.notes);
+
+                // Build rich notes combining LinkedIn, Past Work, and Voice Notes in simple way
+                StringBuilder notesBuilder = new StringBuilder();
+                if (!info.linkedin.isEmpty()) {
+                    notesBuilder.append("🔗 LinkedIn: ").append(info.linkedin).append("\n");
+                }
+                if (!info.pastWork.isEmpty()) {
+                    notesBuilder.append("🏛️ Past Work: ").append(info.pastWork).append("\n");
+                }
+                if (!info.notes.isEmpty()) {
+                    notesBuilder.append(info.notes);
+                }
+                String combinedNotes = notesBuilder.toString().trim();
+                if (!combinedNotes.isEmpty()) {
+                    insertIntent.putExtra(ContactsContract.Intents.Insert.NOTES, combinedNotes);
+                }
+
+                if (!info.website.isEmpty()) {
+                    insertIntent.putExtra(ContactsContract.Intents.Insert.DATA, info.website);
+                } else if (!info.linkedin.isEmpty()) {
+                    insertIntent.putExtra(ContactsContract.Intents.Insert.DATA, info.linkedin);
+                }
+
                 insertIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 startActivity(insertIntent);
             } catch (Exception ignored) {}
@@ -599,7 +686,29 @@ public class CardScannerActivity extends AppCompatActivity {
             if (!info.company.isEmpty()) insertIntent.putExtra(ContactsContract.Intents.Insert.COMPANY, info.company);
             if (!info.title.isEmpty()) insertIntent.putExtra(ContactsContract.Intents.Insert.JOB_TITLE, info.title);
             if (!info.address.isEmpty()) insertIntent.putExtra(ContactsContract.Intents.Insert.POSTAL, info.address);
-            if (!info.notes.isEmpty()) insertIntent.putExtra(ContactsContract.Intents.Insert.NOTES, info.notes);
+
+            // Build rich notes combining LinkedIn, Past Work, and Voice Notes
+            StringBuilder notesBuilder = new StringBuilder();
+            if (!info.linkedin.isEmpty()) {
+                notesBuilder.append("🔗 LinkedIn: ").append(info.linkedin).append("\n");
+            }
+            if (!info.pastWork.isEmpty()) {
+                notesBuilder.append("🏛️ Past Work: ").append(info.pastWork).append("\n");
+            }
+            if (!info.notes.isEmpty()) {
+                notesBuilder.append(info.notes);
+            }
+            String combinedNotes = notesBuilder.toString().trim();
+            if (!combinedNotes.isEmpty()) {
+                insertIntent.putExtra(ContactsContract.Intents.Insert.NOTES, combinedNotes);
+            }
+
+            if (!info.website.isEmpty()) {
+                insertIntent.putExtra(ContactsContract.Intents.Insert.DATA, info.website);
+            } else if (!info.linkedin.isEmpty()) {
+                insertIntent.putExtra(ContactsContract.Intents.Insert.DATA, info.linkedin);
+            }
+
             insertIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(insertIntent);
             Toast.makeText(this, "💾 Saving contact to phone...", Toast.LENGTH_SHORT).show();

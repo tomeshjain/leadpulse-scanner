@@ -39,6 +39,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.WisprFlow">
 
+        <!-- ML Kit OCR Model Download -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="ocr" />
+
         <!-- Launcher Setup & Gemini Model/Key Configuration Activity -->
         <activity
             android:name=".SettingsActivity"
