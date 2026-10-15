@@ -79,42 +79,38 @@ jobs:
           name: WisprFlowKeyboard-APK
           path: ./WisprFlowKeyboard.apk
 
-      - name: Create or Update GitHub Release (Wispr Keyboard v1.3.0)
+      - name: Create or Update GitHub Release (Wispr Keyboard v1.3.1)
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/heads/main')
         with:
-            tag_name: wispr-keyboard-v1.3.0
-            name: "Wispr Flow - Native Android AI Keyboard Extension (v1.3.0)"
+            tag_name: wispr-keyboard-v1.3.1
+            name: "Wispr Flow - Native Android AI Keyboard Extension (v1.3.1)"
             draft: false
             prerelease: false
             make_latest: true
             body: |
-              ## ⌨️ Wispr Flow - Native Android AI Keyboard Extension (v1.3.0)
+              ## ⌨️ Wispr Flow - Native Android AI Keyboard Extension (v1.3.1)
 
-              **Professional Extended Keyboard Facility for Android with Contact Card Scanner (AI Vision OCR + Send Image & Text), Real-Time Spelling Suggestions, Clean Layout with Separated Text/Numeric Keyboards, and 6 Gorgeous Dynamic Themes.**
+              **Professional Extended Keyboard Facility for Android with Instant Camera Contact Card Scanner, Voice Note Attachments, Native Phone Contacts Integration, and Direct Return to Caller Screen.**
 
-              ### 🚀 New & Upgraded Features:
-              - **📇 Business & Contact Card Scanner**:
-                - One-tap scanner right in the keyboard action bar (`📇 Scan Card`).
-                - Snaps card photo or picks from gallery.
-                - Analyzes and extracts Name, Job Title, Organization, Phone numbers, Email, Website, and Address using Gemini Vision AI.
-                - **"Send Image & Text"**: Inserts structured formatted text into active chat/field AND delivers card image directly via rich content `commitContent` & clipboard!
-              - **⌨️ Separated Text & Numeric Keyboards with 10-Key PIN Numpad**:
-                - Text keyboard is now spacious, clean, and separated from numbers (uncluttered QWERTY).
-                - `?123` switches to dedicated numbers & symbols row.
-                - Dedicated **"123 PIN"** button switches to an oversized 3x4 telephone/calculator style numeric keypad (`1 2 3 / 4 5 6 / 7 8 9 / 0`).
-                - Option in Settings to enable permanent number row if desired.
-              - **🎙️ Cleaned Voice Layout (No Duplicate Mic Buttons)**:
-                - Removed redundant microphone key from the bottom row.
-                - High-visibility dedicated `🎙️ Voice` button in the top action toolbar with audio waveform visualizer.
-                - Spoken numbers are automatically collapsed into continuous digits (OTPs, PINs, phone numbers without spaces).
-              - **✨ Real-Time Spelling Suggestions & Autocorrect**:
-                - Real-time typo detection and spelling suggestions in the top predictive strip.
-                - Integrated 600+ word dictionary, 75+ common typo replacements (`teh` ➔ `the`, `becuase` ➔ `because`, `recieved` ➔ `received`), and Levenshtein distance candidate matching.
-              - **🎨 6 Dynamic Keyboard Themes**:
-                - `🎨 Themes` button in keyboard action toolbar opens live theme preview panel.
-                - Choose from **Midnight Slate**, **OLED Pure Black**, **Clean Light / Silver**, **Cyberpunk Neon**, **Forest Emerald**, and **Sunset Amber**.
-                - Live instant re-theming without reloading the keyboard!
+              ### 🚀 What's New in v1.3.1:
+              - **🔙 Fixed Navigation - Returns to Caller Screen**:
+                - Tapping Close or sending/saving from the Contact Card Scanner now returns directly to the screen where the scanner was clicked (e.g. WhatsApp, Slack, Browser, SMS), rather than returning to SettingsActivity.
+                - Implemented isolated task affinity (`com.wisprflow.keyboard.scanner`) with `finishAndRemoveTask()`.
+              - **📸 Direct Camera First Experience**:
+                - The scanner screen no longer forces you to choose between two large buttons.
+                - The camera immediately activates to capture the card right away.
+                - A subtle **"🖼️ Gallery"** button is readily accessible in the top header if picking an existing card image.
+                - Clean card preview with **"📸 Retake Photo"** option.
+              - **📝 Extracted Text Editor**:
+                - Live editable display showing all extracted business card details (Name, Title, Company, Phone, Email, Website, Address, Notes).
+              - **🎙️ Voice Note Facility for Contact Cards**:
+                - Dedicated **"🎙️ Add Voice Note"** button in the extracted information header.
+                - Speak quick notes, meeting memos, or follow-up tasks—automatically transcribed and appended into the contact card details (`🎙️ Voice Note: ...`).
+              - **💾 Save Contact & Send Card cum Text**:
+                - **"💾 Save to Phone Contacts & Send"**: Pre-fills Android's native Contacts app with Name, Phone, Email, Company, Job Title, Address, and Notes/Voice Note with one tap, while simultaneously sending the card text and image into the active chat/field!
+                - **"📤 Send Card & Text"**: Directly sends the structured text and image into the chat without saving to phone contacts.
+                - **"💾 Save Contact to Phone Only"**: Saves contact into your phone book without inserting into the chat.
 
               ### 📲 Quick Setup:
               1. Download and install **`WisprFlowKeyboard.apk`** below.

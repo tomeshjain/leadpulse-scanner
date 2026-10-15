@@ -7,12 +7,14 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.WRITE_CONTACTS" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
 
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
-    <!-- Queries for Android 11+ Speech Recognition & Camera -->
+    <!-- Queries for Android 11+ Speech Recognition, Camera & Contacts -->
     <queries>
         <intent>
             <action android:name="android.speech.RecognitionService" />
@@ -22,6 +24,10 @@
         </intent>
         <intent>
             <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.INSERT" />
+            <data android:mimeType="vnd.android.cursor.dir/contact" />
         </intent>
     </queries>
 
@@ -45,12 +51,16 @@
             </intent-filter>
         </activity>
 
-        <!-- Dedicated Contact Card Scanner Activity -->
+        <!-- Dedicated Contact Card Scanner Activity (Isolated TaskAffinity to return to caller) -->
         <activity
             android:name=".CardScannerActivity"
-            android:exported="true"
+            android:exported="false"
             android:label="Contact Card Scanner"
             android:theme="@style/Theme.WisprFlow"
+            android:taskAffinity="com.wisprflow.keyboard.scanner"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:clearTaskOnLaunch="true"
             android:windowSoftInputMode="adjustResize" />
 
         <!-- Wispr Flow System-Wide Custom Keyboard (InputMethodService) -->

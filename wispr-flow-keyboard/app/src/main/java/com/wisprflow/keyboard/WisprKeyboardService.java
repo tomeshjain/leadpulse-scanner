@@ -176,6 +176,22 @@ public class WisprKeyboardService extends InputMethodService {
         isNumpadMode = false;
 
         // Check if a contact card was scanned by CardScannerActivity and ready for insertion
+        checkPendingContactCard();
+
+        applyCurrentTheme();
+        showPanel(PanelMode.KEYBOARD);
+        captureSystemClipboard();
+        updateEnterKeyAction(info);
+        updateSuggestions();
+    }
+
+    @Override
+    public void onWindowShown() {
+        super.onWindowShown();
+        checkPendingContactCard();
+    }
+
+    private void checkPendingContactCard() {
         if (ContactCardTransfer.hasPendingCard()) {
             ContactCardTransfer.CardPayload payload = ContactCardTransfer.consumePendingCard();
             if (payload != null) {
@@ -190,12 +206,6 @@ public class WisprKeyboardService extends InputMethodService {
                 }
             }
         }
-
-        applyCurrentTheme();
-        showPanel(PanelMode.KEYBOARD);
-        captureSystemClipboard();
-        updateEnterKeyAction(info);
-        updateSuggestions();
     }
 
     @Override
@@ -1808,7 +1818,7 @@ public class WisprKeyboardService extends InputMethodService {
     private void openCardScanner() {
         try {
             Intent intent = new Intent(this, CardScannerActivity.class);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             startActivity(intent);
         } catch (Exception e) {
             Toast.makeText(this, "Could not open Card Scanner: " + e.getMessage(), Toast.LENGTH_SHORT).show();
