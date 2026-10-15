@@ -1,5 +1,5 @@
 $headers = @{ 'User-Agent' = 'Mozilla/5.0' }
-$relUrl = 'https://api.github.com/repos/tomeshjain/leadpulse-scanner/releases/tags/wispr-keyboard-v1.4.1'
+$relUrl = 'https://api.github.com/repos/tomeshjain/leadpulse-scanner/releases/tags/leadpulse-v1.5.0'
 $rel = Invoke-RestMethod -Uri $relUrl -Headers $headers
 Write-Host "Release:" $rel.name
 Write-Host "Tag:" $rel.tag_name

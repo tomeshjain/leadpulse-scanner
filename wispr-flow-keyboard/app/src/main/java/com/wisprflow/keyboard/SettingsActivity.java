@@ -72,6 +72,7 @@ public class SettingsActivity extends AppCompatActivity {
     private LinearLayout cardShortcuts;
     private LinearLayout cardPatterns;
     private LinearLayout cardTesting;
+    private LinearLayout cardAiDiagnostics;
 
     private Button btnEnableKeyboard;
     private Button btnSelectKeyboard;
@@ -94,6 +95,10 @@ public class SettingsActivity extends AppCompatActivity {
     private Button btnResetPatterns;
     private EditText etTestInput;
     private Button btnTestSampleVoice;
+    private Button btnTestPureAiVoice;
+    private Button btnTestPureAiCard;
+    private Button btnTestLiveWs;
+    private TextView tvPureAiTestResult;
 
     private ThemedSpinnerAdapter modelAdapter;
     private ThemedSpinnerAdapter modeAdapter;
@@ -150,6 +155,7 @@ public class SettingsActivity extends AppCompatActivity {
         cardShortcuts = findViewById(R.id.cardShortcuts);
         cardPatterns = findViewById(R.id.cardPatterns);
         cardTesting = findViewById(R.id.cardTesting);
+        cardAiDiagnostics = findViewById(R.id.cardAiDiagnostics);
 
         btnEnableKeyboard = findViewById(R.id.btnEnableKeyboard);
         btnSelectKeyboard = findViewById(R.id.btnSelectKeyboard);
@@ -172,6 +178,11 @@ public class SettingsActivity extends AppCompatActivity {
         btnResetPatterns = findViewById(R.id.btnResetPatterns);
         etTestInput = findViewById(R.id.etTestInput);
         btnTestSampleVoice = findViewById(R.id.btnTestSampleVoice);
+
+        btnTestPureAiVoice = findViewById(R.id.btnTestPureAiVoice);
+        btnTestPureAiCard = findViewById(R.id.btnTestPureAiCard);
+        btnTestLiveWs = findViewById(R.id.btnTestLiveWs);
+        tvPureAiTestResult = findViewById(R.id.tvPureAiTestResult);
     }
 
     private void setupListeners() {
@@ -182,7 +193,7 @@ public class SettingsActivity extends AppCompatActivity {
                     Intent intent = new Intent(Settings.ACTION_INPUT_METHOD_SETTINGS);
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     startActivity(intent);
-                    Toast.makeText(this, "Enable 'Wispr Flow AI Keyboard' in the list", Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, "Enable 'LeadPulse AI Keyboard' in the list", Toast.LENGTH_LONG).show();
                 } catch (Exception e) {
                     Toast.makeText(this, "Could not open settings: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 }
@@ -305,6 +316,107 @@ public class SettingsActivity extends AppCompatActivity {
                     @Override
                     public void onError(String errorMessage, String fallbackText) {
                         runOnUiThread(() -> etTestInput.setText("✓ Offline Output:\n\n" + fallbackText));
+                    }
+                });
+            });
+        }
+
+        // Test Pure AI Voice (Strict No-Fallback)
+        if (btnTestPureAiVoice != null) {
+            btnTestPureAiVoice.setOnClickListener(v -> {
+                String apiKey = prefs.getApiKey();
+                if (apiKey.isEmpty()) {
+                    tvPureAiTestResult.setText("❌ Error: API Key is required for Pure AI testing. Enter your key in Step 3.");
+                    return;
+                }
+                String model = prefs.getSelectedModel();
+                btnTestPureAiVoice.setEnabled(false);
+                tvPureAiTestResult.setText("⏳ Testing Pure AI Voice with model " + model + " (Strict, no fallback)...");
+
+                String sample = "um hello team uh please find the quarterly report attached and let me know your thoughts";
+                GeminiFlowClient.testPureAiVoice(sample, apiKey, model, new GeminiFlowClient.StrictAiCallback() {
+                    @Override
+                    public void onSuccess(String result, long latencyMs, String modelUsed) {
+                        runOnUiThread(() -> {
+                            btnTestPureAiVoice.setEnabled(true);
+                            tvPureAiTestResult.setText("🟢 Pure AI Voice Test: SUCCESS (" + latencyMs + "ms)\n\n" +
+                                    "Model: " + modelUsed + "\n" +
+                                    "Input: \"" + sample + "\"\n\n" +
+                                    "Polished Output:\n" + result);
+                        });
+                    }
+
+                    @Override
+                    public void onError(String errorMessage) {
+                        runOnUiThread(() -> {
+                            btnTestPureAiVoice.setEnabled(true);
+                            tvPureAiTestResult.setText("❌ Pure AI Voice Test FAILED:\n" + errorMessage);
+                        });
+                    }
+                });
+            });
+        }
+
+        // Test Pure AI Contact Card Extraction (Strict 6 Fields)
+        if (btnTestPureAiCard != null) {
+            btnTestPureAiCard.setOnClickListener(v -> {
+                String apiKey = prefs.getApiKey();
+                if (apiKey.isEmpty()) {
+                    tvPureAiTestResult.setText("❌ Error: API Key is required for Pure AI testing. Enter your key in Step 3.");
+                    return;
+                }
+                String model = prefs.getSelectedModel();
+                btnTestPureAiCard.setEnabled(false);
+                tvPureAiTestResult.setText("⏳ Testing Pure AI Contact Card Extraction (Strict 6 Fields)...");
+
+                String mockCardText = "Sarah Jenkins\nVP of Enterprise Growth\nApex Cloud Solutions\nsarah.jenkins@apexcloud.io\nDirect: +1 415-555-0198\nMarket Street, San Francisco, CA";
+                GeminiFlowClient.formatExtractedCardText(mockCardText, apiKey, model, new GeminiFlowClient.CardScanResultCallback() {
+                    @Override
+                    public void onSuccess(String formattedContactCard, long latencyMs, String modelUsed, boolean isFallback) {
+                        runOnUiThread(() -> {
+                            btnTestPureAiCard.setEnabled(true);
+                            tvPureAiTestResult.setText("🟢 Pure AI Contact Card Test: SUCCESS (" + latencyMs + "ms)\n\n" +
+                                    "Model: " + modelUsed + (isFallback ? " (Fallback Model)" : " (Primary AI Model)") + "\n\n" +
+                                    "Strict 6-Field Output (No N/A):\n" + formattedContactCard);
+                        });
+                    }
+
+                    @Override
+                    public void onError(String errorMessage) {
+                        runOnUiThread(() -> {
+                            btnTestPureAiCard.setEnabled(true);
+                            tvPureAiTestResult.setText("❌ Pure AI Card Extraction FAILED:\n" + errorMessage);
+                        });
+                    }
+                });
+            });
+        }
+
+        // Test Live WebSocket (wss://)
+        if (btnTestLiveWs != null) {
+            btnTestLiveWs.setOnClickListener(v -> {
+                String apiKey = prefs.getApiKey();
+                if (apiKey.isEmpty()) {
+                    tvPureAiTestResult.setText("❌ Error: API Key is required for WebSocket testing. Enter your key in Step 3.");
+                    return;
+                }
+                btnTestLiveWs.setEnabled(false);
+                tvPureAiTestResult.setText("⏳ Initiating Gemini Multimodal Live WebSocket handshake (wss://generativelanguage.googleapis.com)...");
+
+                GeminiLiveWebSocketClient.testConnection(apiKey, new GeminiLiveWebSocketClient.TestCallback() {
+                    @Override
+                    public void onResult(boolean success, String message) {
+                        runOnUiThread(() -> {
+                            btnTestLiveWs.setEnabled(true);
+                            if (success) {
+                                tvPureAiTestResult.setText("🟢 Gemini Live WebSocket: CONNECTED\n\n" +
+                                        "Protocol: wss:// Bidirectional Multimodal Streaming\n" +
+                                        "Target: Google GenerativeService.BidiGenerateContent\n\n" +
+                                        message);
+                            } else {
+                                tvPureAiTestResult.setText("❌ Gemini Live WebSocket Handshake FAILED:\n\n" + message);
+                            }
+                        });
                     }
                 });
             });
@@ -454,10 +566,11 @@ public class SettingsActivity extends AppCompatActivity {
         if (tvBrandTitle != null) tvBrandTitle.setTextColor(theme.textColor);
         if (tvBrandSubtitle != null) tvBrandSubtitle.setTextColor(theme.accentColor);
 
-        // 4. Style all 8 Cards
+        // 4. Style all Cards
         LinearLayout[] cards = {
             cardActivation, cardMic, cardGemini, cardAppearance,
-            cardScanner, cardShortcuts, cardPatterns, cardTesting
+            cardScanner, cardShortcuts, cardPatterns, cardTesting,
+            cardAiDiagnostics
         };
         for (LinearLayout card : cards) {
             if (card != null) {
@@ -479,8 +592,8 @@ public class SettingsActivity extends AppCompatActivity {
             etTestInput.setHintTextColor(theme.subTextColor);
         }
 
-        // 6. Primary Buttons
-        Button[] primaryButtons = { btnEnableKeyboard, btnSaveApiKey, btnLaunchScanner, btnAddShortcut };
+        // 6. Primary Action Buttons (Executive Indigo & Cyan)
+        Button[] primaryButtons = { btnEnableKeyboard, btnSaveApiKey, btnLaunchScanner, btnAddShortcut, btnTestPureAiVoice };
         for (Button btn : primaryButtons) {
             if (btn != null) {
                 btn.setBackground(createChipDrawable(theme.accentColor, theme.accentColor, 10));
@@ -488,14 +601,21 @@ public class SettingsActivity extends AppCompatActivity {
             }
         }
 
-        // 7. Secondary Buttons
+        // 7. Secondary Action Buttons
         int secTextColor = theme.isLight ? theme.textColor : Color.WHITE;
-        Button[] secondaryButtons = { btnSelectKeyboard, btnGrantMicPermission, btnTestSampleVoice, btnResetPatterns };
+        Button[] secondaryButtons = { btnSelectKeyboard, btnGrantMicPermission, btnTestSampleVoice, btnResetPatterns, btnTestPureAiCard, btnTestLiveWs };
         for (Button btn : secondaryButtons) {
             if (btn != null) {
                 btn.setBackground(createChipDrawable(theme.actionKeyColor, theme.dividerColor, 10));
                 btn.setTextColor(secTextColor);
             }
+        }
+
+        // 7b. Diagnostics Result Console Styling
+        if (tvPureAiTestResult != null) {
+            tvPureAiTestResult.setBackground(createChipDrawable(theme.isLight ? Color.parseColor("#0f172a") : Color.parseColor("#020617"),
+                    theme.dividerColor, 10));
+            tvPureAiTestResult.setTextColor(Color.parseColor("#38bdf8"));
         }
 
         // 8. Spinners & Dropdown Adapters
@@ -567,13 +687,13 @@ public class SettingsActivity extends AppCompatActivity {
 
         boolean isLight = theme != null && theme.isLight;
         if (isCurrent) {
-            tvActivationStatus.setText("✓ Wispr Flow is currently ENABLED and ACTIVE as your keyboard!");
+            tvActivationStatus.setText("✓ LeadPulse AI Keyboard is currently ENABLED and ACTIVE as your keyboard!");
             tvActivationStatus.setTextColor(isLight ? Color.parseColor("#16a34a") : Color.parseColor("#34d399"));
         } else if (isEnabled) {
-            tvActivationStatus.setText("✓ Wispr Flow is enabled. Tap '2. Switch Active Keyboard' to select it.");
+            tvActivationStatus.setText("✓ LeadPulse AI is enabled. Tap '2. Switch to LeadPulse Keyboard' to select it.");
             tvActivationStatus.setTextColor(isLight ? Color.parseColor("#d97706") : Color.parseColor("#fbbf24"));
         } else {
-            tvActivationStatus.setText("⚠️ Not yet enabled. Tap '1. Enable Wispr Flow in Settings' to begin.");
+            tvActivationStatus.setText("⚠️ Not yet enabled. Tap '1. Enable LeadPulse in Settings' to begin.");
             tvActivationStatus.setTextColor(isLight ? Color.parseColor("#dc2626") : Color.parseColor("#f87171"));
         }
     }

@@ -1,4 +1,4 @@
-name: Build Wispr Flow Keyboard APK
+name: Build LeadPulse AI Keyboard APK
 
 on:
   push:
@@ -30,7 +30,7 @@ jobs:
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Build Wispr Flow Keyboard APK with Gradle
+      - name: Build LeadPulse AI Keyboard APK with Gradle
         working-directory: wispr-flow-keyboard
         run: |
           set -o pipefail
@@ -69,46 +69,54 @@ jobs:
             find wispr-flow-keyboard/app/build -maxdepth 5 || true
             exit 1
           fi
-          echo "Copying $APK_FILE to ./WisprFlowKeyboard.apk"
+          echo "Copying $APK_FILE to ./LeadPulseAIKeyboard.apk"
+          cp "$APK_FILE" ./LeadPulseAIKeyboard.apk
           cp "$APK_FILE" ./WisprFlowKeyboard.apk
-          ls -lh ./WisprFlowKeyboard.apk
+          ls -lh ./LeadPulseAIKeyboard.apk
 
       - name: Upload Keyboard APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: WisprFlowKeyboard-APK
-          path: ./WisprFlowKeyboard.apk
+          name: LeadPulseAIKeyboard-APK
+          path: ./LeadPulseAIKeyboard.apk
 
-      - name: Create or Update GitHub Release (Wispr Keyboard v1.4.1)
+      - name: Create or Update GitHub Release (LeadPulse v1.5.0)
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/heads/main')
         with:
-            tag_name: wispr-keyboard-v1.4.1
-            name: "Wispr Flow - Native Android AI Keyboard Extension (v1.4.1)"
+            tag_name: leadpulse-v1.5.0
+            name: "LeadPulse AI Keyboard & Smart Scanner (v1.5.0)"
             draft: false
             prerelease: false
             make_latest: true
             body: |
-              ## ⌨️ Wispr Flow - Native Android AI Keyboard Extension (v1.4.1)
+              ## 🚀 LeadPulse AI Keyboard & Smart Scanner (v1.5.0)
 
-              **Professional Extended Keyboard Facility for Android with Real Animated GIF Media Insertion, Contextual Text-to-GIF Suggestions, Live & Voice GIF Search, and Rich Curated Reactions Library.**
+              **Professional Executive AI Keyboard for Android with PulseFlow Voice Dictation, Strict 6-Field LeadPulse Card Scanner, Zero-Touch Automated Contact Saving, Transparent Model Engine Badges, and Pure AI Diagnostics.**
 
-              ### 🚀 What's New in v1.4.1:
-              - **🎞️ True GIF Image Insertion (No Raw URLs)**:
-                - Fixed issue where raw web URLs were pasted into chats instead of the actual GIF image.
-                - GIFs are downloaded and cached locally, delivered directly as rich content images via `InputConnectionCompat.commitContent()` (with `FileProvider` permissions) across WhatsApp, Telegram, Google Messages, Discord, Slack, and other supported messengers.
-                - For apps that don't support direct rich content in text fields, the animated GIF is automatically copied to the clipboard as an image clip so it can be pasted with 1 tap.
-              - **🧠 Contextual Text-to-GIF Suggestions**:
-                - Typing common conversational keywords (e.g., "applause", "congrats", "cheers", "haha", "celebrate", "awesome", "lol", "love", "thanks", "wow", "good job") automatically suggests a prominent, glowing GIF chip in the top keyboard suggestion bar (`🎞️ GIF: [Title]`).
-                - Tapping the suggestion immediately sends the matching GIF image without needing to leave the chat.
-              - **🔍 Live Search & Voice Search in GIF Panel**:
-                - Added real-time search bar that filters the catalog as you type with zero latency.
-                - Debounced live online search powered by Giphy/Tenor for unlimited query discovery.
-                - Added **`🎙️ Voice Search`** button to speak any GIF query directly.
-                - 10 Quick-tap category pills: `[🔥 Trending]`, `[👏 Applause]`, `[😂 Laugh & Fun]`, `[🎉 Celebrate]`, `[👍 Agree]`, `[🤔 Thinking]`, `[❤️ Love & Thanks]`, `[💼 Work & Hustle]`, `[🐱 Cute Pets]`, `[✨ Kaomoji]`.
-              - **🌟 Expanded Best-of-the-Best Curated Catalog**:
-                - Over 100 top-rated, high-definition animated reaction GIFs covering all major sentiments and expressions.
+              ### 💎 What's New in v1.5.0:
+              - **🌟 Complete Executive Rebranding**:
+                - Rebranded to **LeadPulse AI Keyboard** with **PulseFlow Voice Dictation** & **LeadPulse Smart Scanner**.
+                - Brand-new commercial 3D soundwave + keycap diamond AI glyph icon rendered across all Android mipmap densities (`mdpi`, `hdpi`, `xhdpi`, `xxhdpi`, `xxxhdpi`).
+              - **📇 Strict 6-Field Contact Card Extraction**:
+                - Output strictly restricted to: `Name`, `Designation`, `Organization`, `Email`, `Phone Number`, `City`.
+                - If any field is missing or not present, it is **omitted completely** (Zero "N/A", "None", or empty lines).
+              - **⚡ 100% Automated Silent Contact Saving (Zero Human Intervention)**:
+                - Tapping "Save Contact" programmatically inserts details directly into the phone's native address book via Android `ContentResolver.applyBatch` (`ContactsContract.RawContacts` & `ContactsContract.Data`).
+                - No confirmation popups, no contact editor screen—saves instantly in the background.
+              - **🧠 Multi-Model Fallback Cascade**:
+                - Primary (`gemini-2.0-flash`) ➔ Secondary (`gemini-1.5-flash`) ➔ Tertiary (`gemini-1.5-pro`) ➔ Offline Engine.
+              - **🟢 Transparent Engine Indicator Badges**:
+                - Real-time badges reveal whether `🟢 Pure AI`, `🟡 Fallback AI`, or `⚪ Offline Local Engine` processed your voice dictation or business card, complete with execution latency in milliseconds.
+              - **🧪 Dedicated Pure AI & Gemini Live WebSocket Diagnostics**:
+                - Test Pure AI Voice Translation (strict no-fallback mode).
+                - Test Pure AI Contact Card Extraction with 6-field schema verification.
+                - Test Gemini Multimodal Live WebSocket handshake (`wss://generativelanguage.googleapis.com/...`).
+                - Dedicated dark monospace diagnostics console.
+              - **🎨 Refined Executive UI & Button Color Palette**:
+                - Upgraded Settings page buttons to Royal Indigo (`#4f46e5`), crisp white typography, and frosted slate secondary pills.
             files: |
+              ./LeadPulseAIKeyboard.apk
               ./WisprFlowKeyboard.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

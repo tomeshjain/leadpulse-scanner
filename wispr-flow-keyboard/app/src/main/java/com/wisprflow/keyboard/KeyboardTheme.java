@@ -55,7 +55,7 @@ public class KeyboardTheme {
                 "clean_light", "Clean Light", "☀️",
                 Color.parseColor("#f1f5f9"), Color.parseColor("#f8fafc"),
                 Color.parseColor("#ffffff"), Color.parseColor("#cbd5e1"),
-                Color.parseColor("#e2e8f0"), Color.parseColor("#2563eb"),
+                Color.parseColor("#f1f5f9"), Color.parseColor("#4f46e5"),
                 Color.parseColor("#0f172a"), Color.parseColor("#64748b"),
                 Color.parseColor("#e2e8f0"), true
         ));
@@ -65,7 +65,7 @@ public class KeyboardTheme {
                 "system_auto", "System Auto (OS)", "📱",
                 Color.parseColor("#f1f5f9"), Color.parseColor("#f8fafc"),
                 Color.parseColor("#ffffff"), Color.parseColor("#cbd5e1"),
-                Color.parseColor("#e2e8f0"), Color.parseColor("#2563eb"),
+                Color.parseColor("#f1f5f9"), Color.parseColor("#4f46e5"),
                 Color.parseColor("#0f172a"), Color.parseColor("#64748b"),
                 Color.parseColor("#e2e8f0"), true
         ));

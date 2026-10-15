@@ -3,6 +3,7 @@ package com.wisprflow.keyboard;
 import android.Manifest;
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.content.ContentProviderOperation;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -19,6 +20,7 @@ import android.provider.MediaStore;
 import android.speech.RecognizerIntent;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -65,12 +67,14 @@ public class CardScannerActivity extends AppCompatActivity {
     private static final int REQUEST_VOICE_NOTE = 103;
     private static final int PERMISSION_CAMERA_REQ = 201;
     private static final int PERMISSION_AUDIO_REQ = 202;
+    private static final int PERMISSION_WRITE_CONTACTS_REQ = 203;
 
     private KeyboardPreferences prefs;
     private ImageView imgCardPreview;
     private LinearLayout cameraPlaceholderLayout;
     private LinearLayout progressContainer;
     private TextView tvStatusMessage;
+    private TextView tvEngineIndicator;
     private EditText etExtractedText;
     private LinearLayout actionButtonsLayout;
     private Button btnRetake;
@@ -80,18 +84,16 @@ public class CardScannerActivity extends AppCompatActivity {
     private File capturedPhotoFile = null;
     private Bitmap currentCardBitmap = null;
     private boolean isInitialCameraTriggered = false;
+    private ContactInfo pendingSaveContactInfo = null;
+    private boolean pendingCloseAfterSave = false;
 
     public static class ContactInfo {
         public String name = "";
-        public String title = "";
-        public String company = "";
-        public String phone = "";
+        public String designation = "";
+        public String organization = "";
         public String email = "";
-        public String linkedin = "";
-        public String pastWork = "";
-        public String website = "";
-        public String address = "";
-        public String notes = "";
+        public String phone = "";
+        public String city = "";
     }
 
     @Override
@@ -118,7 +120,7 @@ public class CardScannerActivity extends AppCompatActivity {
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
         TextView tvTitle = new TextView(this);
-        tvTitle.setText("📇 Contact Card Scanner");
+        tvTitle.setText("📇 LeadPulse Smart Scanner");
         tvTitle.setTextColor(isLight ? Color.parseColor("#0f172a") : Color.WHITE);
         tvTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
         tvTitle.setTypeface(null, Typeface.BOLD);
@@ -257,6 +259,18 @@ public class CardScannerActivity extends AppCompatActivity {
 
         root.addView(textHeaderRow);
 
+        // Transparent Engine & Model Indicator Badge
+        tvEngineIndicator = new TextView(this);
+        tvEngineIndicator.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+        tvEngineIndicator.setTypeface(null, Typeface.BOLD);
+        tvEngineIndicator.setPadding(dpToPx(10), dpToPx(5), dpToPx(10), dpToPx(5));
+        tvEngineIndicator.setVisibility(View.GONE);
+        LinearLayout.LayoutParams indParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        indParams.setMargins(0, 0, 0, dpToPx(6));
+        tvEngineIndicator.setLayoutParams(indParams);
+        root.addView(tvEngineIndicator);
+
         // Extracted Text Result Editor
         etExtractedText = new EditText(this);
         etExtractedText.setTextColor(isLight ? Color.parseColor("#0f172a") : Color.WHITE);
@@ -355,6 +369,18 @@ public class CardScannerActivity extends AppCompatActivity {
                 startVoiceNoteRecording();
             } else {
                 Toast.makeText(this, "Microphone permission needed for voice notes", Toast.LENGTH_SHORT).show();
+            }
+        } else if (requestCode == PERMISSION_WRITE_CONTACTS_REQ) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                if (pendingSaveContactInfo != null) {
+                    executeDirectContactSave(pendingSaveContactInfo);
+                    pendingSaveContactInfo = null;
+                }
+            } else {
+                Toast.makeText(this, "Contacts permission required to save contacts automatically", Toast.LENGTH_SHORT).show();
+            }
+            if (pendingCloseAfterSave) {
+                closeScanner();
             }
         }
     }
@@ -475,13 +501,13 @@ public class CardScannerActivity extends AppCompatActivity {
         String apiKey = prefs.getApiKey();
         String model = prefs.getSelectedModel();
 
-        GeminiFlowClient.scanContactCard(jpegBytes, apiKey, model, new GeminiFlowClient.CardScanCallback() {
+        GeminiFlowClient.scanContactCard(jpegBytes, apiKey, model, new GeminiFlowClient.CardScanResultCallback() {
             @Override
-            public void onSuccess(String formattedContactCard, long latencyMs) {
+            public void onSuccess(String formattedContactCard, long latencyMs, String modelUsed, boolean isFallback) {
                 progressContainer.setVisibility(View.GONE);
                 etExtractedText.setText(formattedContactCard);
                 actionButtonsLayout.setVisibility(View.VISIBLE);
-                Toast.makeText(CardScannerActivity.this, "Card Scanned (" + latencyMs + "ms)", Toast.LENGTH_SHORT).show();
+                showEngineIndicator(modelUsed, isFallback, latencyMs);
             }
 
             @Override
@@ -513,22 +539,22 @@ public class CardScannerActivity extends AppCompatActivity {
                             String apiKey = prefs.getApiKey();
                             String model = prefs.getSelectedModel();
 
-                            GeminiFlowClient.formatExtractedCardText(rawOcrText, apiKey, model, new GeminiFlowClient.CardScanCallback() {
+                            GeminiFlowClient.formatExtractedCardText(rawOcrText, apiKey, model, new GeminiFlowClient.CardScanResultCallback() {
                                 @Override
-                                public void onSuccess(String formattedCard, long latencyMs) {
+                                public void onSuccess(String formattedCard, long latencyMs, String modelUsed, boolean isFallback) {
                                     progressContainer.setVisibility(View.GONE);
                                     etExtractedText.setText(formattedCard);
                                     actionButtonsLayout.setVisibility(View.VISIBLE);
-                                    Toast.makeText(CardScannerActivity.this, "✓ Extracted via Local OCR + Gemini (" + latencyMs + "ms)", Toast.LENGTH_SHORT).show();
+                                    showEngineIndicator(modelUsed, isFallback, latencyMs);
                                 }
 
                                 @Override
                                 public void onError(String error) {
                                     progressContainer.setVisibility(View.GONE);
-                                    String localParsed = GeminiFlowClient.parseRawOcrLocal(rawOcrText);
+                                    String localParsed = GeminiFlowClient.cleanCardOutput(GeminiFlowClient.parseRawOcrLocal(rawOcrText));
                                     etExtractedText.setText(localParsed);
                                     actionButtonsLayout.setVisibility(View.VISIBLE);
-                                    Toast.makeText(CardScannerActivity.this, "✓ Extracted via On-Device Local OCR", Toast.LENGTH_SHORT).show();
+                                    showEngineIndicator("Offline Local OCR", false, 0);
                                 }
                             });
                         } else {
@@ -546,9 +572,27 @@ public class CardScannerActivity extends AppCompatActivity {
     private void fallbackToRuleBasedExtraction(String errorReason) {
         progressContainer.setVisibility(View.GONE);
         actionButtonsLayout.setVisibility(View.VISIBLE);
-        String fallback = GeminiFlowClient.parseRawOcrLocal("");
+        String fallback = GeminiFlowClient.cleanCardOutput(GeminiFlowClient.parseRawOcrLocal(""));
         etExtractedText.setText(fallback);
-        Toast.makeText(this, "Local OCR fallback: " + (errorReason != null ? errorReason : "Ready"), Toast.LENGTH_SHORT).show();
+        showEngineIndicator("Offline Local Rules", false, 0);
+    }
+
+    private void showEngineIndicator(String modelUsed, boolean isFallback, long latencyMs) {
+        if (tvEngineIndicator == null) return;
+        tvEngineIndicator.setVisibility(View.VISIBLE);
+        if (modelUsed != null && (modelUsed.toLowerCase().contains("offline") || modelUsed.contains("Local"))) {
+            tvEngineIndicator.setText("⚪ Offline: Local Engine (" + latencyMs + "ms)");
+            tvEngineIndicator.setTextColor(Color.parseColor("#475569"));
+            tvEngineIndicator.setBackground(createBoxDrawable("#f1f5f9", "#cbd5e1", 6));
+        } else if (isFallback) {
+            tvEngineIndicator.setText("🟡 Fallback AI: " + modelUsed + " (" + latencyMs + "ms)");
+            tvEngineIndicator.setTextColor(Color.parseColor("#b45309"));
+            tvEngineIndicator.setBackground(createBoxDrawable("#fef3c7", "#f59e0b", 6));
+        } else {
+            tvEngineIndicator.setText("🟢 Pure AI: " + modelUsed + " (" + latencyMs + "ms)");
+            tvEngineIndicator.setTextColor(Color.parseColor("#15803d"));
+            tvEngineIndicator.setBackground(createBoxDrawable("#dcfce7", "#22c55e", 6));
+        }
     }
 
     private ContactInfo parseContactInfo(String text) {
@@ -557,28 +601,19 @@ public class CardScannerActivity extends AppCompatActivity {
         String[] lines = text.split("\n");
         for (String line : lines) {
             String l = line.trim();
-            if (l.contains("Name:")) {
+            String lower = l.toLowerCase(Locale.US);
+            if (lower.startsWith("name:")) {
                 c.name = cleanField(l, "Name:");
-            } else if (l.contains("Title:")) {
-                c.title = cleanField(l, "Title:");
-            } else if (l.contains("Company:")) {
-                c.company = cleanField(l, "Company:");
-            } else if (l.contains("Phone:")) {
-                c.phone = cleanField(l, "Phone:");
-            } else if (l.contains("Email:")) {
+            } else if (lower.startsWith("designation:") || lower.startsWith("title:") || lower.startsWith("job title:")) {
+                c.designation = cleanField(l, l.substring(0, l.indexOf(':') + 1));
+            } else if (lower.startsWith("organization:") || lower.startsWith("company:")) {
+                c.organization = cleanField(l, l.substring(0, l.indexOf(':') + 1));
+            } else if (lower.startsWith("phone number:") || lower.startsWith("phone:") || lower.startsWith("mobile:")) {
+                c.phone = cleanField(l, l.substring(0, l.indexOf(':') + 1));
+            } else if (lower.startsWith("email:")) {
                 c.email = cleanField(l, "Email:");
-            } else if (l.contains("LinkedIn:")) {
-                c.linkedin = cleanField(l, "LinkedIn:");
-            } else if (l.contains("Past Work / Experience:") || l.contains("Past Work:") || l.contains("Experience:")) {
-                c.pastWork = cleanField(l, "Past Work / Experience:");
-                if (c.pastWork.isEmpty()) c.pastWork = cleanField(l, "Past Work:");
-                if (c.pastWork.isEmpty()) c.pastWork = cleanField(l, "Experience:");
-            } else if (l.contains("Website:")) {
-                c.website = cleanField(l, "Website:");
-            } else if (l.contains("Address:")) {
-                c.address = cleanField(l, "Address:");
-            } else if (l.contains("Notes:") || l.contains("Voice Note:")) {
-                c.notes += (c.notes.isEmpty() ? "" : "\n") + l;
+            } else if (lower.startsWith("city:") || lower.startsWith("location:")) {
+                c.city = cleanField(l, l.substring(0, l.indexOf(':') + 1));
             }
         }
         return c;
@@ -588,7 +623,9 @@ public class CardScannerActivity extends AppCompatActivity {
         int idx = line.indexOf(prefix);
         if (idx >= 0) {
             String val = line.substring(idx + prefix.length()).trim();
-            if (val.equalsIgnoreCase("N/A") || val.equalsIgnoreCase("None") || val.equalsIgnoreCase("null")) {
+            String lower = val.toLowerCase(Locale.US);
+            if (lower.equals("n/a") || lower.equals("na") || lower.equals("none") ||
+                    lower.equals("null") || lower.equals("not available") || lower.equals("unknown")) {
                 return "";
             }
             if (val.startsWith("[") && val.endsWith("]")) {
@@ -606,7 +643,7 @@ public class CardScannerActivity extends AppCompatActivity {
             return;
         }
 
-        // 1. Prepare Keyboard Transfer Payload & Clipboard
+        // 1. Prepare Keyboard Transfer Payload & System Clipboard
         ContactCardTransfer.setPendingCard(cardText, capturedPhotoUri, "image/jpeg");
 
         try {
@@ -614,59 +651,23 @@ public class CardScannerActivity extends AppCompatActivity {
             if (cm != null) {
                 ClipData clip;
                 if (capturedPhotoUri != null) {
-                    clip = ClipData.newUri(getContentResolver(), "Scanned Contact Card", capturedPhotoUri);
+                    clip = ClipData.newUri(getContentResolver(), "LeadPulse Contact Card", capturedPhotoUri);
                     clip.addItem(new ClipData.Item(cardText));
                 } else {
-                    clip = ClipData.newPlainText("Scanned Contact Card", cardText);
+                    clip = ClipData.newPlainText("LeadPulse Contact Card", cardText);
                 }
                 cm.setPrimaryClip(clip);
             }
         } catch (Exception ignored) {}
 
-        // 2. If saving contact to phone:
+        // 2. Automated Direct Contact Insertion (Zero Human Intervention)
         if (saveContactFirst) {
             ContactInfo info = parseContactInfo(cardText);
-            try {
-                Intent insertIntent = new Intent(Intent.ACTION_INSERT);
-                insertIntent.setType(ContactsContract.Contacts.CONTENT_TYPE);
-                if (!info.name.isEmpty()) insertIntent.putExtra(ContactsContract.Intents.Insert.NAME, info.name);
-                if (!info.phone.isEmpty()) insertIntent.putExtra(ContactsContract.Intents.Insert.PHONE, info.phone);
-                if (!info.email.isEmpty()) insertIntent.putExtra(ContactsContract.Intents.Insert.EMAIL, info.email);
-                if (!info.company.isEmpty()) insertIntent.putExtra(ContactsContract.Intents.Insert.COMPANY, info.company);
-                if (!info.title.isEmpty()) insertIntent.putExtra(ContactsContract.Intents.Insert.JOB_TITLE, info.title);
-                if (!info.address.isEmpty()) insertIntent.putExtra(ContactsContract.Intents.Insert.POSTAL, info.address);
-
-                // Build rich notes combining LinkedIn, Past Work, and Voice Notes in simple way
-                StringBuilder notesBuilder = new StringBuilder();
-                if (!info.linkedin.isEmpty()) {
-                    notesBuilder.append("🔗 LinkedIn: ").append(info.linkedin).append("\n");
-                }
-                if (!info.pastWork.isEmpty()) {
-                    notesBuilder.append("🏛️ Past Work: ").append(info.pastWork).append("\n");
-                }
-                if (!info.notes.isEmpty()) {
-                    notesBuilder.append(info.notes);
-                }
-                String combinedNotes = notesBuilder.toString().trim();
-                if (!combinedNotes.isEmpty()) {
-                    insertIntent.putExtra(ContactsContract.Intents.Insert.NOTES, combinedNotes);
-                }
-
-                if (!info.website.isEmpty()) {
-                    insertIntent.putExtra(ContactsContract.Intents.Insert.DATA, info.website);
-                } else if (!info.linkedin.isEmpty()) {
-                    insertIntent.putExtra(ContactsContract.Intents.Insert.DATA, info.linkedin);
-                }
-
-                insertIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                startActivity(insertIntent);
-            } catch (Exception ignored) {}
+            saveContactDirectly(info, true);
+        } else {
+            Toast.makeText(this, "📇 Sending Contact Card & Image...", Toast.LENGTH_SHORT).show();
+            closeScanner();
         }
-
-        Toast.makeText(this, "📇 Sending Contact Card & Image...", Toast.LENGTH_SHORT).show();
-
-        // 3. Close scanner and return directly to the caller screen
-        closeScanner();
     }
 
     private void handleSaveOnly() {
@@ -677,45 +678,107 @@ public class CardScannerActivity extends AppCompatActivity {
         }
 
         ContactInfo info = parseContactInfo(cardText);
-        try {
-            Intent insertIntent = new Intent(Intent.ACTION_INSERT);
-            insertIntent.setType(ContactsContract.Contacts.CONTENT_TYPE);
-            if (!info.name.isEmpty()) insertIntent.putExtra(ContactsContract.Intents.Insert.NAME, info.name);
-            if (!info.phone.isEmpty()) insertIntent.putExtra(ContactsContract.Intents.Insert.PHONE, info.phone);
-            if (!info.email.isEmpty()) insertIntent.putExtra(ContactsContract.Intents.Insert.EMAIL, info.email);
-            if (!info.company.isEmpty()) insertIntent.putExtra(ContactsContract.Intents.Insert.COMPANY, info.company);
-            if (!info.title.isEmpty()) insertIntent.putExtra(ContactsContract.Intents.Insert.JOB_TITLE, info.title);
-            if (!info.address.isEmpty()) insertIntent.putExtra(ContactsContract.Intents.Insert.POSTAL, info.address);
+        saveContactDirectly(info, true);
+    }
 
-            // Build rich notes combining LinkedIn, Past Work, and Voice Notes
-            StringBuilder notesBuilder = new StringBuilder();
-            if (!info.linkedin.isEmpty()) {
-                notesBuilder.append("🔗 LinkedIn: ").append(info.linkedin).append("\n");
-            }
-            if (!info.pastWork.isEmpty()) {
-                notesBuilder.append("🏛️ Past Work: ").append(info.pastWork).append("\n");
-            }
-            if (!info.notes.isEmpty()) {
-                notesBuilder.append(info.notes);
-            }
-            String combinedNotes = notesBuilder.toString().trim();
-            if (!combinedNotes.isEmpty()) {
-                insertIntent.putExtra(ContactsContract.Intents.Insert.NOTES, combinedNotes);
-            }
-
-            if (!info.website.isEmpty()) {
-                insertIntent.putExtra(ContactsContract.Intents.Insert.DATA, info.website);
-            } else if (!info.linkedin.isEmpty()) {
-                insertIntent.putExtra(ContactsContract.Intents.Insert.DATA, info.linkedin);
-            }
-
-            insertIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(insertIntent);
-            Toast.makeText(this, "💾 Saving contact to phone...", Toast.LENGTH_SHORT).show();
-        } catch (Exception e) {
-            Toast.makeText(this, "Error saving contact: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+    /**
+     * Programmatically inserts contact details directly into Android's native contacts provider.
+     * ZERO HUMAN INTERVENTION REQUIRED: No manual confirmation dialog or editor activity shown.
+     */
+    private void saveContactDirectly(ContactInfo info, boolean closeAfter) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            pendingSaveContactInfo = info;
+            pendingCloseAfterSave = closeAfter;
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_CONTACTS}, PERMISSION_WRITE_CONTACTS_REQ);
+            return;
         }
-        closeScanner();
+
+        executeDirectContactSave(info);
+        if (closeAfter) {
+            closeScanner();
+        }
+    }
+
+    private void executeDirectContactSave(ContactInfo info) {
+        if (info == null) return;
+        try {
+            ArrayList<ContentProviderOperation> ops = new ArrayList<>();
+            int rawContactInsertIndex = ops.size();
+
+            ops.add(ContentProviderOperation.newInsert(ContactsContract.RawContacts.CONTENT_URI)
+                    .withValue(ContactsContract.RawContacts.ACCOUNT_TYPE, null)
+                    .withValue(ContactsContract.RawContacts.ACCOUNT_NAME, null)
+                    .build());
+
+            // Name
+            if (!info.name.isEmpty()) {
+                ops.add(ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
+                        .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, rawContactInsertIndex)
+                        .withValue(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE)
+                        .withValue(ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME, info.name)
+                        .build());
+            }
+
+            // Phone
+            if (!info.phone.isEmpty()) {
+                ops.add(ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
+                        .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, rawContactInsertIndex)
+                        .withValue(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE)
+                        .withValue(ContactsContract.CommonDataKinds.Phone.NUMBER, info.phone)
+                        .withValue(ContactsContract.CommonDataKinds.Phone.TYPE, ContactsContract.CommonDataKinds.Phone.TYPE_WORK)
+                        .build());
+            }
+
+            // Email
+            if (!info.email.isEmpty()) {
+                ops.add(ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
+                        .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, rawContactInsertIndex)
+                        .withValue(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE)
+                        .withValue(ContactsContract.CommonDataKinds.Email.DATA, info.email)
+                        .withValue(ContactsContract.CommonDataKinds.Email.TYPE, ContactsContract.CommonDataKinds.Email.TYPE_WORK)
+                        .build());
+            }
+
+            // Organization & Designation
+            if (!info.organization.isEmpty() || !info.designation.isEmpty()) {
+                ops.add(ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
+                        .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, rawContactInsertIndex)
+                        .withValue(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.Organization.CONTENT_ITEM_TYPE)
+                        .withValue(ContactsContract.CommonDataKinds.Organization.COMPANY, info.organization)
+                        .withValue(ContactsContract.CommonDataKinds.Organization.TITLE, info.designation)
+                        .withValue(ContactsContract.CommonDataKinds.Organization.TYPE, ContactsContract.CommonDataKinds.Organization.TYPE_WORK)
+                        .build());
+            }
+
+            // City
+            if (!info.city.isEmpty()) {
+                ops.add(ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
+                        .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, rawContactInsertIndex)
+                        .withValue(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.StructuredPostal.CONTENT_ITEM_TYPE)
+                        .withValue(ContactsContract.CommonDataKinds.StructuredPostal.CITY, info.city)
+                        .withValue(ContactsContract.CommonDataKinds.StructuredPostal.TYPE, ContactsContract.CommonDataKinds.StructuredPostal.TYPE_WORK)
+                        .build());
+            }
+
+            getContentResolver().applyBatch(ContactsContract.AUTHORITY, ops);
+            String savedLabel = !info.name.isEmpty() ? info.name : "Contact";
+            Toast.makeText(this, "✓ " + savedLabel + " automatically saved to contacts!", Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            Log.e("CardScanner", "Direct contact insertion fallback", e);
+            // Fallback to intent if unexpected permission issue occurs
+            try {
+                Intent insertIntent = new Intent(Intent.ACTION_INSERT);
+                insertIntent.setType(ContactsContract.Contacts.CONTENT_TYPE);
+                if (!info.name.isEmpty()) insertIntent.putExtra(ContactsContract.Intents.Insert.NAME, info.name);
+                if (!info.phone.isEmpty()) insertIntent.putExtra(ContactsContract.Intents.Insert.PHONE, info.phone);
+                if (!info.email.isEmpty()) insertIntent.putExtra(ContactsContract.Intents.Insert.EMAIL, info.email);
+                if (!info.organization.isEmpty()) insertIntent.putExtra(ContactsContract.Intents.Insert.COMPANY, info.organization);
+                if (!info.designation.isEmpty()) insertIntent.putExtra(ContactsContract.Intents.Insert.JOB_TITLE, info.designation);
+                if (!info.city.isEmpty()) insertIntent.putExtra(ContactsContract.Intents.Insert.POSTAL, info.city);
+                insertIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(insertIntent);
+            } catch (Exception ignored) {}
+        }
     }
 
     private void closeScanner() {

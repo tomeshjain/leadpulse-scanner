@@ -25,7 +25,7 @@
                 android:layout_width="52dp"
                 android:layout_height="52dp"
                 android:src="@mipmap/ic_launcher"
-                android:contentDescription="Wispr Flow Logo" />
+                android:contentDescription="LeadPulse AI Logo" />
 
             <LinearLayout
                 android:layout_width="wrap_content"
@@ -37,7 +37,7 @@
                     android:id="@+id/tvBrandTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Wispr Flow"
+                    android:text="LeadPulse AI"
                     android:textColor="@color/text_primary"
                     android:textSize="24sp"
                     android:textStyle="bold" />
@@ -46,7 +46,7 @@
                     android:id="@+id/tvBrandSubtitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Extended AI Voice Keyboard &amp; Typing Assistant"
+                    android:text="PulseFlow Voice Dictation &amp; LeadPulse Smart Scanner"
                     android:textColor="@color/accent_primary"
                     android:textSize="12sp"
                     android:textStyle="bold"
@@ -76,7 +76,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Activate Wispr Flow in Android system settings and select it as your default input method:"
+                android:text="Activate LeadPulse AI Keyboard in Android system settings and select it as your default input method:"
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp"
                 android:layout_marginBottom="14dp" />
@@ -86,7 +86,7 @@
                 android:id="@+id/btnEnableKeyboard"
                 android:layout_width="match_parent"
                 android:layout_height="46dp"
-                android:text="1. Enable Wispr Flow in Settings"
+                android:text="1. Enable LeadPulse in Settings"
                 android:textColor="#ffffff"
                 android:background="@drawable/bg_btn_primary"
                 android:textAllCaps="false"
@@ -99,7 +99,7 @@
                 android:id="@+id/btnSelectKeyboard"
                 android:layout_width="match_parent"
                 android:layout_height="46dp"
-                android:text="2. Switch Active Keyboard"
+                android:text="2. Switch to LeadPulse Keyboard"
                 android:textColor="@color/btn_secondary_text"
                 android:background="@drawable/bg_btn_secondary"
                 android:textAllCaps="false"
@@ -467,7 +467,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Tap below to bring up Wispr Flow. Try typing, testing suggestions, emojis, or pressing the 🎙️ mic button:"
+                android:text="Tap below to bring up LeadPulse AI. Try typing, testing suggestions, emojis, or pressing the 🎙️ mic button:"
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp"
                 android:layout_marginBottom="14dp" />
@@ -476,7 +476,7 @@
                 android:id="@+id/etTestInput"
                 android:layout_width="match_parent"
                 android:layout_height="100dp"
-                android:hint="Tap here to bring up Wispr Flow Keyboard..."
+                android:hint="Tap here to bring up LeadPulse AI Keyboard..."
                 android:textColorHint="@color/text_muted"
                 android:textColor="@color/text_primary"
                 android:textSize="14sp"
@@ -496,6 +496,82 @@
                 android:textAllCaps="false"
                 android:textSize="13sp"
                 android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- CARD 9: PURE AI & GEMINI LIVE DIAGNOSTICS -->
+        <LinearLayout
+            android:id="@+id/cardAiDiagnostics"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="18dp"
+            android:layout_marginBottom="24dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🧪 Pure AI &amp; Gemini Live Diagnostics"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Inspect raw model latencies, test pure AI execution without offline fallbacks, and verify Gemini Multimodal Live WebSocket connectivity:"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:layout_marginBottom="14dp" />
+
+            <Button
+                android:id="@+id/btnTestPureAiVoice"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:text="🎙️ Test Pure AI Voice (Strict - No Fallback)"
+                android:textColor="#ffffff"
+                android:background="@drawable/bg_btn_primary"
+                android:textAllCaps="false"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="10dp" />
+
+            <Button
+                android:id="@+id/btnTestPureAiCard"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:text="📇 Test Pure AI Contact Card (Strict 6 Fields)"
+                android:textColor="@color/btn_secondary_text"
+                android:background="@drawable/bg_btn_secondary"
+                android:textAllCaps="false"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="10dp" />
+
+            <Button
+                android:id="@+id/btnTestLiveWs"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:text="⚡ Test Gemini Multimodal Live (WebSocket wss://)"
+                android:textColor="@color/btn_secondary_text"
+                android:background="@drawable/bg_btn_secondary"
+                android:textAllCaps="false"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="12dp" />
+
+            <TextView
+                android:id="@+id/tvPureAiTestResult"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_key"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp"
+                android:typeface="monospace"
+                android:padding="12dp"
+                android:lineSpacingExtra="2dp"
+                android:text="Diagnostic Console: Ready. Tap any test button above." />
         </LinearLayout>
 
     </LinearLayout>

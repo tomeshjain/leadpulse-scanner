@@ -16,22 +16,39 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Handles communication with Google Gemini AI API and provides local offline fallback.
+ * Handles communication with Google Gemini AI API with:
+ * - Multi-model fallback cascade (gemini-2.0-flash -> gemini-1.5-flash -> gemini-1.5-pro)
+ * - Strict 6-field card extraction (Name, Designation, Organization, Email, Phone Number, City only; No N/A)
+ * - Pure AI test methods (strict no-fallback mode)
+ * - Model usage indicator (Selected AI Model vs Fallback AI Model vs Offline)
  */
 public class GeminiFlowClient {
 
     private static final String TAG = "GeminiFlowClient";
     private static final String BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
-    private static final ExecutorService executor = Executors.newFixedThreadPool(2);
+    private static final ExecutorService executor = Executors.newFixedThreadPool(3);
     private static final Handler mainHandler = new Handler(Looper.getMainLooper());
+
+    private static final String[] DEFAULT_MODEL_CHAIN = {
+            "gemini-2.0-flash",
+            "gemini-1.5-flash",
+            "gemini-1.5-pro"
+    };
 
     public interface PolishCallback {
         void onSuccess(String polishedText, long latencyMs);
+        void onError(String errorMessage, String fallbackText);
+    }
+
+    public interface PolishResultCallback {
+        void onSuccess(String polishedText, long latencyMs, String modelUsed, boolean isFallback);
         void onError(String errorMessage, String fallbackText);
     }
 
@@ -45,255 +62,123 @@ public class GeminiFlowClient {
         void onError(String errorMessage);
     }
 
+    public interface CardScanResultCallback {
+        void onSuccess(String formattedContactCard, long latencyMs, String modelUsed, boolean isFallback);
+        void onError(String errorMessage);
+    }
+
+    public interface StrictAiCallback {
+        void onSuccess(String result, long latencyMs, String modelUsed);
+        void onError(String errorMessage);
+    }
+
     /**
-     * Refines spoken text using Google Gemini Flash or instant offline rule-based polisher.
+     * Backward-compatible polishSpeech overload.
      */
     public static void polishSpeech(final String rawSpeech,
                                     final String apiKey,
                                     final String modelName,
                                     final FlowMode mode,
                                     final PolishCallback callback) {
+        polishSpeechWithFallback(rawSpeech, apiKey, modelName, mode, new PolishResultCallback() {
+            @Override
+            public void onSuccess(String polishedText, long latencyMs, String modelUsed, boolean isFallback) {
+                callback.onSuccess(polishedText, latencyMs);
+            }
+
+            @Override
+            public void onError(String errorMessage, String fallbackText) {
+                callback.onError(errorMessage, fallbackText);
+            }
+        });
+    }
+
+    /**
+     * Refines spoken text using multi-model fallback cascade.
+     */
+    public static void polishSpeechWithFallback(final String rawSpeech,
+                                                final String apiKey,
+                                                final String preferredModel,
+                                                final FlowMode mode,
+                                                final PolishResultCallback callback) {
         if (rawSpeech == null || rawSpeech.trim().isEmpty()) {
-            mainHandler.post(() -> callback.onSuccess("", 0));
+            mainHandler.post(() -> callback.onSuccess("", 0, "None", false));
             return;
         }
 
         final String cleanInput = rawSpeech.trim();
         final long startTime = System.currentTimeMillis();
 
-        // If no API key is provided, use instant local rule-based polisher
         if (apiKey == null || apiKey.trim().isEmpty()) {
-            final String localResult = ruleBasedPolish(cleanInput, mode);
-            mainHandler.post(() -> callback.onSuccess(localResult, System.currentTimeMillis() - startTime));
+            final String offline = polishOfflineRules(cleanInput, mode);
+            mainHandler.post(() -> callback.onSuccess(offline, System.currentTimeMillis() - startTime, "Offline Rules", false));
             return;
         }
 
         executor.execute(() -> {
-            try {
-                String targetModel = (modelName != null && !modelName.isEmpty()) ? modelName : "gemini-2.0-flash";
-                if (targetModel.startsWith("models/")) {
-                    targetModel = targetModel.substring(7);
-                }
+            List<String> chain = buildModelChain(preferredModel);
+            String lastError = "";
 
-                URL url = new URL(BASE_URL + "/" + targetModel + ":generateContent?key=" + apiKey.trim());
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-Type", "application/json");
-                conn.setConnectTimeout(6000);
-                conn.setReadTimeout(10000);
-                conn.setDoOutput(true);
-
-                // Build Request JSON
-                JSONObject requestJson = new JSONObject();
-                JSONArray contentsArray = new JSONArray();
-                JSONObject contentObj = new JSONObject();
-                contentObj.put("role", "user");
-
-                JSONArray partsArray = new JSONArray();
-                JSONObject partObj = new JSONObject();
-                String promptText = mode.getSystemPrompt() + "\n\nRAW SPOKEN TRANSCRIPT:\n\"" + cleanInput + "\"\n\nPOLISHED OUTPUT:";
-                partObj.put("text", promptText);
-                partsArray.put(partObj);
-
-                contentObj.put("parts", partsArray);
-                contentsArray.put(contentObj);
-                requestJson.put("contents", contentsArray);
-
-                JSONObject genConfig = new JSONObject();
-                genConfig.put("temperature", mode == FlowMode.COMMAND ? 0.3 : 0.1);
-                genConfig.put("maxOutputTokens", 1024);
-                requestJson.put("generationConfig", genConfig);
-
-                byte[] postData = requestJson.toString().getBytes(StandardCharsets.UTF_8);
-                try (OutputStream os = conn.getOutputStream()) {
-                    os.write(postData);
-                    os.flush();
-                }
-
-                int responseCode = conn.getResponseCode();
-                InputStream is = (responseCode >= 200 && responseCode < 300) ? conn.getInputStream() : conn.getErrorStream();
-
-                BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
-                StringBuilder responseSb = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    responseSb.append(line);
-                }
-                reader.close();
-
-                if (responseCode >= 200 && responseCode < 300) {
-                    JSONObject responseJson = new JSONObject(responseSb.toString());
-                    JSONArray candidates = responseJson.optJSONArray("candidates");
-                    if (candidates != null && candidates.length() > 0) {
-                        JSONObject first = candidates.getJSONObject(0);
-                        JSONObject content = first.optJSONObject("content");
-                        if (content != null) {
-                            JSONArray parts = content.optJSONArray("parts");
-                            if (parts != null && parts.length() > 0) {
-                                String text = collapseSpokenDigits(parts.getJSONObject(0).optString("text", "").trim());
-                                final long latency = System.currentTimeMillis() - startTime;
-                                mainHandler.post(() -> callback.onSuccess(text, latency));
-                                return;
-                            }
-                        }
+            for (int i = 0; i < chain.size(); i++) {
+                String model = chain.get(i);
+                boolean isFallback = (i > 0);
+                try {
+                    String prompt = mode.buildPrompt(cleanInput);
+                    String polished = callGeminiGenerateContent(prompt, apiKey.trim(), model);
+                    if (polished != null && !polished.trim().isEmpty()) {
+                        final long latency = System.currentTimeMillis() - startTime;
+                        final String res = polished.trim();
+                        mainHandler.post(() -> callback.onSuccess(res, latency, model, isFallback));
+                        return;
                     }
+                } catch (Exception e) {
+                    lastError = e.getMessage();
+                    Log.w(TAG, "Model " + model + " failed: " + lastError + ". Trying next fallback model...");
                 }
+            }
 
-                // If API returned error or empty candidate, use rule-based fallback
-                Log.w(TAG, "Gemini API HTTP " + responseCode + ", using rule-based fallback: " + responseSb);
-                final String fallback = ruleBasedPolish(cleanInput, mode);
-                final long latency = System.currentTimeMillis() - startTime;
-                mainHandler.post(() -> callback.onSuccess(fallback, latency));
+            // All models failed -> fallback to offline rules
+            final String offline = polishOfflineRules(cleanInput, mode);
+            final String finalErr = lastError;
+            mainHandler.post(() -> callback.onError("AI unavailable (" + finalErr + ")", offline));
+        });
+    }
 
+    /**
+     * Strict Pure AI Voice Test (no fallback).
+     */
+    public static void testPureAiVoice(final String sampleText,
+                                       final String apiKey,
+                                       final String modelName,
+                                       final StrictAiCallback callback) {
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            mainHandler.post(() -> callback.onError("API Key is missing. Paste your Gemini API Key in Settings."));
+            return;
+        }
+
+        final long start = System.currentTimeMillis();
+        final String targetModel = (modelName != null && !modelName.isEmpty()) ? modelName : "gemini-2.0-flash";
+
+        executor.execute(() -> {
+            try {
+                String prompt = "You are an executive dictation assistant. Clean up filler words and format cleanly:\n\n" + sampleText;
+                String result = callGeminiGenerateContent(prompt, apiKey.trim(), targetModel);
+                long latency = System.currentTimeMillis() - start;
+                mainHandler.post(() -> callback.onSuccess(result, latency, targetModel));
             } catch (Exception e) {
-                Log.e(TAG, "Network exception during Gemini polish: " + e.getMessage());
-                final String fallback = ruleBasedPolish(cleanInput, mode);
-                final long latency = System.currentTimeMillis() - startTime;
-                mainHandler.post(() -> callback.onSuccess(fallback, latency));
+                mainHandler.post(() -> callback.onError("Pure AI Error (" + targetModel + "): " + e.getMessage()));
             }
         });
     }
 
     /**
-     * Discovers all supported Gemini models from the user's API key.
-     */
-    public static void fetchAvailableModels(final String apiKey, final ModelsCallback callback) {
-        if (apiKey == null || apiKey.trim().isEmpty()) {
-            callback.onError("Please enter a valid Gemini API key first.");
-            return;
-        }
-
-        executor.execute(() -> {
-            try {
-                URL url = new URL(BASE_URL + "?key=" + apiKey.trim());
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("GET");
-                conn.setConnectTimeout(6000);
-                conn.setReadTimeout(8000);
-
-                int responseCode = conn.getResponseCode();
-                InputStream is = (responseCode >= 200 && responseCode < 300) ? conn.getInputStream() : conn.getErrorStream();
-
-                BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
-                StringBuilder responseSb = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    responseSb.append(line);
-                }
-                reader.close();
-
-                if (responseCode >= 200 && responseCode < 300) {
-                    JSONObject json = new JSONObject(responseSb.toString());
-                    JSONArray modelsArray = json.optJSONArray("models");
-                    List<String> modelList = new ArrayList<>();
-
-                    if (modelsArray != null) {
-                        for (int i = 0; i < modelsArray.length(); i++) {
-                            JSONObject m = modelsArray.getJSONObject(i);
-                            String name = m.optString("name", "").replace("models/", "");
-                            JSONArray methods = m.optJSONArray("supportedGenerationMethods");
-                            boolean canGenerate = false;
-                            if (methods != null) {
-                                for (int j = 0; j < methods.length(); j++) {
-                                    if ("generateContent".equals(methods.optString(j))) {
-                                        canGenerate = true;
-                                        break;
-                                    }
-                                }
-                            }
-                            if (canGenerate && (name.contains("flash") || name.contains("pro") || name.contains("gemini"))) {
-                                modelList.add(name);
-                            }
-                        }
-                    }
-
-                    if (!modelList.contains("gemini-2.0-flash")) {
-                        modelList.add(0, "gemini-2.0-flash");
-                    }
-
-                    mainHandler.post(() -> callback.onSuccess(modelList));
-                } else {
-                    mainHandler.post(() -> callback.onError("Invalid API key or network error (HTTP " + responseCode + ")"));
-                }
-            } catch (Exception e) {
-                mainHandler.post(() -> callback.onError("Connection failed: " + e.getMessage()));
-            }
-        });
-    }
-
-    /**
-     * Instant local rule-based polisher (<5ms execution).
-     */
-    public static String ruleBasedPolish(String rawText, FlowMode mode) {
-        if (rawText == null || rawText.trim().isEmpty()) return "";
-
-        String text = rawText.trim();
-
-        // 1. Strip verbal filler ticks
-        text = text.replaceAll("(?i)\\b(um|uh|erm|er|ah)\\b", "");
-        text = text.replaceAll("(?i)\\b(like)\\s(?=(you know|basically|i mean))", "");
-        text = text.replaceAll("(?i)\\b(you know|basically|so yeah|i mean)\\b", "");
-        text = text.replaceAll("(?i)\\b(kind of|sort of)\\b(?=\\s(like|um))", "");
-
-        // 2. Remove duplicate words (stutters: "I I", "the the")
-        text = text.replaceAll("(?i)\\b(\\w+)\\s+\\1\\b", "$1");
-
-        // 2b. Collapse spaced digits (e.g. phone numbers, OTPs: "9 8 7 6" -> "9876")
-        text = collapseSpokenDigits(text);
-
-        // 3. Normalize whitespace
-        text = text.replaceAll("\\s+", " ").trim();
-
-        // 4. Capitalization
-        if (!text.isEmpty()) {
-            text = Character.toUpperCase(text.charAt(0)) + (text.length() > 1 ? text.substring(1) : "");
-            text = text.replaceAll("([.?!])\\s*([a-z])", "$1 $2".toUpperCase());
-            text = text.replaceAll("\\bi\\b", "I");
-        }
-
-        // 5. Inferred punctuation
-        if (!text.isEmpty() && !text.matches(".*[.?!]$")) {
-            boolean isQuestion = text.matches("(?i)^(who|what|where|when|why|how|can|could|would|will|is|are|do|does|did)\\b.*");
-            text += isQuestion ? "?" : ".";
-        }
-
-        // Mode specific touches
-        if (mode == FlowMode.EMAIL) {
-            text = "Hi,\n\n" + text + "\n\nBest regards,";
-        } else if (mode == FlowMode.NOTES) {
-            text = "# Notes\n• " + text;
-        }
-
-        return text;
-    }
-
-    /**
-     * Collapses spoken consecutive digits (e.g. phone numbers, OTPs, PINs) into continuous numbers without spaces.
-     */
-    public static String collapseSpokenDigits(String text) {
-        if (text == null || text.isEmpty()) return "";
-
-        // Convert spoken single-digit words into numbers
-        String[] digitWords = {"zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"};
-        for (int i = 0; i < digitWords.length; i++) {
-            text = text.replaceAll("(?i)\\b" + digitWords[i] + "\\b", String.valueOf(i));
-        }
-
-        // Collapse sequences of digits separated by whitespace: "9 8 7 6" -> "9876"
-        for (int i = 0; i < 6; i++) {
-            text = text.replaceAll("(\\b\\d)\\s+(?=\\d\\b)", "$1");
-            text = text.replaceAll("(\\d)\\s+(\\d)", "$1$2");
-        }
-        return text;
-    }
-
-    /**
-     * Extracts structured business / contact card information from a JPEG image using Gemini Vision API.
+     * Extracts card details with multi-model fallback chain.
+     * Enforces STRICT 6-field output: Name, Designation, Organization, Email, Phone Number, City only. No N/A.
      */
     public static void scanContactCard(final byte[] jpegBytes,
                                        final String apiKey,
                                        final String modelName,
-                                       final CardScanCallback callback) {
+                                       final CardScanResultCallback callback) {
         if (jpegBytes == null || jpegBytes.length == 0) {
             mainHandler.post(() -> callback.onError("No image data provided for contact card scanning"));
             return;
@@ -302,339 +187,524 @@ public class GeminiFlowClient {
         final long startTime = System.currentTimeMillis();
 
         if (apiKey == null || apiKey.trim().isEmpty()) {
-            // Offline fallback template if no API key is configured
-            final String fallbackCard = "📇 CONTACT CARD\n" +
-                    "👤 Name: [Scanned Contact]\n" +
-                    "💼 Title: Business Executive\n" +
-                    "🏢 Company: Organization\n" +
-                    "📞 Phone: +1 (555) 019-2834\n" +
-                    "✉️ Email: contact@company.com\n" +
-                    "🌐 Website: www.company.com\n" +
-                    "📍 Address: 100 Innovation Way\n" +
-                    "📝 Notes: Captured via Wispr Card Scanner (Set Gemini API Key for AI OCR)";
-            mainHandler.post(() -> callback.onSuccess(fallbackCard, System.currentTimeMillis() - startTime));
+            mainHandler.post(() -> callback.onError("No API key configured for Gemini Vision"));
             return;
         }
 
         executor.execute(() -> {
-            try {
-                String targetModel = (modelName != null && !modelName.isEmpty()) ? modelName : "gemini-2.0-flash";
-                if (targetModel.startsWith("models/")) {
-                    targetModel = targetModel.substring(7);
-                }
+            List<String> chain = buildModelChain(modelName);
+            String lastError = "";
 
-                URL url = new URL(BASE_URL + "/" + targetModel + ":generateContent?key=" + apiKey.trim());
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-Type", "application/json");
-                conn.setConnectTimeout(10000);
-                conn.setReadTimeout(15000);
-                conn.setDoOutput(true);
-
-                // Encode JPEG bytes to base64
-                String base64Image = Base64.encodeToString(jpegBytes, Base64.NO_WRAP);
-
-                // Build Multimodal Prompt
-                JSONObject requestJson = new JSONObject();
-                JSONArray contentsArray = new JSONArray();
-                JSONObject contentObj = new JSONObject();
-                contentObj.put("role", "user");
-
-                JSONArray partsArray = new JSONArray();
-
-                // 1. Image part
-                JSONObject imagePart = new JSONObject();
-                JSONObject inlineData = new JSONObject();
-                inlineData.put("mime_type", "image/jpeg");
-                inlineData.put("data", base64Image);
-                imagePart.put("inline_data", inlineData);
-                partsArray.put(imagePart);
-
-                // 2. Text prompt part
-                JSONObject textPart = new JSONObject();
-                String promptText = "You are an expert OCR business card and contact card scanner.\n" +
-                        "Carefully read all visible text in this business card image and extract all contact details.\n" +
-                        "Format the output strictly as follows:\n\n" +
-                        "📇 CONTACT CARD\n" +
-                        "👤 Name: [Full Name]\n" +
-                        "💼 Title: [Designation / Current Role]\n" +
-                        "🏢 Company: [Company or Organization Name]\n" +
-                        "📞 Phone: [Phone Number(s)]\n" +
-                        "✉️ Email: [Email Address(es)]\n" +
-                        "🔗 LinkedIn: [LinkedIn Profile URL or handle]\n" +
-                        "🏛️ Past Work / Experience: [Past companies, previous roles, or background if mentioned]\n" +
-                        "🌐 Website: [Website URL]\n" +
-                        "📍 Address: [Physical Location or Address]\n" +
-                        "📝 Notes: [Services, tagline, or other details]\n\n" +
-                        "If a field is not on the card, write N/A for that field. Keep it clean and structured.";
-                textPart.put("text", promptText);
-                partsArray.put(textPart);
-
-                contentObj.put("parts", partsArray);
-                contentsArray.put(contentObj);
-                requestJson.put("contents", contentsArray);
-
-                JSONObject genConfig = new JSONObject();
-                genConfig.put("temperature", 0.1);
-                genConfig.put("maxOutputTokens", 1024);
-                requestJson.put("generationConfig", genConfig);
-
-                byte[] postData = requestJson.toString().getBytes(StandardCharsets.UTF_8);
-                try (OutputStream os = conn.getOutputStream()) {
-                    os.write(postData);
-                    os.flush();
-                }
-
-                int responseCode = conn.getResponseCode();
-                InputStream is = (responseCode >= 200 && responseCode < 300) ? conn.getInputStream() : conn.getErrorStream();
-
-                BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
-                StringBuilder responseSb = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    responseSb.append(line);
-                }
-                reader.close();
-
-                if (responseCode >= 200 && responseCode < 300) {
-                    JSONObject responseJson = new JSONObject(responseSb.toString());
-                    JSONArray candidates = responseJson.optJSONArray("candidates");
-                    if (candidates != null && candidates.length() > 0) {
-                        JSONObject firstCandidate = candidates.getJSONObject(0);
-                        JSONObject content = firstCandidate.optJSONObject("content");
-                        if (content != null) {
-                            JSONArray respParts = content.optJSONArray("parts");
-                            if (respParts != null && respParts.length() > 0) {
-                                String extractedCard = respParts.getJSONObject(0).optString("text", "").trim();
-                                final long latency = System.currentTimeMillis() - startTime;
-                                mainHandler.post(() -> callback.onSuccess(extractedCard, latency));
-                                return;
-                            }
-                        }
+            for (int i = 0; i < chain.size(); i++) {
+                String model = chain.get(i);
+                boolean isFallback = (i > 0);
+                try {
+                    String rawResult = callGeminiVision(jpegBytes, apiKey.trim(), model);
+                    String cleaned = cleanCardOutput(rawResult);
+                    if (cleaned != null && !cleaned.isEmpty()) {
+                        final long latency = System.currentTimeMillis() - startTime;
+                        mainHandler.post(() -> callback.onSuccess(cleaned, latency, model, isFallback));
+                        return;
                     }
-                    mainHandler.post(() -> callback.onError("No text returned by Gemini"));
-                } else {
-                    Log.e(TAG, "Gemini Vision error " + responseCode + ": " + responseSb);
-                    mainHandler.post(() -> callback.onError("API Error " + responseCode + ": " + responseSb));
+                } catch (Exception e) {
+                    lastError = e.getMessage();
+                    Log.w(TAG, "Vision model " + model + " failed: " + lastError);
                 }
-            } catch (Exception e) {
-                Log.e(TAG, "Exception scanning card", e);
-                mainHandler.post(() -> callback.onError("Scan error: " + e.getMessage()));
+            }
+
+            final String err = lastError;
+            mainHandler.post(() -> callback.onError("Gemini Vision AI failed (" + err + ")"));
+        });
+    }
+
+    public static void scanContactCard(final byte[] jpegBytes,
+                                       final String apiKey,
+                                       final String modelName,
+                                       final CardScanCallback callback) {
+        scanContactCard(jpegBytes, apiKey, modelName, new CardScanResultCallback() {
+            @Override
+            public void onSuccess(String formattedContactCard, long latencyMs, String modelUsed, boolean isFallback) {
+                callback.onSuccess(formattedContactCard, latencyMs);
+            }
+
+            @Override
+            public void onError(String errorMessage) {
+                callback.onError(errorMessage);
             }
         });
     }
 
     /**
-     * Formats raw text extracted from on-device local OCR using Gemini text model.
-     * Uses ultra low latency gemini-2.0-flash with unlimited free tier requests.
+     * Strict Pure AI Vision Card Test (no fallback).
+     */
+    public static void testPureAiVision(final byte[] jpegBytes,
+                                        final String apiKey,
+                                        final String modelName,
+                                        final StrictAiCallback callback) {
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            mainHandler.post(() -> callback.onError("API Key is missing."));
+            return;
+        }
+
+        final long start = System.currentTimeMillis();
+        final String targetModel = (modelName != null && !modelName.isEmpty()) ? modelName : "gemini-2.0-flash";
+
+        executor.execute(() -> {
+            try {
+                String raw = callGeminiVision(jpegBytes, apiKey.trim(), targetModel);
+                String cleaned = cleanCardOutput(raw);
+                long latency = System.currentTimeMillis() - start;
+                mainHandler.post(() -> callback.onSuccess(cleaned, latency, targetModel));
+            } catch (Exception e) {
+                mainHandler.post(() -> callback.onError("Pure AI Vision Error (" + targetModel + "): " + e.getMessage()));
+            }
+        });
+    }
+
+    /**
+     * Formats raw on-device OCR text using Gemini with strict 6-field enforcement.
      */
     public static void formatExtractedCardText(final String rawOcrText,
                                                final String apiKey,
                                                final String modelName,
-                                               final CardScanCallback callback) {
+                                               final CardScanResultCallback callback) {
         if (rawOcrText == null || rawOcrText.trim().isEmpty()) {
-            mainHandler.post(() -> callback.onError("No OCR text to format"));
+            mainHandler.post(() -> callback.onSuccess("", 0, "None", false));
             return;
         }
 
         final long startTime = System.currentTimeMillis();
 
         if (apiKey == null || apiKey.trim().isEmpty()) {
-            final String fallbackCard = parseRawOcrLocal(rawOcrText);
-            mainHandler.post(() -> callback.onSuccess(fallbackCard, System.currentTimeMillis() - startTime));
+            final String fallback = cleanCardOutput(parseRawOcrLocal(rawOcrText));
+            mainHandler.post(() -> callback.onSuccess(fallback, System.currentTimeMillis() - startTime, "Offline OCR Regex", false));
             return;
         }
 
         executor.execute(() -> {
-            try {
-                String targetModel = (modelName != null && !modelName.isEmpty()) ? modelName : "gemini-2.0-flash";
-                if (targetModel.startsWith("models/")) {
-                    targetModel = targetModel.substring(7);
-                }
+            List<String> chain = buildModelChain(modelName);
+            for (int i = 0; i < chain.size(); i++) {
+                String model = chain.get(i);
+                boolean isFallback = (i > 0);
+                try {
+                    String prompt = "You are an expert contact card parser.\n" +
+                            "Here is raw OCR text extracted from a business card:\n" +
+                            "\"\"\"\n" + rawOcrText + "\n\"\"\"\n\n" +
+                            "Extract ONLY the following fields if present in the text:\n" +
+                            "Name: [Full Name]\n" +
+                            "Designation: [Job Title or Role]\n" +
+                            "Organization: [Company or Business Name]\n" +
+                            "Email: [Email Address]\n" +
+                            "Phone Number: [Phone Number]\n" +
+                            "City: [City Name]\n\n" +
+                            "CRITICAL RULES:\n" +
+                            "- Output ONLY these 6 fields. Do NOT output any other field.\n" +
+                            "- If any field is missing or not mentioned, DO NOT output that line at all.\n" +
+                            "- Absolutely NO N/A, None, or empty lines.\n" +
+                            "- Plain text output only.";
 
-                URL url = new URL(BASE_URL + "/" + targetModel + ":generateContent?key=" + apiKey.trim());
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-Type", "application/json");
-                conn.setConnectTimeout(8000);
-                conn.setReadTimeout(12000);
-                conn.setDoOutput(true);
-
-                JSONObject requestJson = new JSONObject();
-                JSONArray contentsArray = new JSONArray();
-                JSONObject contentObj = new JSONObject();
-                contentObj.put("role", "user");
-                JSONArray partsArray = new JSONArray();
-
-                JSONObject textPart = new JSONObject();
-                String promptText = "You are an expert contact card parser.\n" +
-                        "Here is raw OCR text scanned from a business card:\n\"\"\"\n" + rawOcrText + "\n\"\"\"\n" +
-                        "Extract all contact details, including LinkedIn profile and past work / prior experience if present.\n" +
-                        "Format strictly as follows:\n\n" +
-                        "📇 CONTACT CARD\n" +
-                        "👤 Name: [Full Name]\n" +
-                        "💼 Title: [Designation / Current Role]\n" +
-                        "🏢 Company: [Company or Organization Name]\n" +
-                        "📞 Phone: [Phone Number(s)]\n" +
-                        "✉️ Email: [Email Address(es)]\n" +
-                        "🔗 LinkedIn: [LinkedIn Profile URL or handle]\n" +
-                        "🏛️ Past Work / Experience: [Past companies, previous roles, or background if mentioned]\n" +
-                        "🌐 Website: [Website URL]\n" +
-                        "📍 Address: [Physical Location or Address]\n" +
-                        "📝 Notes: [Services, tagline, or other details]\n\n" +
-                        "If a field is not present in the text, write N/A for that field. Keep it clean and structured.";
-                textPart.put("text", promptText);
-                partsArray.put(textPart);
-
-                contentObj.put("parts", partsArray);
-                contentsArray.put(contentObj);
-                requestJson.put("contents", contentsArray);
-
-                JSONObject genConfig = new JSONObject();
-                genConfig.put("temperature", 0.1);
-                genConfig.put("maxOutputTokens", 512);
-                requestJson.put("generationConfig", genConfig);
-
-                byte[] postData = requestJson.toString().getBytes(StandardCharsets.UTF_8);
-                try (OutputStream os = conn.getOutputStream()) {
-                    os.write(postData);
-                    os.flush();
-                }
-
-                int responseCode = conn.getResponseCode();
-                InputStream is = (responseCode >= 200 && responseCode < 300) ? conn.getInputStream() : conn.getErrorStream();
-                BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
-                StringBuilder responseSb = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    responseSb.append(line);
-                }
-                reader.close();
-
-                if (responseCode >= 200 && responseCode < 300) {
-                    JSONObject responseJson = new JSONObject(responseSb.toString());
-                    JSONArray candidates = responseJson.optJSONArray("candidates");
-                    if (candidates != null && candidates.length() > 0) {
-                        JSONObject first = candidates.getJSONObject(0);
-                        JSONObject content = first.optJSONObject("content");
-                        if (content != null) {
-                            JSONArray respParts = content.optJSONArray("parts");
-                            if (respParts != null && respParts.length() > 0) {
-                                String text = respParts.getJSONObject(0).optString("text", "").trim();
-                                final long latency = System.currentTimeMillis() - startTime;
-                                mainHandler.post(() -> callback.onSuccess(text, latency));
-                                return;
-                            }
-                        }
+                    String formatted = callGeminiGenerateContent(prompt, apiKey.trim(), model);
+                    String cleaned = cleanCardOutput(formatted);
+                    if (cleaned != null && !cleaned.isEmpty()) {
+                        final long latency = System.currentTimeMillis() - startTime;
+                        mainHandler.post(() -> callback.onSuccess(cleaned, latency, model, isFallback));
+                        return;
                     }
-                }
+                } catch (Exception ignored) {}
+            }
 
-                // Fallback to local regex formatting
-                final String fallback = parseRawOcrLocal(rawOcrText);
-                final long latency = System.currentTimeMillis() - startTime;
-                mainHandler.post(() -> callback.onSuccess(fallback, latency));
-            } catch (Exception e) {
-                final String fallback = parseRawOcrLocal(rawOcrText);
-                final long latency = System.currentTimeMillis() - startTime;
-                mainHandler.post(() -> callback.onSuccess(fallback, latency));
+            final String fallback = cleanCardOutput(parseRawOcrLocal(rawOcrText));
+            final long latency = System.currentTimeMillis() - startTime;
+            mainHandler.post(() -> callback.onSuccess(fallback, latency, "Offline Local OCR", false));
+        });
+    }
+
+    public static void formatExtractedCardText(final String rawOcrText,
+                                               final String apiKey,
+                                               final String modelName,
+                                               final CardScanCallback callback) {
+        formatExtractedCardText(rawOcrText, apiKey, modelName, new CardScanResultCallback() {
+            @Override
+            public void onSuccess(String formattedContactCard, long latencyMs, String modelUsed, boolean isFallback) {
+                callback.onSuccess(formattedContactCard, latencyMs);
+            }
+
+            @Override
+            public void onError(String errorMessage) {
+                callback.onError(errorMessage);
             }
         });
     }
 
     /**
-     * Intelligent local regex fallback to structure raw OCR text without network/API key.
+     * Strict 6-Field Sanitizer:
+     * Retains ONLY Name, Designation, Organization, Email, Phone Number, City.
+     * Completely eliminates any field that is N/A, None, not available, or empty.
+     */
+    public static String cleanCardOutput(String text) {
+        if (text == null || text.trim().isEmpty()) return "";
+
+        StringBuilder sb = new StringBuilder();
+        String[] lines = text.split("\n");
+
+        for (String raw : lines) {
+            String line = raw.trim();
+            if (line.isEmpty()) continue;
+            if (line.contains("CONTACT CARD") || line.contains("---") || line.startsWith("#")) continue;
+
+            String lower = line.toLowerCase(Locale.US);
+            String field = null;
+            String val = null;
+
+            if (lower.startsWith("name:") || lower.startsWith("👤 name:")) {
+                field = "Name";
+                val = line.substring(line.indexOf(':') + 1).trim();
+            } else if (lower.startsWith("designation:") || lower.startsWith("title:") || lower.startsWith("job title:") ||
+                    lower.startsWith("💼 title:") || lower.startsWith("💼 designation:")) {
+                field = "Designation";
+                val = line.substring(line.indexOf(':') + 1).trim();
+            } else if (lower.startsWith("organization:") || lower.startsWith("company:") || lower.startsWith("company name:") ||
+                    lower.startsWith("🏢 company:") || lower.startsWith("🏢 organization:")) {
+                field = "Organization";
+                val = line.substring(line.indexOf(':') + 1).trim();
+            } else if (lower.startsWith("email:") || lower.startsWith("email address:") || lower.startsWith("✉️ email:")) {
+                field = "Email";
+                val = line.substring(line.indexOf(':') + 1).trim();
+            } else if (lower.startsWith("phone number:") || lower.startsWith("phone:") || lower.startsWith("mobile:") ||
+                    lower.startsWith("tel:") || lower.startsWith("📞 phone:")) {
+                field = "Phone Number";
+                val = line.substring(line.indexOf(':') + 1).trim();
+            } else if (lower.startsWith("city:") || lower.startsWith("location:") || lower.startsWith("📍 city:")) {
+                field = "City";
+                val = line.substring(line.indexOf(':') + 1).trim();
+            }
+
+            if (field != null && val != null) {
+                val = val.trim();
+                String valLower = val.toLowerCase(Locale.US);
+                if (!val.isEmpty() && !valLower.equals("n/a") && !valLower.equals("na") &&
+                        !valLower.equals("none") && !valLower.equals("not available") &&
+                        !valLower.equals("not specified") && !valLower.equals("[scanned contact]") &&
+                        !valLower.equals("null") && !valLower.equals("-") && !valLower.equals("unknown")) {
+                    sb.append(field).append(": ").append(val).append("\n");
+                }
+            }
+        }
+        return sb.toString().trim();
+    }
+
+    /**
+     * Local regex fallback honoring the strict 6-field rule.
      */
     public static String parseRawOcrLocal(String rawText) {
-        if (rawText == null || rawText.trim().isEmpty()) {
-            return "📇 CONTACT CARD\n" +
-                    "👤 Name: [Scanned Contact]\n" +
-                    "💼 Title: Business Executive\n" +
-                    "🏢 Company: Organization\n" +
-                    "📞 Phone: N/A\n" +
-                    "✉️ Email: N/A\n" +
-                    "🔗 LinkedIn: N/A\n" +
-                    "🏛️ Past Work / Experience: N/A\n" +
-                    "🌐 Website: N/A\n" +
-                    "📍 Address: N/A\n" +
-                    "📝 Notes: Captured via Local OCR";
-        }
+        if (rawText == null || rawText.trim().isEmpty()) return "";
 
         String name = "";
-        String title = "";
-        String company = "";
+        String designation = "";
+        String organization = "";
         String phone = "";
         String email = "";
-        String linkedin = "";
-        String pastWork = "";
-        String website = "";
-        String address = "";
+        String city = "";
 
         String[] lines = rawText.split("\n");
         java.util.regex.Pattern emailPattern = java.util.regex.Pattern.compile("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}");
         java.util.regex.Pattern phonePattern = java.util.regex.Pattern.compile("(\\+?[0-9]{1,4}[-\\s]?)?(\\(?\\d{2,4}\\)?[-\\s]?)?[\\d\\s-]{7,15}");
-        java.util.regex.Pattern linkedinPattern = java.util.regex.Pattern.compile("(?:https?:\\/\\/)?(?:www\\.)?linkedin\\.com\\/(?:in\\/)?([a-zA-Z0-9_-]+)", java.util.regex.Pattern.CASE_INSENSITIVE);
-        java.util.regex.Pattern webPattern = java.util.regex.Pattern.compile("(https?:\\/\\/|www\\.)[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}");
 
-        List<String> remainingLines = new ArrayList<>();
+        List<String> remaining = new ArrayList<>();
 
         for (String rawLine : lines) {
             String line = rawLine.trim();
             if (line.isEmpty()) continue;
 
-            // Check Email
             java.util.regex.Matcher em = emailPattern.matcher(line);
             if (em.find() && email.isEmpty()) {
                 email = em.group();
                 continue;
             }
 
-            // Check LinkedIn
-            java.util.regex.Matcher lm = linkedinPattern.matcher(line);
-            if (lm.find() && linkedin.isEmpty()) {
-                linkedin = lm.group();
-                continue;
-            }
-
-            // Check Phone
             java.util.regex.Matcher pm = phonePattern.matcher(line);
             if (pm.find() && phone.isEmpty() && line.replaceAll("[^0-9]", "").length() >= 7) {
                 phone = pm.group().trim();
                 continue;
             }
 
-            // Check Website
-            java.util.regex.Matcher wm = webPattern.matcher(line);
-            if (wm.find() && website.isEmpty() && !line.contains("linkedin.com")) {
-                website = wm.group();
-                continue;
+            if (line.toLowerCase(Locale.US).contains("city") || line.matches("(?i).*(san francisco|new york|chicago|london|tokyo|paris|berlin|bangalore|mumbai|delhi|dubai|toronto|sydney).*")) {
+                if (city.isEmpty()) {
+                    city = line.replaceAll("(?i)^(city|location)[:\\s]*", "").trim();
+                    continue;
+                }
             }
 
-            // Check Past Work / Experience
-            if (line.toLowerCase().contains("ex-") || line.toLowerCase().contains("previously") ||
-                line.toLowerCase().contains("former") || line.toLowerCase().contains("past work")) {
-                pastWork += (pastWork.isEmpty() ? "" : "; ") + line;
-                continue;
-            }
-
-            remainingLines.add(line);
+            remaining.add(line);
         }
 
-        // Infer Name, Title, Company from remaining lines
-        if (remainingLines.size() > 0) name = remainingLines.get(0);
-        if (remainingLines.size() > 1) title = remainingLines.get(1);
-        if (remainingLines.size() > 2) company = remainingLines.get(2);
-        if (remainingLines.size() > 3) address = remainingLines.get(3);
+        if (remaining.size() > 0) name = remaining.get(0);
+        if (remaining.size() > 1) designation = remaining.get(1);
+        if (remaining.size() > 2) organization = remaining.get(2);
 
-        return "📇 CONTACT CARD\n" +
-                "👤 Name: " + (name.isEmpty() ? "N/A" : name) + "\n" +
-                "💼 Title: " + (title.isEmpty() ? "N/A" : title) + "\n" +
-                "🏢 Company: " + (company.isEmpty() ? "N/A" : company) + "\n" +
-                "📞 Phone: " + (phone.isEmpty() ? "N/A" : phone) + "\n" +
-                "✉️ Email: " + (email.isEmpty() ? "N/A" : email) + "\n" +
-                "🔗 LinkedIn: " + (linkedin.isEmpty() ? "N/A" : linkedin) + "\n" +
-                "🏛️ Past Work / Experience: " + (pastWork.isEmpty() ? "N/A" : pastWork) + "\n" +
-                "🌐 Website: " + (website.isEmpty() ? "N/A" : website) + "\n" +
-                "📍 Address: " + (address.isEmpty() ? "N/A" : address) + "\n" +
-                "📝 Notes: Extracted via On-Device Local OCR";
+        StringBuilder sb = new StringBuilder();
+        if (!name.isEmpty()) sb.append("Name: ").append(name).append("\n");
+        if (!designation.isEmpty()) sb.append("Designation: ").append(designation).append("\n");
+        if (!organization.isEmpty()) sb.append("Organization: ").append(organization).append("\n");
+        if (!email.isEmpty()) sb.append("Email: ").append(email).append("\n");
+        if (!phone.isEmpty()) sb.append("Phone Number: ").append(phone).append("\n");
+        if (!city.isEmpty()) sb.append("City: ").append(city).append("\n");
+
+        return sb.toString().trim();
+    }
+
+    private static String callGeminiGenerateContent(String prompt, String apiKey, String modelName) throws Exception {
+        String cleanModel = modelName.startsWith("models/") ? modelName.substring(7) : modelName;
+        URL url = new URL(BASE_URL + "/" + cleanModel + ":generateContent?key=" + apiKey);
+
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/json");
+        conn.setConnectTimeout(8000);
+        conn.setReadTimeout(12000);
+        conn.setDoOutput(true);
+
+        JSONObject requestJson = new JSONObject();
+        JSONArray contentsArray = new JSONArray();
+        JSONObject contentObj = new JSONObject();
+        contentObj.put("role", "user");
+
+        JSONArray partsArray = new JSONArray();
+        JSONObject partObj = new JSONObject();
+        partObj.put("text", prompt);
+        partsArray.put(partObj);
+
+        contentObj.put("parts", partsArray);
+        contentsArray.put(contentObj);
+        requestJson.put("contents", contentsArray);
+
+        JSONObject genConfig = new JSONObject();
+        genConfig.put("temperature", 0.2);
+        genConfig.put("maxOutputTokens", 512);
+        requestJson.put("generationConfig", genConfig);
+
+        OutputStream os = conn.getOutputStream();
+        os.write(requestJson.toString().getBytes(StandardCharsets.UTF_8));
+        os.flush();
+        os.close();
+
+        int responseCode = conn.getResponseCode();
+        if (responseCode != HttpURLConnection.HTTP_OK) {
+            String err = readStream(conn.getErrorStream());
+            throw new Exception("HTTP " + responseCode + ": " + err);
+        }
+
+        String responseBody = readStream(conn.getInputStream());
+        JSONObject respJson = new JSONObject(responseBody);
+        JSONArray candidates = respJson.optJSONArray("candidates");
+        if (candidates != null && candidates.length() > 0) {
+            JSONObject candidate = candidates.getJSONObject(0);
+            JSONObject content = candidate.optJSONObject("content");
+            if (content != null) {
+                JSONArray respParts = content.optJSONArray("parts");
+                if (respParts != null && respParts.length() > 0) {
+                    return respParts.getJSONObject(0).optString("text", "").trim();
+                }
+            }
+        }
+        throw new Exception("Empty response from " + cleanModel);
+    }
+
+    private static String callGeminiVision(byte[] jpegBytes, String apiKey, String modelName) throws Exception {
+        String cleanModel = modelName.startsWith("models/") ? modelName.substring(7) : modelName;
+        URL url = new URL(BASE_URL + "/" + cleanModel + ":generateContent?key=" + apiKey);
+
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/json");
+        conn.setConnectTimeout(10000);
+        conn.setReadTimeout(18000);
+        conn.setDoOutput(true);
+
+        String base64Image = Base64.encodeToString(jpegBytes, Base64.NO_WRAP);
+
+        JSONObject requestJson = new JSONObject();
+        JSONArray contentsArray = new JSONArray();
+        JSONObject contentObj = new JSONObject();
+        contentObj.put("role", "user");
+
+        JSONArray partsArray = new JSONArray();
+
+        JSONObject imagePart = new JSONObject();
+        JSONObject inlineData = new JSONObject();
+        inlineData.put("mime_type", "image/jpeg");
+        inlineData.put("data", base64Image);
+        imagePart.put("inline_data", inlineData);
+        partsArray.put(imagePart);
+
+        JSONObject textPart = new JSONObject();
+        String prompt = "You are an expert business card scanner.\n" +
+                "Extract and output ONLY the following fields if present on this card:\n" +
+                "Name: [Full Name]\n" +
+                "Designation: [Job Title or Role]\n" +
+                "Organization: [Company or Business Name]\n" +
+                "Email: [Email Address]\n" +
+                "Phone Number: [Phone Number]\n" +
+                "City: [City Name]\n\n" +
+                "RULES:\n" +
+                "- ONLY these 6 fields. Do NOT output any other field.\n" +
+                "- If a field is not available or missing, DO NOT include that line. Omit it completely.\n" +
+                "- Do NOT write N/A, None, or empty lines.\n" +
+                "- Plain text output only.";
+        textPart.put("text", prompt);
+        partsArray.put(textPart);
+
+        contentObj.put("parts", partsArray);
+        contentsArray.put(contentObj);
+        requestJson.put("contents", contentsArray);
+
+        JSONObject genConfig = new JSONObject();
+        genConfig.put("temperature", 0.1);
+        genConfig.put("maxOutputTokens", 512);
+        requestJson.put("generationConfig", genConfig);
+
+        OutputStream os = conn.getOutputStream();
+        os.write(requestJson.toString().getBytes(StandardCharsets.UTF_8));
+        os.flush();
+        os.close();
+
+        int responseCode = conn.getResponseCode();
+        if (responseCode != HttpURLConnection.HTTP_OK) {
+            String err = readStream(conn.getErrorStream());
+            throw new Exception("HTTP " + responseCode + ": " + err);
+        }
+
+        String responseBody = readStream(conn.getInputStream());
+        JSONObject respJson = new JSONObject(responseBody);
+        JSONArray candidates = respJson.optJSONArray("candidates");
+        if (candidates != null && candidates.length() > 0) {
+            JSONObject candidate = candidates.getJSONObject(0);
+            JSONObject content = candidate.optJSONObject("content");
+            if (content != null) {
+                JSONArray respParts = content.optJSONArray("parts");
+                if (respParts != null && respParts.length() > 0) {
+                    return respParts.getJSONObject(0).optString("text", "").trim();
+                }
+            }
+        }
+        throw new Exception("No text returned from Vision AI");
+    }
+
+    private static List<String> buildModelChain(String preferredModel) {
+        List<String> chain = new ArrayList<>();
+        if (preferredModel != null && !preferredModel.trim().isEmpty()) {
+            chain.add(preferredModel.trim());
+        }
+        for (String m : DEFAULT_MODEL_CHAIN) {
+            if (!chain.contains(m)) {
+                chain.add(m);
+            }
+        }
+        return chain;
+    }
+
+    public static void fetchAvailableModels(final String apiKey, final ModelsCallback callback) {
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            mainHandler.post(() -> callback.onError("API Key is empty"));
+            return;
+        }
+
+        executor.execute(() -> {
+            try {
+                URL url = new URL(BASE_URL + "?key=" + apiKey.trim());
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("GET");
+                conn.setConnectTimeout(8000);
+                conn.setReadTimeout(10000);
+
+                int responseCode = conn.getResponseCode();
+                if (responseCode != HttpURLConnection.HTTP_OK) {
+                    String err = readStream(conn.getErrorStream());
+                    mainHandler.post(() -> callback.onError("HTTP " + responseCode + ": " + err));
+                    return;
+                }
+
+                String responseBody = readStream(conn.getInputStream());
+                JSONObject respJson = new JSONObject(responseBody);
+                JSONArray modelsArray = respJson.optJSONArray("models");
+                List<String> modelNames = new ArrayList<>();
+
+                if (modelsArray != null) {
+                    for (int i = 0; i < modelsArray.length(); i++) {
+                        JSONObject m = modelsArray.getJSONObject(i);
+                        String name = m.optString("name", "");
+                        JSONArray methods = m.optJSONArray("supportedGenerationMethods");
+                        boolean canGenerate = false;
+                        if (methods != null) {
+                            for (int j = 0; j < methods.length(); j++) {
+                                if ("generateContent".equals(methods.getString(j))) {
+                                    canGenerate = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (canGenerate && (name.contains("flash") || name.contains("pro") || name.contains("gemini-2.0"))) {
+                            modelNames.add(name.replace("models/", ""));
+                        }
+                    }
+                }
+
+                if (!modelNames.contains("gemini-2.0-flash")) {
+                    modelNames.add(0, "gemini-2.0-flash");
+                }
+                if (!modelNames.contains("gemini-1.5-flash")) {
+                    modelNames.add("gemini-1.5-flash");
+                }
+                if (!modelNames.contains("gemini-1.5-pro")) {
+                    modelNames.add("gemini-1.5-pro");
+                }
+
+                mainHandler.post(() -> callback.onSuccess(modelNames));
+            } catch (Exception e) {
+                mainHandler.post(() -> callback.onError("Error fetching models: " + e.getMessage()));
+            }
+        });
+    }
+
+    public static String polishOfflineRules(String text, FlowMode mode) {
+        if (text == null) return "";
+        text = text.replaceAll("(?i)\\b(um|uh|erm|like|you know|sort of|kind of)\\b", "");
+        text = text.replaceAll("\\s+", " ").trim();
+        text = collapseSpokenDigits(text);
+        if (!text.isEmpty()) {
+            text = Character.toUpperCase(text.charAt(0)) + (text.length() > 1 ? text.substring(1) : "");
+            text = text.replaceAll("([.?!])\\s*([a-z])", "$1 $2".toUpperCase());
+            text = text.replaceAll("\\bi\\b", "I");
+        }
+        if (!text.isEmpty() && !text.matches(".*[.?!]$")) {
+            boolean isQuestion = text.matches("(?i)^(who|what|where|when|why|how|can|could|would|will|is|are|do|does|did)\\b.*");
+            text += isQuestion ? "?" : ".";
+        }
+        return text;
+    }
+
+    public static String collapseSpokenDigits(String text) {
+        if (text == null || text.isEmpty()) return "";
+        String[] digitWords = {"zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"};
+        for (int i = 0; i < digitWords.length; i++) {
+            text = text.replaceAll("(?i)\\b" + digitWords[i] + "\\b", String.valueOf(i));
+        }
+        for (int i = 0; i < 6; i++) {
+            text = text.replaceAll("(\\b\\d)\\s+(?=\\d\\b)", "$1");
+            text = text.replaceAll("(\\d)\\s+(\\d)", "$1$2");
+        }
+        return text;
+    }
+
+    private static String readStream(InputStream is) throws Exception {
+        if (is == null) return "";
+        BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
+        StringBuilder sb = new StringBuilder();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            sb.append(line).append("\n");
+        }
+        reader.close();
+        return sb.toString().trim();
     }
 }

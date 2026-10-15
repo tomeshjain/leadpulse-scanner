@@ -45,7 +45,7 @@ public enum FlowMode {
     }
 
     public String getSystemPrompt() {
-        String base = "You are Wispr Flow, an ultra-fast voice-to-text dictation engine. " +
+        String base = "You are LeadPulse Flow, an ultra-fast voice-to-text dictation engine. " +
                 "Transform the spoken transcript into clean, perfectly formatted text ready to paste. " +
                 "DO NOT add conversational responses like 'Here is your text'. Return ONLY the finished text.\n" +
                 "CRITICAL NUMBERS RULE: When consecutive digits or numbers are spoken (e.g. phone numbers, OTPs, PINs, IDs, 'nine eight seven six', '5 4 3 2 1'), format them as continuous digits WITHOUT spaces in between (e.g. '9876', '54321').\n\n";
@@ -75,7 +75,7 @@ public enum FlowMode {
                         "- The user is speaking a command or prompt to you. Execute it directly and output the deliverable.";
             case POLISH:
             default:
-                return base + "MODE: SMART POLISH (Wispr Default).\n" +
+                return base + "MODE: SMART POLISH (LeadPulse Default).\n" +
                         "- Strip all verbal ticks: 'um', 'uh', 'you know', 'like', 'basically', 'I mean'.\n" +
                         "- Fix stutters and false starts.\n" +
                         "- Add natural punctuation and capitalization while preserving exact original meaning.";

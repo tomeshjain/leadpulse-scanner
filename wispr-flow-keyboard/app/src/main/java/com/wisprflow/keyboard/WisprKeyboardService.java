@@ -1401,7 +1401,7 @@ public class WisprKeyboardService extends InputMethodService {
         // NORMAL CLEAN SPACEBAR WITH CURSOR SCRUBBING
         KeyboardTheme theme = KeyboardTheme.resolveTheme(this, prefs != null ? prefs.getThemeId() : null);
         final Button spaceBtn = new Button(this);
-        spaceBtn.setText("English • Wispr Flow");
+        spaceBtn.setText("English • LeadPulse AI");
         spaceBtn.setTextColor(theme.subTextColor);
         spaceBtn.setTextSize(13);
         spaceBtn.setAllCaps(false);
@@ -1883,9 +1883,9 @@ public class WisprKeyboardService extends InputMethodService {
 
         Toast.makeText(this, "✨ Polishing with " + mode.getDisplayName() + "...", Toast.LENGTH_SHORT).show();
 
-        GeminiFlowClient.polishSpeech(rawText, apiKey, model, mode, new GeminiFlowClient.PolishCallback() {
+        GeminiFlowClient.polishSpeechWithFallback(rawText, apiKey, model, mode, new GeminiFlowClient.PolishResultCallback() {
             @Override
-            public void onSuccess(String polishedText, long latencyMs) {
+            public void onSuccess(String polishedText, long latencyMs, String modelUsed, boolean isFallback) {
                 // Collapse any remaining spoken spaced digits (e.g. OTPs, phone numbers)
                 String formatted = GeminiFlowClient.collapseSpokenDigits(polishedText);
 
@@ -1893,6 +1893,15 @@ public class WisprKeyboardService extends InputMethodService {
                 if (ic != null && !formatted.isEmpty()) {
                     ic.commitText(formatted + " ", 1);
                     triggerHaptic(new long[]{20, 40});
+                }
+
+                // Show transparent engine indicator
+                if (modelUsed != null && (modelUsed.toLowerCase().contains("offline") || modelUsed.contains("Local"))) {
+                    Toast.makeText(WisprKeyboardService.this, "⚪ Offline Polishing Engine", Toast.LENGTH_SHORT).show();
+                } else if (isFallback) {
+                    Toast.makeText(WisprKeyboardService.this, "🟡 Fallback AI: " + modelUsed + " (" + latencyMs + "ms)", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(WisprKeyboardService.this, "🟢 Pure AI: " + modelUsed + " (" + latencyMs + "ms)", Toast.LENGTH_SHORT).show();
                 }
             }
 
@@ -1903,6 +1912,7 @@ public class WisprKeyboardService extends InputMethodService {
                 if (ic != null && !formatted.isEmpty()) {
                     ic.commitText(formatted + " ", 1);
                 }
+                Toast.makeText(WisprKeyboardService.this, "⚪ Offline Polishing Engine", Toast.LENGTH_SHORT).show();
             }
         });
     }

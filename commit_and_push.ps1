@@ -12,7 +12,7 @@ Write-Host "Adding files..."
 & $gitExe add -A
 
 Write-Host "Committing..."
-& $gitExe commit -m "feat: True GIF image insertion via commitContent, live and voice GIF search, contextual text-to-GIF suggestions, and expanded curated reaction catalog"
+& $gitExe commit -m "feat: LeadPulse AI Keyboard v1.5.0 - complete executive rebranding, strict 6-field card extraction, zero-touch automated contact saving, multi-model fallback cascade, transparent engine badges, Gemini Live WebSocket client, and pure AI diagnostics"
 
 Write-Host "Pushing to origin main..."
 & $gitExe push origin main
