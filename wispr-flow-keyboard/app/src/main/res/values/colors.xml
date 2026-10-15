@@ -12,6 +12,7 @@
     <color name="accent_emerald">#10b981</color>
     <color name="accent_red">#ef4444</color>
     <color name="accent_amber">#f59e0b</color>
+    <color name="accent_pink">#ec4899</color>
     <color name="text_primary">#0f172a</color>
     <color name="text_secondary">#475569</color>
     <color name="text_muted">#94a3b8</color>
