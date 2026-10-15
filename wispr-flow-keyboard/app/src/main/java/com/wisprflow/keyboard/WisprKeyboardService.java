@@ -273,7 +273,7 @@ public class WisprKeyboardService extends InputMethodService {
         tvVoiceStatus.setLayoutParams(tvVoiceParams);
         voiceStatusBanner.addView(tvVoiceStatus);
 
-        btnVoiceCancel = new Button(this);
+        Button btnVoiceCancel = new Button(this);
         btnVoiceCancel.setText("Done / Stop");
         btnVoiceCancel.setTextSize(11);
         btnVoiceCancel.setTextColor(Color.WHITE);
