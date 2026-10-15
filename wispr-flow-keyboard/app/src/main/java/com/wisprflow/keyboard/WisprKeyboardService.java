@@ -683,6 +683,8 @@ public class WisprKeyboardService extends InputMethodService {
     // --- GIF & REACTION PANEL ---
 
     private String currentGifSearchQuery = "";
+    private boolean isGifTypingActive = false;
+    private boolean isKeyboardShortcutsExpanded = false;
 
     private void buildGifsPanel() {
         buildGifsPanel(currentGifSearchQuery);
@@ -699,67 +701,84 @@ public class WisprKeyboardService extends InputMethodService {
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
         layout.setBackgroundColor(theme.backgroundColor);
 
-        // 1. Search Bar & Voice Search Header
+        // 1. Sleek Unified Search Bar Header
         LinearLayout searchHeader = new LinearLayout(this);
         searchHeader.setOrientation(LinearLayout.HORIZONTAL);
         searchHeader.setGravity(Gravity.CENTER_VERTICAL);
-        searchHeader.setPadding(dpToPx(8), dpToPx(4), dpToPx(8), dpToPx(4));
+        searchHeader.setPadding(dpToPx(8), dpToPx(6), dpToPx(8), dpToPx(6));
+
+        // Unified Search Pill Container
+        LinearLayout searchPill = new LinearLayout(this);
+        searchPill.setOrientation(LinearLayout.HORIZONTAL);
+        searchPill.setGravity(Gravity.CENTER_VERTICAL);
+        searchPill.setBackground(createChipDrawable(theme.keyColor, theme.dividerColor, 18));
+        searchPill.setPadding(dpToPx(12), 0, dpToPx(6), 0);
+        LinearLayout.LayoutParams pillParams = new LinearLayout.LayoutParams(0, dpToPx(38), 1.0f);
+        searchPill.setLayoutParams(pillParams);
+
+        TextView tvSearchIcon = new TextView(this);
+        tvSearchIcon.setText("🔍 ");
+        tvSearchIcon.setTextSize(12);
+        tvSearchIcon.setTextColor(theme.subTextColor);
+        searchPill.addView(tvSearchIcon);
 
         final TextView tvSearchBox = new TextView(this);
         if (currentGifSearchQuery.isEmpty()) {
-            tvSearchBox.setText("🔍 Tap to type or speak GIF search...");
+            tvSearchBox.setText("Search GIFs & reactions...");
             tvSearchBox.setTextColor(theme.subTextColor);
         } else {
-            tvSearchBox.setText("🔍 " + currentGifSearchQuery);
+            tvSearchBox.setText(currentGifSearchQuery);
             tvSearchBox.setTextColor(theme.textColor);
+            tvSearchBox.setTypeface(null, Typeface.BOLD);
         }
         tvSearchBox.setTextSize(12);
-        tvSearchBox.setBackground(createChipDrawable(theme.keyColor, theme.dividerColor, 8));
-        tvSearchBox.setPadding(dpToPx(10), dpToPx(8), dpToPx(10), dpToPx(8));
-        LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(0, dpToPx(36), 1.0f);
+        tvSearchBox.setSingleLine(true);
+        tvSearchBox.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
         tvSearchBox.setLayoutParams(searchParams);
-        tvSearchBox.setOnClickListener(v -> {
-            isGifTypingActive = !isGifTypingActive;
-            buildGifsPanel(currentGifSearchQuery);
-        });
-        searchHeader.addView(tvSearchBox);
+        searchPill.addView(tvSearchBox);
 
-        // Clear button
+        // Clear '✕' inside search pill
         if (!currentGifSearchQuery.isEmpty()) {
-            final Button btnClear = new Button(this);
+            Button btnClear = new Button(this);
             btnClear.setText("✕");
-            btnClear.setTextSize(12);
+            btnClear.setTextSize(11);
             btnClear.setTextColor(theme.subTextColor);
             btnClear.setBackgroundColor(Color.TRANSPARENT);
-            LinearLayout.LayoutParams clearParams = new LinearLayout.LayoutParams(dpToPx(36), dpToPx(36));
+            LinearLayout.LayoutParams clearParams = new LinearLayout.LayoutParams(dpToPx(30), dpToPx(32));
             btnClear.setLayoutParams(clearParams);
             btnClear.setOnClickListener(v -> {
                 currentGifSearchQuery = "";
                 buildGifsPanel("");
             });
-            searchHeader.addView(btnClear);
+            searchPill.addView(btnClear);
         }
 
-        // Voice Search button
+        // Voice Search Mic button inside search pill
         Button btnVoiceSearch = new Button(this);
         btnVoiceSearch.setText("🎙️");
-        btnVoiceSearch.setTextSize(14);
-        btnVoiceSearch.setBackground(createChipDrawable(theme.actionKeyColor, theme.dividerColor, 8));
-        LinearLayout.LayoutParams vsParams = new LinearLayout.LayoutParams(dpToPx(36), dpToPx(36));
-        vsParams.leftMargin = dpToPx(4);
+        btnVoiceSearch.setTextSize(13);
+        btnVoiceSearch.setBackgroundColor(Color.TRANSPARENT);
+        LinearLayout.LayoutParams vsParams = new LinearLayout.LayoutParams(dpToPx(32), dpToPx(32));
         btnVoiceSearch.setLayoutParams(vsParams);
         btnVoiceSearch.setOnClickListener(v -> startGifVoiceSearch());
-        searchHeader.addView(btnVoiceSearch);
+        searchPill.addView(btnVoiceSearch);
 
-        // Toggle Type / Grid button
+        searchPill.setOnClickListener(v -> {
+            isGifTypingActive = !isGifTypingActive;
+            buildGifsPanel(currentGifSearchQuery);
+        });
+        searchHeader.addView(searchPill);
+
+        // Toggle Type / Grid button on the right
         Button btnToggleType = new Button(this);
         btnToggleType.setText(isGifTypingActive ? "🖼️ Grid" : "⌨️ Type");
         btnToggleType.setTextSize(11);
         btnToggleType.setTextColor(isGifTypingActive ? theme.accentColor : Color.WHITE);
         btnToggleType.setAllCaps(false);
-        btnToggleType.setBackground(createChipDrawable(isGifTypingActive ? theme.actionKeyColor : theme.accentColor, theme.dividerColor, 8));
-        LinearLayout.LayoutParams ttParams = new LinearLayout.LayoutParams(dpToPx(62), dpToPx(36));
-        ttParams.leftMargin = dpToPx(4);
+        btnToggleType.setBackground(createChipDrawable(isGifTypingActive ? theme.actionKeyColor : theme.accentColor, theme.dividerColor, 18));
+        LinearLayout.LayoutParams ttParams = new LinearLayout.LayoutParams(dpToPx(66), dpToPx(36));
+        ttParams.leftMargin = dpToPx(6);
         btnToggleType.setLayoutParams(ttParams);
         btnToggleType.setOnClickListener(v -> {
             isGifTypingActive = !isGifTypingActive;
@@ -774,7 +793,7 @@ public class WisprKeyboardService extends InputMethodService {
         tabScroll.setHorizontalScrollBarEnabled(false);
         final LinearLayout tabs = new LinearLayout(this);
         tabs.setOrientation(LinearLayout.HORIZONTAL);
-        tabs.setPadding(dpToPx(4), dpToPx(2), dpToPx(4), dpToPx(4));
+        tabs.setPadding(dpToPx(6), dpToPx(2), dpToPx(6), dpToPx(4));
         tabScroll.addView(tabs);
         layout.addView(tabScroll);
 
@@ -785,12 +804,12 @@ public class WisprKeyboardService extends InputMethodService {
             catBtn.setText(cat);
             catBtn.setTextSize(11);
             boolean isSelected = cat.equalsIgnoreCase(currentGifSearchQuery) || (i == 0 && currentGifSearchQuery.isEmpty());
-            catBtn.setTextColor(isSelected ? theme.accentColor : theme.subTextColor);
-            catBtn.setBackground(createChipDrawable(isSelected ? theme.actionKeyColor : theme.keyColor, theme.dividerColor, 8));
-            catBtn.setPadding(dpToPx(10), 0, dpToPx(10), 0);
+            catBtn.setTextColor(isSelected ? Color.WHITE : theme.subTextColor);
+            catBtn.setBackground(createChipDrawable(isSelected ? theme.accentColor : theme.keyColor, theme.dividerColor, 14));
+            catBtn.setPadding(dpToPx(12), 0, dpToPx(12), 0);
             catBtn.setAllCaps(false);
             LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT, dpToPx(30));
+                    LinearLayout.LayoutParams.WRAP_CONTENT, dpToPx(28));
             cp.setMargins(dpToPx(2), 0, dpToPx(2), 0);
             catBtn.setLayoutParams(cp);
 
@@ -1784,7 +1803,9 @@ public class WisprKeyboardService extends InputMethodService {
         layout.addView(scroll);
 
         List<ShortcutsManager.ShortcutItem> list = shortcutsManager.getAllShortcuts();
-        for (final ShortcutsManager.ShortcutItem item : list) {
+        int maxItemsToShow = (list.size() > 3 && !isKeyboardShortcutsExpanded) ? 3 : list.size();
+        for (int i = 0; i < maxItemsToShow; i++) {
+            final ShortcutsManager.ShortcutItem item = list.get(i);
             LinearLayout card = new LinearLayout(this);
             card.setOrientation(LinearLayout.HORIZONTAL);
             card.setGravity(Gravity.CENTER_VERTICAL);
@@ -1822,6 +1843,27 @@ public class WisprKeyboardService extends InputMethodService {
             });
 
             content.addView(card);
+        }
+
+        // Expander Button for > 3 shortcuts on keyboard
+        if (list.size() > 3) {
+            Button btnExpander = new Button(this);
+            btnExpander.setText(isKeyboardShortcutsExpanded
+                    ? "▲ Show Less (Showing All " + list.size() + ")"
+                    : "▼ Show All (" + list.size() + ") Shortcuts");
+            btnExpander.setTextSize(12);
+            btnExpander.setAllCaps(false);
+            btnExpander.setTextColor(Color.parseColor("#818cf8"));
+            btnExpander.setBackground(createChipDrawable("#1e293b", "#334155", 8));
+            LinearLayout.LayoutParams ep = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(38));
+            ep.topMargin = dpToPx(4);
+            btnExpander.setLayoutParams(ep);
+            btnExpander.setOnClickListener(v -> {
+                isKeyboardShortcutsExpanded = !isKeyboardShortcutsExpanded;
+                buildShortcutsPanel();
+            });
+            content.addView(btnExpander);
         }
 
         layout.addView(createPanelBottomBar());

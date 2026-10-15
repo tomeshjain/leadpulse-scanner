@@ -37,6 +37,8 @@ public class ShortcutsManager {
         }
     }
 
+    private static final String KEY_CLEANED_DEFAULTS_V2 = "has_cleaned_defaults_v2";
+
     public ShortcutsManager(Context context) {
         this.prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
         loadShortcuts();
@@ -44,11 +46,13 @@ public class ShortcutsManager {
 
     private void loadShortcuts() {
         shortcutsMap.clear();
+        boolean cleanedV2 = prefs.getBoolean(KEY_CLEANED_DEFAULTS_V2, false);
         String jsonStr = prefs.getString(KEY_SHORTCUTS_JSON, null);
 
-        if (jsonStr == null || jsonStr.trim().isEmpty()) {
+        if (!cleanedV2 || jsonStr == null || jsonStr.trim().isEmpty()) {
             loadDefaultShortcuts();
             saveShortcuts();
+            prefs.edit().putBoolean(KEY_CLEANED_DEFAULTS_V2, true).apply();
         } else {
             try {
                 JSONObject obj = new JSONObject(jsonStr);
@@ -64,21 +68,8 @@ public class ShortcutsManager {
     }
 
     private void loadDefaultShortcuts() {
-        shortcutsMap.put("GM", "Good Morning");
-        shortcutsMap.put("GE", "Good Evening");
-        shortcutsMap.put("GA", "Good Afternoon");
-        shortcutsMap.put("GN", "Good Night");
-        shortcutsMap.put("TY", "Thank you very much");
-        shortcutsMap.put("TYS", "Thank you so much!");
-        shortcutsMap.put("NP", "No problem!");
-        shortcutsMap.put("BRB", "Be right back");
-        shortcutsMap.put("OMW", "On my way!");
-        shortcutsMap.put("IDK", "I don't know");
-        shortcutsMap.put("BTW", "By the way");
-        shortcutsMap.put("PLZ", "Please");
-        shortcutsMap.put("ASAP", "As soon as possible");
-        shortcutsMap.put("TC", "Take care");
-        shortcutsMap.put("HBU", "How about you?");
+        // Only one sample shortcut by default so user understands how the feature works
+        shortcutsMap.put("TY", "Thank you very much!");
     }
 
     private synchronized void saveShortcuts() {

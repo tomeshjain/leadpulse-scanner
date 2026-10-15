@@ -91,10 +91,10 @@ public class SettingsActivity extends AppCompatActivity {
     private Button btnLaunchScanner;
     private LinearLayout llShortcutsList;
     private Button btnAddShortcut;
+    private Button btnToggleShortcutsExpander;
+    private boolean isShortcutsListExpanded = false;
     private TextView tvPatternStats;
     private Button btnResetPatterns;
-    private EditText etTestInput;
-    private Button btnTestSampleVoice;
     private Button btnTestPureAiVoice;
     private Button btnTestPureAiCard;
     private Button btnTestLiveWs;
@@ -174,10 +174,9 @@ public class SettingsActivity extends AppCompatActivity {
         btnLaunchScanner = findViewById(R.id.btnLaunchScanner);
         llShortcutsList = findViewById(R.id.llShortcutsList);
         btnAddShortcut = findViewById(R.id.btnAddShortcut);
+        btnToggleShortcutsExpander = findViewById(R.id.btnToggleShortcutsExpander);
         tvPatternStats = findViewById(R.id.tvPatternStats);
         btnResetPatterns = findViewById(R.id.btnResetPatterns);
-        etTestInput = findViewById(R.id.etTestInput);
-        btnTestSampleVoice = findViewById(R.id.btnTestSampleVoice);
 
         btnTestPureAiVoice = findViewById(R.id.btnTestPureAiVoice);
         btnTestPureAiCard = findViewById(R.id.btnTestPureAiCard);
@@ -300,24 +299,11 @@ public class SettingsActivity extends AppCompatActivity {
             });
         }
 
-        // Test Simulated Speech Button
-        if (btnTestSampleVoice != null) {
-            btnTestSampleVoice.setOnClickListener(v -> {
-                String sample = "um hello team uh please find the quarterly report attached and let me know your thoughts";
-                etTestInput.setText("Input: \"" + sample + "\"\n\nPolishing with " + prefs.getSelectedModel() + "...");
-
-                FlowMode mode = FlowMode.fromId(prefs.getFlowMode());
-                GeminiFlowClient.polishSpeech(sample, prefs.getApiKey(), prefs.getSelectedModel(), mode, new GeminiFlowClient.PolishCallback() {
-                    @Override
-                    public void onSuccess(String polishedText, long latencyMs) {
-                        runOnUiThread(() -> etTestInput.setText("✓ " + mode.getDisplayName() + " (" + latencyMs + "ms):\n\n" + polishedText));
-                    }
-
-                    @Override
-                    public void onError(String errorMessage, String fallbackText) {
-                        runOnUiThread(() -> etTestInput.setText("✓ Offline Output:\n\n" + fallbackText));
-                    }
-                });
+        // Shortcuts Expander Toggle
+        if (btnToggleShortcutsExpander != null) {
+            btnToggleShortcutsExpander.setOnClickListener(v -> {
+                isShortcutsListExpanded = !isShortcutsListExpanded;
+                renderShortcutsList(currentActiveTheme);
             });
         }
 
@@ -732,7 +718,9 @@ public class SettingsActivity extends AppCompatActivity {
         llShortcutsList.removeAllViews();
         List<ShortcutsManager.ShortcutItem> list = shortcutsManager.getAllShortcuts();
 
-        for (final ShortcutsManager.ShortcutItem item : list) {
+        int maxItemsToShow = (list.size() > 3 && !isShortcutsListExpanded) ? 3 : list.size();
+        for (int i = 0; i < maxItemsToShow; i++) {
+            final ShortcutsManager.ShortcutItem item = list.get(i);
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(Gravity.CENTER_VERTICAL);
@@ -775,6 +763,18 @@ public class SettingsActivity extends AppCompatActivity {
             row.addView(btnDel);
 
             llShortcutsList.addView(row);
+        }
+
+        // Configure Expander Button for > 3 shortcuts
+        if (btnToggleShortcutsExpander != null) {
+            if (list.size() > 3) {
+                btnToggleShortcutsExpander.setVisibility(View.VISIBLE);
+                btnToggleShortcutsExpander.setText(isShortcutsListExpanded
+                        ? "▲ Show Less (Showing All " + list.size() + ")"
+                        : "▼ Show All (" + list.size() + ") Shortcuts");
+            } else {
+                btnToggleShortcutsExpander.setVisibility(View.GONE);
+            }
         }
     }
 

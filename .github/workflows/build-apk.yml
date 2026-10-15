@@ -71,8 +71,6 @@ jobs:
           fi
           echo "Copying $APK_FILE to ./SmartAIKeyboard.apk"
           cp "$APK_FILE" ./SmartAIKeyboard.apk
-          cp "$APK_FILE" ./LeadPulseAIKeyboard.apk
-          cp "$APK_FILE" ./WisprFlowKeyboard.apk
           ls -lh ./SmartAIKeyboard.apk
 
       - name: Upload Keyboard APK Artifact
@@ -122,8 +120,6 @@ jobs:
                 - Dedicated `🎙️💬 Meeting` button right on the top action row.
             files: |
               ./SmartAIKeyboard.apk
-              ./LeadPulseAIKeyboard.apk
-              ./WisprFlowKeyboard.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

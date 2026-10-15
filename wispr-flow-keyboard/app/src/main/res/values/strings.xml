@@ -22,7 +22,6 @@
     <string name="label_model">Select AI Model:</string>
     <string name="label_mode">Default Flow Mode:</string>
 
-    <string name="step_4_title">4. Test Your Keyboard</string>
-    <string name="step_4_desc">Tap the box below to bring up Smart AI Keyboard and test voice dictation.</string>
-    <string name="hint_test_input">Tap here to test typing and voice flow...</string>
+    <string name="step_4_title">4. How Smart AI Works</string>
+    <string name="step_4_desc">Architecture, multi-model fallback cascades, and security overview.</string>
 </resources>

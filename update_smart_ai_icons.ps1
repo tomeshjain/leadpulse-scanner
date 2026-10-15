@@ -1,6 +1,6 @@
 Add-Type -AssemblyName System.Drawing
 
-$src = 'C:\Users\Dell\.gemini\antigravity-ide\brain\2411c2a6-361e-4a47-afa6-50b50b501233\smart_ai_logo_1792074088552.jpg'
+$src = 'C:\Users\Dell\.gemini\antigravity-ide\brain\2411c2a6-361e-4a47-afa6-50b50b501233\smart_ai_clean_logo_1792075821505.jpg'
 if (-not (Test-Path $src)) {
     Write-Error "Source image not found at $src"
     exit 1

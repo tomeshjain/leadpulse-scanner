@@ -403,6 +403,20 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical" />
+
+            <!-- Shortcuts Expander Toggle Button (Shown when > 3 shortcuts) -->
+            <Button
+                android:id="@+id/btnToggleShortcutsExpander"
+                android:layout_width="match_parent"
+                android:layout_height="38dp"
+                android:visibility="gone"
+                android:text="▼ Show all shortcuts"
+                android:textColor="@color/accent_primary"
+                android:background="@drawable/bg_btn_secondary"
+                android:textAllCaps="false"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:layout_marginTop="6dp" />
         </LinearLayout>
 
         <!-- CARD 7: TYPING PATTERN & COLLOCATION STATS -->
@@ -445,9 +459,9 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- CARD 8: INTERACTIVE TEST ARENA -->
+        <!-- CARD 8: HOW SMART AI KEYBOARD WORKS & ARCHITECTURE GUIDE -->
         <LinearLayout
-            android:id="@+id/cardTesting"
+            android:id="@+id/cardHowItWorks"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
@@ -458,44 +472,108 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="⌨️ Keyboard Live Test Playground"
+                android:text="ℹ️ How Smart AI Works &amp; Architecture Guide"
                 android:textColor="@color/text_primary"
                 android:textSize="16sp"
                 android:textStyle="bold"
                 android:layout_marginBottom="4dp" />
 
             <TextView
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Tap below to bring up Smart AI Keyboard. Try typing, testing suggestions, emojis, or pressing the 🎙️ mic button:"
+                android:text="Core processes, multi-model fallback cascades, and security architecture:"
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp"
                 android:layout_marginBottom="14dp" />
 
-            <EditText
-                android:id="@+id/etTestInput"
+            <!-- Workflow 1 -->
+            <TextView
                 android:layout_width="match_parent"
-                android:layout_height="100dp"
-                android:hint="Tap here to bring up Smart AI Keyboard..."
-                android:textColorHint="@color/text_muted"
-                android:textColor="@color/text_primary"
-                android:textSize="14sp"
-                android:background="@drawable/bg_key"
-                android:gravity="top|start"
-                android:padding="14dp"
-                android:inputType="textMultiLine"
-                android:layout_marginBottom="14dp" />
-
-            <Button
-                android:id="@+id/btnTestSampleVoice"
-                android:layout_width="match_parent"
-                android:layout_height="46dp"
-                android:text="🧪 Test AI Polishing Engine (Simulate Speech)"
-                android:textColor="@color/btn_secondary_text"
-                android:background="@drawable/bg_btn_secondary"
-                android:textAllCaps="false"
+                android:layout_height="wrap_content"
+                android:text="1. 🎙️ AI Voice Dictation &amp; Smart Polish"
+                android:textColor="@color/accent_primary"
                 android:textSize="13sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:layout_marginBottom="3dp" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="• Real-Time Audio Capture: Voice is recorded via on-device speech recognition without latency delays.\n• Instant AI Polishing: Passed to Google Gemini 2.0 Flash in &lt;300ms, stripping verbal filler words ('um', 'uh', 'you know'), fixing stutters, formatting continuous digits (e.g. phone numbers, OTPs), and applying executive punctuation.\n• Multi-Tone Selection: Choose between Smart Polish, Casual Chat, Executive Email, Structured Notes, Raw Dictation, and Developer Code directly on the keyboard."
+                android:textColor="@color/text_primary"
+                android:textSize="12sp"
+                android:lineSpacingExtra="3dp"
+                android:layout_marginBottom="12dp" />
+
+            <!-- Workflow 2 -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="2. 🎙️💬 Meeting &amp; Conversation Recording"
+                android:textColor="@color/accent_primary"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="3dp" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="• Person-Controlled: Manual [▶️ Start Conversation] and [⏹️ Stop &amp; Summarize] controls. Recording never stops until you press stop.\n• Auto-Restarting Speech Loop: Seamlessly handles lengthy multi-speaker dialogues without timing out.\n• Structured AI Response: Automatically generates an Executive Summary, Key Discussion Topics, and a Pending Action Items checklist (- [ ] Task (Owner, Due)) with 1-tap insert &amp; copy."
+                android:textColor="@color/text_primary"
+                android:textSize="12sp"
+                android:lineSpacingExtra="3dp"
+                android:layout_marginBottom="12dp" />
+
+            <!-- Workflow 3 -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="3. 📇 Strict 6-Field Contact Card Scanner"
+                android:textColor="@color/accent_primary"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="3dp" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="• Immediate Camera Capture: Launches directly to camera preview with gallery fallback.\n• Strict 6-Field Schema: Extracts strictly Name, Designation, Organization, Email, Phone Number, and City. Missing attributes are omitted with zero 'N/A' or placeholder text.\n• 100% Automated Save: Directly injects contact into Android's native contacts provider in the background with zero clicks required."
+                android:textColor="@color/text_primary"
+                android:textSize="12sp"
+                android:lineSpacingExtra="3dp"
+                android:layout_marginBottom="12dp" />
+
+            <!-- Workflow 4 -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="4. 🧠 Multi-Model Fallback Cascade"
+                android:textColor="@color/accent_primary"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="3dp" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Smart AI guarantees zero interruption through a 3-tier cascade:\n• 🟢 Tier 1 (Pure AI): Primary execution using Google Gemini 2.0 Flash for sub-second latency.\n• 🟡 Tier 2 (Cloud Fallback): Automatically fails over to Gemini 1.5 Flash or Gemini 1.5 Pro if rate limits, quota limits, or transient connection issues occur.\n• ⚪ Tier 3 (On-Device Offline): Embedded ML Kit OCR &amp; rule-based normalizer ensures full offline functionality when airplane mode or zero network connectivity is detected."
+                android:textColor="@color/text_primary"
+                android:textSize="12sp"
+                android:lineSpacingExtra="3dp"
+                android:layout_marginBottom="12dp" />
+
+            <!-- Workflow 5 -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="5. 📋 Resilient Clipboard &amp; 🎞️ Visual Animated GIFs"
+                android:textColor="@color/accent_primary"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="3dp" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="• Protected Pinned Clips: Clearing history removes only temporary clips—pinned snippets are 100% preserved. Dedicated [⭐ All], [📌 Pinned], and [🕒 Recent] shelves.\n• Glide Animated GIFs: Moving visual GIF previews with voice search, trending tags, and direct rich media insertion via Android InputConnectionCompat."
+                android:textColor="@color/text_primary"
+                android:textSize="12sp"
+                android:lineSpacingExtra="3dp" />
         </LinearLayout>
 
         <!-- CARD 9: PURE AI & GEMINI LIVE DIAGNOSTICS -->
