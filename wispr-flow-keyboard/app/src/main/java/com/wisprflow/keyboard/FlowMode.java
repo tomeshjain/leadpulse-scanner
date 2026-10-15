@@ -81,4 +81,8 @@ public enum FlowMode {
                         "- Add natural punctuation and capitalization while preserving exact original meaning.";
         }
     }
+
+    public String buildPrompt(String rawSpeech) {
+        return getSystemPrompt() + "\n\nSpoken transcript to process:\n\"\"\"\n" + (rawSpeech != null ? rawSpeech : "") + "\n\"\"\"";
+    }
 }

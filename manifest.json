@@ -1,7 +1,7 @@
 {
-  "name": "Wispr Flow - AI Voice Keyboard & Dictation",
-  "short_name": "Wispr Flow",
-  "description": "Ultra-low latency AI voice dictation that replaces typing across your entire mobile phone.",
+  "name": "LeadPulse AI Keyboard & Smart Scanner",
+  "short_name": "LeadPulse AI",
+  "description": "Ultra-low latency AI voice dictation, smart lead scanner, and executive Android keyboard.",
   "id": "./",
   "start_url": "./index.html",
   "scope": "./",
