@@ -1169,10 +1169,9 @@ public class WisprKeyboardService extends InputMethodService {
                 LinearLayout card = new LinearLayout(this);
                 card.setOrientation(LinearLayout.HORIZONTAL);
                 card.setGravity(Gravity.CENTER_VERTICAL);
-                card.setBackground(createChipDrawable(
-                        clip.isPinned ? (theme.isLight ? "#e0e7ff" : "#1e1b4b") : theme.keyColor,
-                        clip.isPinned ? theme.accentColor : theme.dividerColor,
-                        10));
+                int cardBg = clip.isPinned ? (theme.isLight ? Color.parseColor("#e0e7ff") : Color.parseColor("#1e1b4b")) : theme.keyColor;
+                int cardStroke = clip.isPinned ? theme.accentColor : theme.dividerColor;
+                card.setBackground(createChipDrawable(cardBg, cardStroke, 10));
                 card.setPadding(dpToPx(12), dpToPx(8), dpToPx(8), dpToPx(8));
                 LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -1250,10 +1249,9 @@ public class WisprKeyboardService extends InputMethodService {
         btn.setAllCaps(false);
         boolean isSelected = (currentClipboardTab == tab);
         btn.setTextColor(isSelected ? theme.accentColor : theme.subTextColor);
-        btn.setBackground(createChipDrawable(
-                isSelected ? (theme.isLight ? "#e0e7ff" : "#1e1b4b") : theme.actionKeyColor,
-                isSelected ? theme.accentColor : theme.dividerColor,
-                8));
+        int btnBg = isSelected ? (theme.isLight ? Color.parseColor("#e0e7ff") : Color.parseColor("#1e1b4b")) : theme.actionKeyColor;
+        int btnStroke = isSelected ? theme.accentColor : theme.dividerColor;
+        btn.setBackground(createChipDrawable(btnBg, btnStroke, 8));
         btn.setPadding(dpToPx(10), 0, dpToPx(10), 0);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dpToPx(32), 1.0f);
         lp.setMargins(dpToPx(2), 0, dpToPx(2), 0);
@@ -1676,7 +1674,7 @@ public class WisprKeyboardService extends InputMethodService {
             tvActions.setText(result.actionItems);
             tvActions.setTextColor(theme.textColor);
             tvActions.setTextSize(12);
-            tvActions.setBackground(createChipDrawable(theme.keyColor, "#059669", 8));
+            tvActions.setBackground(createChipDrawable(theme.keyColor, Color.parseColor("#059669"), 8));
             tvActions.setPadding(dpToPx(8), dpToPx(8), dpToPx(8), dpToPx(8));
             content.addView(tvActions);
         }
