@@ -79,32 +79,30 @@ jobs:
           name: WisprFlowKeyboard-APK
           path: ./WisprFlowKeyboard.apk
 
-      - name: Create or Update GitHub Release (Wispr Keyboard v1.1.0)
+      - name: Create or Update GitHub Release (Wispr Keyboard v1.2.0)
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/heads/main')
         with:
-          tag_name: wispr-keyboard-v1.1.0
-          name: "Wispr Flow - Native Android AI Keyboard Extension (v1.1.0)"
+          tag_name: wispr-keyboard-v1.2.0
+          name: "Wispr Flow - Native Android AI Keyboard Extension (v1.2.0)"
           draft: false
           prerelease: false
           make_latest: true
           body: |
-            ## ⌨️ Wispr Flow - Native Android AI Keyboard Extension (v1.1.0)
+            ## ⌨️ Wispr Flow - Native Android AI Keyboard Extension (v1.2.0)
 
-            **Professional Extended Keyboard Facility for Android with AI Voice Dictation, Smart Predictions, and Text Expansion.**
+            **Professional Extended Keyboard Facility for Android with Continuous Digits Dictation, Dedicated Suggestion & Action Toolbars, Number Row, and Selected Text Backspace Fix.**
 
             ### 🚀 New & Upgraded Features:
-            - **🎙️ Dedicated Separate Microphone Button**: Voice dictation now has its own dedicated mic button in both the top toolbar and bottom key row. Normal spacebar functions strictly as a clean, responsive spacebar!
-            - **🧠 Smart Suggestions & Collocation Learning**: Learns your typing habits dynamically and predicts next collocated words (e.g. *Good ➔ Morning, Afternoon, Luck*; *Thank ➔ you so much*).
-            - **⚡ Text Shortcuts & Custom Expansions**:
-              - Default built-in shortcuts: `GM` ➔ `Good Morning`, `GE` ➔ `Good Evening`, `TY` ➔ `Thank you very much`, `BRB` ➔ `Be right back`, `OMW` ➔ `On my way!`, `NP` ➔ `No problem!`, etc.
-              - **Custom Shortcuts Manager**: Add, edit, or delete any custom shortcut from the Settings screen!
-            - **😊 Categorized Emojis Panel**: Over 150+ categorized emojis (Smileys, Gestures, Hearts, Activities, Food, Work) with 1-tap insertion.
-            - **🎞️ GIFs & Reaction Stickers**: Quick reaction GIFs and kaomoji stickers (`(づ｡◕‿‿◕｡)づ`, `¯\_(ツ)_/¯`, `(╯°□°)╯︵ ┻━┻`).
-            - **📋 Clipboard History & 📌 Pinning Favorites**: Stores recent clipboard history with 1-tap pasting and permanent pin favorites for frequent addresses, messages, or notes.
-            - **⇪ Double-Tap Caps Lock**: Single tap for Shift, double tap for illuminated permanent Caps Lock.
-            - **⚙️ Instant Settings Launcher**: 1-tap access to configure Gemini API Key, select AI Model (`gemini-2.0-flash`, `gemini-1.5-flash`, etc.), and grant microphone permissions.
-            - **🎙️ Microphone Permission Checker**: In-app runtime permission check to ensure flawless voice dictation out of the box.
+            - **🛠️ Backspace Selected Text Fix**: Correctly removes selected/highlighted text across any app and provides smooth repeating backspace.
+            - **🔢 Continuous Spoken Digits**: Formats spoken numbers, OTPs, PINs, phone numbers, and codes as continuous digits without spaces in between (e.g. `987654` instead of `9 8 7 6 5 4`).
+            - **✨ Dedicated Top Suggestion Row**: Clean full-width top strip with large touch targets for next-word predictions, learned collocations, and instant 1-tap paste chip.
+            - **⚡ Dedicated Quick Action Toolbar**: Second row with quick-access buttons for 🎙️ Voice Dictate, 😊 Emojis, 🎞️ GIFs, 📋 Clipboard, ⚡ Shortcuts, ✨ AI Flow Mode, and ⚙️ Settings.
+            - **🔢 Dedicated Number Row (1-0)**: Seamless row of numbers directly above QWERTY letters for faster typing without switching layouts.
+            - **↔️ Spacebar Cursor Scrubbing**: Slide your finger across the spacebar to glide the cursor precisely through text.
+            - **📋 Real-Time Clipboard Monitor**: Automatically tracks copied text for quick pasting and permanent pinned favorites.
+            - **🎙️ Dedicated Separate Microphone Button**: High-visibility voice button with live listening waveform pulse.
+            - **⚡ Shortcuts Facility**: Auto-expands abbreviations like `GM` ➔ `Good Morning`, `TY` ➔ `Thank you very much`.
 
             ### 📲 Quick Setup:
             1. Download and install **`WisprFlowKeyboard.apk`** below.

@@ -47,7 +47,8 @@ public enum FlowMode {
     public String getSystemPrompt() {
         String base = "You are Wispr Flow, an ultra-fast voice-to-text dictation engine. " +
                 "Transform the spoken transcript into clean, perfectly formatted text ready to paste. " +
-                "DO NOT add conversational responses like 'Here is your text'. Return ONLY the finished text.\n\n";
+                "DO NOT add conversational responses like 'Here is your text'. Return ONLY the finished text.\n" +
+                "CRITICAL NUMBERS RULE: When consecutive digits or numbers are spoken (e.g. phone numbers, OTPs, PINs, IDs, 'nine eight seven six', '5 4 3 2 1'), format them as continuous digits WITHOUT spaces in between (e.g. '9876', '54321').\n\n";
 
         switch (this) {
             case CASUAL:

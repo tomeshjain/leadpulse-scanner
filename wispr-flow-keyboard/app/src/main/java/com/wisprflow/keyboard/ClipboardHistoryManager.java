@@ -173,4 +173,11 @@ public class ClipboardHistoryManager {
         }
         return list;
     }
+
+    public synchronized String getLastCopiedText() {
+        if (!items.isEmpty()) {
+            return items.get(0).text;
+        }
+        return null;
+    }
 }

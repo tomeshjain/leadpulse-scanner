@@ -124,7 +124,7 @@ public class GeminiFlowClient {
                         if (content != null) {
                             JSONArray parts = content.optJSONArray("parts");
                             if (parts != null && parts.length() > 0) {
-                                String text = parts.getJSONObject(0).optString("text", "").trim();
+                                String text = collapseSpokenDigits(parts.getJSONObject(0).optString("text", "").trim());
                                 final long latency = System.currentTimeMillis() - startTime;
                                 mainHandler.post(() -> callback.onSuccess(text, latency));
                                 return;
@@ -232,6 +232,9 @@ public class GeminiFlowClient {
         // 2. Remove duplicate words (stutters: "I I", "the the")
         text = text.replaceAll("(?i)\\b(\\w+)\\s+\\1\\b", "$1");
 
+        // 2b. Collapse spaced digits (e.g. phone numbers, OTPs: "9 8 7 6" -> "9876")
+        text = collapseSpokenDigits(text);
+
         // 3. Normalize whitespace
         text = text.replaceAll("\\s+", " ").trim();
 
@@ -255,6 +258,26 @@ public class GeminiFlowClient {
             text = "# Notes\n• " + text;
         }
 
+        return text;
+    }
+
+    /**
+     * Collapses spoken consecutive digits (e.g. phone numbers, OTPs, PINs) into continuous numbers without spaces.
+     */
+    public static String collapseSpokenDigits(String text) {
+        if (text == null || text.isEmpty()) return "";
+
+        // Convert spoken single-digit words into numbers
+        String[] digitWords = {"zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"};
+        for (int i = 0; i < digitWords.length; i++) {
+            text = text.replaceAll("(?i)\\b" + digitWords[i] + "\\b", String.valueOf(i));
+        }
+
+        // Collapse sequences of digits separated by whitespace: "9 8 7 6" -> "9876"
+        for (int i = 0; i < 6; i++) {
+            text = text.replaceAll("(\\b\\d)\\s+(?=\\d\\b)", "$1");
+            text = text.replaceAll("(\\d)\\s+(\\d)", "$1$2");
+        }
         return text;
     }
 }

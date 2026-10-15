@@ -20,9 +20,9 @@ import android.speech.SpeechRecognizer;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.widget.Button;
@@ -41,16 +41,15 @@ import java.util.Locale;
 /**
  * Wispr Flow Professional Extended Android Keyboard (InputMethodService)
  * 
- * Comprehensive Features:
- * 1. Clean, state-of-the-art QWERTY keyboard with Caps Lock, punctuation, and dynamic action keys.
- * 2. Next-Word Predictions & Collocated Word Learning (learns user's typing patterns over time).
- * 3. Text Shortcuts (e.g. GM -> Good Morning) with auto-suggestions and inline expansion.
- * 4. Separate dedicated 🎙️ Voice Microphone (no hijacking of normal spacebar).
- * 5. Gemini 2.0 Flash AI Voice Dictation & Text Polishing with offline rule-based fallback.
- * 6. Categorized Emoji Panel (Smileys, Gestures, Hearts, Activities, Food, Work).
- * 7. GIFs & Reaction Stickers (Kaomoji and express reactions).
- * 8. Clipboard Manager with Recent History and 📌 Pinned Favorites.
- * 9. Quick ⚙️ Settings button for instant access to API key and model selection.
+ * Features:
+ * 1. Dedicated Top Suggestion Row with Next-Word Prediction & Collocation Learning.
+ * 2. Dedicated Action Toolbar Row (🎙️ Voice, 😊 Emoji, 🎞️ GIF, 📋 Clipboard, ⚡ Shortcuts, ✨ Mode, ⚙️ Settings).
+ * 3. Dedicated Number Row (1-0) above QWERTY for fast, un-cluttered typing.
+ * 4. Full Backspace functionality supporting selected text deletion and repeat delete.
+ * 5. Spacebar cursor scrubbing (swipe spacebar left/right to move cursor).
+ * 6. System clipboard monitor with instant 1-tap paste chip and pinned history.
+ * 7. Continuous spoken digits formatting (OTPs, phone numbers, codes without spaces).
+ * 8. Gemini 2.0 Flash AI voice dictation with offline fallback.
  */
 public class WisprKeyboardService extends InputMethodService {
 
@@ -71,6 +70,8 @@ public class WisprKeyboardService extends InputMethodService {
     private ClipboardHistoryManager clipboardManager;
     private Vibrator vibrator;
     private SpeechRecognizer speechRecognizer;
+    private ClipboardManager systemClipboard;
+    private ClipboardManager.OnPrimaryClipChangedListener clipListener;
 
     private PanelMode currentPanel = PanelMode.KEYBOARD;
     private boolean isListening = false;
@@ -82,11 +83,13 @@ public class WisprKeyboardService extends InputMethodService {
     // Typing tracking for Suggestions & Collocations
     private final StringBuilder currentWordBuffer = new StringBuilder();
     private String lastCommittedWord = "";
+    private String lastCopiedSnippet = null;
 
     // UI Components
     private LinearLayout keyboardRoot;
     private LinearLayout toolbarContainer;
     private LinearLayout suggestionsBar;
+    private LinearLayout actionToolbarRow;
     private LinearLayout voiceStatusBanner;
     private TextView tvVoiceStatus;
     private LinearLayout keysContainer;
@@ -107,40 +110,50 @@ public class WisprKeyboardService extends InputMethodService {
         suggestionEngine = new SuggestionEngine(this, shortcutsManager);
         clipboardManager = new ClipboardHistoryManager(this);
         vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+
+        // System clipboard monitoring
+        systemClipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (systemClipboard != null) {
+            clipListener = () -> {
+                captureSystemClipboard();
+                updateSuggestions();
+            };
+            try {
+                systemClipboard.addPrimaryClipChangedListener(clipListener);
+            } catch (Exception ignored) {}
+        }
     }
 
     @Override
     public View onCreateInputView() {
         keyboardRoot = new LinearLayout(this);
         keyboardRoot.setOrientation(LinearLayout.VERTICAL);
-        keyboardRoot.setBackgroundColor(Color.parseColor("#090d16"));
-        keyboardRoot.setPadding(dpToPx(4), dpToPx(3), dpToPx(4), dpToPx(6));
+        keyboardRoot.setBackgroundColor(Color.parseColor("#080b11"));
+        keyboardRoot.setPadding(dpToPx(4), dpToPx(2), dpToPx(4), dpToPx(4));
 
-        // 1. Build Top Smart Toolbar (Suggestions + Quick Action Buttons)
-        buildToolbar();
+        // 1. Two-Tier Header: Tier 1 (Suggestions) + Tier 2 (Action Toolbar)
+        buildTwoTierToolbar();
 
-        // 2. Main Content Container (Holds either Key Rows or Active Panel like Emojis/Clipboard)
+        // 2. Main Key Rows Container
         keysContainer = new LinearLayout(this);
         keysContainer.setOrientation(LinearLayout.VERTICAL);
         keysContainer.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         keyboardRoot.addView(keysContainer);
 
+        // 3. Panel Container for Emojis, GIFs, Clipboard, Shortcuts
         panelContainer = new LinearLayout(this);
         panelContainer.setOrientation(LinearLayout.VERTICAL);
         panelContainer.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(245)));
+                LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(260)));
         panelContainer.setVisibility(View.GONE);
         keyboardRoot.addView(panelContainer);
 
-        // Render initial view
+        // Render Keyboard
         showPanel(PanelMode.KEYBOARD);
 
         // Initialize Speech Recognizer
         initSpeechRecognizer();
-
-        // Update suggestions for initial empty state
-        updateSuggestions();
 
         return keyboardRoot;
     }
@@ -155,9 +168,7 @@ public class WisprKeyboardService extends InputMethodService {
         isSymbolMode = false;
         showPanel(PanelMode.KEYBOARD);
 
-        // Check clipboard for any new external clips copied by user
         captureSystemClipboard();
-
         updateEnterKeyAction(info);
         updateSuggestions();
     }
@@ -173,46 +184,62 @@ public class WisprKeyboardService extends InputMethodService {
         }
     }
 
-    // --- TOOLBAR & SMART ACTIONS ---
+    // --- TWO-TIER TOOLBAR DESIGN (ROW 1: SUGGESTIONS | ROW 2: ACTIONS) ---
 
-    private void buildToolbar() {
+    private void buildTwoTierToolbar() {
         toolbarContainer = new LinearLayout(this);
         toolbarContainer.setOrientation(LinearLayout.VERTICAL);
         toolbarContainer.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        toolbarContainer.setBackgroundColor(Color.parseColor("#0d1424"));
-        toolbarContainer.setPadding(dpToPx(4), dpToPx(2), dpToPx(4), dpToPx(3));
+        toolbarContainer.setBackgroundColor(Color.parseColor("#0c121e"));
+        toolbarContainer.setPadding(dpToPx(4), dpToPx(2), dpToPx(4), dpToPx(2));
 
-        // Row A: Suggestions Strip & Quick Action Icons
-        LinearLayout actionRow = new LinearLayout(this);
-        actionRow.setOrientation(LinearLayout.HORIZONTAL);
-        actionRow.setGravity(Gravity.CENTER_VERTICAL);
-        actionRow.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(40)));
-
-        // Suggestions Area (takes dynamic remaining space)
+        // TIER 1: Dedicated Full-Width Suggestion Strip
         suggestionsBar = new LinearLayout(this);
         suggestionsBar.setOrientation(LinearLayout.HORIZONTAL);
         suggestionsBar.setGravity(Gravity.CENTER_VERTICAL);
-        LinearLayout.LayoutParams sugParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f);
-        suggestionsBar.setLayoutParams(sugParams);
-        actionRow.addView(suggestionsBar);
+        suggestionsBar.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(38)));
+        toolbarContainer.addView(suggestionsBar);
 
-        // Quick Action Buttons Row (Mic, Emoji, GIF, Clipboard, Shortcuts, Mode, Settings)
+        // Divider
+        View divider = new View(this);
+        divider.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(1)));
+        divider.setBackgroundColor(Color.parseColor("#1a2638"));
+        toolbarContainer.addView(divider);
+
+        // TIER 2: Dedicated Quick Action Toolbar Row
+        actionToolbarRow = new LinearLayout(this);
+        actionToolbarRow.setOrientation(LinearLayout.HORIZONTAL);
+        actionToolbarRow.setGravity(Gravity.CENTER_VERTICAL);
+        actionToolbarRow.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(38)));
+
         HorizontalScrollView hsv = new HorizontalScrollView(this);
         hsv.setHorizontalScrollBarEnabled(false);
         hsv.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.MATCH_PARENT));
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
 
         LinearLayout iconRow = new LinearLayout(this);
         iconRow.setOrientation(LinearLayout.HORIZONTAL);
         iconRow.setGravity(Gravity.CENTER_VERTICAL);
         hsv.addView(iconRow);
 
-        // 🎙️ SEPARATE Dedicated Microphone Button
-        Button btnMic = createToolbarIconButton("🎙️", Color.parseColor("#4338ca"));
-        btnMic.setOnClickListener(v -> toggleVoiceDictation());
-        iconRow.addView(btnMic);
+        // 🎙️ SEPARATE Dedicated Microphone Button with text
+        Button btnVoice = new Button(this);
+        btnVoice.setText("🎙️ Voice");
+        btnVoice.setTextSize(11);
+        btnVoice.setTextColor(Color.WHITE);
+        btnVoice.setAllCaps(false);
+        btnVoice.setBackground(createChipDrawable("#4338ca", "#6366f1", 12));
+        btnVoice.setPadding(dpToPx(10), 0, dpToPx(10), 0);
+        LinearLayout.LayoutParams voiceParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, dpToPx(30));
+        voiceParams.setMargins(dpToPx(2), 0, dpToPx(4), 0);
+        btnVoice.setLayoutParams(voiceParams);
+        btnVoice.setOnClickListener(v -> toggleVoiceDictation());
+        iconRow.addView(btnVoice);
 
         // 😊 Emojis Toggle
         Button btnEmoji = createToolbarIconButton("😊", Color.TRANSPARENT);
@@ -243,21 +270,21 @@ public class WisprKeyboardService extends InputMethodService {
         modeChipButton.setBackground(createChipDrawable("#1e1b4b", "#6366f1", 12));
         modeChipButton.setPadding(dpToPx(8), 0, dpToPx(8), 0);
         LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, dpToPx(28));
-        chipParams.setMargins(dpToPx(2), 0, dpToPx(2), 0);
+                LinearLayout.LayoutParams.WRAP_CONTENT, dpToPx(30));
+        chipParams.setMargins(dpToPx(4), 0, dpToPx(4), 0);
         modeChipButton.setLayoutParams(chipParams);
         modeChipButton.setOnClickListener(v -> cycleNextMode());
         iconRow.addView(modeChipButton);
 
-        // ⚙️ Settings Button (Launches SettingsActivity)
+        // ⚙️ Settings Button
         Button btnSettings = createToolbarIconButton("⚙️", Color.TRANSPARENT);
         btnSettings.setOnClickListener(v -> openSettingsActivity());
         iconRow.addView(btnSettings);
 
-        actionRow.addView(hsv);
-        toolbarContainer.addView(actionRow);
+        actionToolbarRow.addView(hsv);
+        toolbarContainer.addView(actionToolbarRow);
 
-        // Row B: Voice Listening Banner (Visible only while speaking)
+        // Voice Listening Banner (shown while dictating)
         voiceStatusBanner = new LinearLayout(this);
         voiceStatusBanner.setOrientation(LinearLayout.HORIZONTAL);
         voiceStatusBanner.setGravity(Gravity.CENTER_VERTICAL);
@@ -302,7 +329,7 @@ public class WisprKeyboardService extends InputMethodService {
             btn.setBackground(gd);
         }
 
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dpToPx(34), dpToPx(34));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dpToPx(36), dpToPx(34));
         params.setMargins(dpToPx(2), 0, dpToPx(2), 0);
         btn.setLayoutParams(params);
         return btn;
@@ -314,24 +341,56 @@ public class WisprKeyboardService extends InputMethodService {
         if (suggestionsBar == null) return;
         suggestionsBar.removeAllViews();
 
+        // 1. Quick Clipboard Paste Chip (if user has copied text)
+        if (lastCopiedSnippet != null && !lastCopiedSnippet.trim().isEmpty()) {
+            final String clipToPaste = lastCopiedSnippet.trim();
+            String displayClip = clipToPaste.length() > 14 ? clipToPaste.substring(0, 14) + "…" : clipToPaste;
+
+            Button clipBtn = new Button(this);
+            clipBtn.setText("📋 " + displayClip);
+            clipBtn.setTextColor(Color.parseColor("#fbbf24"));
+            clipBtn.setTextSize(11);
+            clipBtn.setAllCaps(false);
+            clipBtn.setSingleLine(true);
+            clipBtn.setBackground(createChipDrawable("#241c08", "#d97706", 8));
+            clipBtn.setPadding(dpToPx(8), 0, dpToPx(8), 0);
+
+            LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, dpToPx(32));
+            cp.setMargins(dpToPx(2), 0, dpToPx(4), 0);
+            clipBtn.setLayoutParams(cp);
+
+            clipBtn.setOnClickListener(v -> {
+                InputConnection ic = getCurrentInputConnection();
+                if (ic != null) {
+                    ic.commitText(clipToPaste + " ", 1);
+                    triggerHaptic(15);
+                    lastCopiedSnippet = null;
+                    updateSuggestions();
+                }
+            });
+            suggestionsBar.addView(clipBtn);
+        }
+
+        // 2. Next-Word Prediction / Typing Pattern Suggestions
         String currentWord = currentWordBuffer.toString();
-        List<String> suggestions = suggestionEngine.getSuggestions(lastCommittedWord, currentWord, 3);
+        List<String> suggestions = suggestionEngine.getSuggestions(lastCommittedWord, currentWord, 4);
 
         for (int i = 0; i < suggestions.size(); i++) {
             final String suggestion = suggestions.get(i);
             Button sugBtn = new Button(this);
             sugBtn.setText(suggestion);
-            sugBtn.setTextColor(i == 0 ? Color.parseColor("#a5b4fc") : Color.WHITE);
+            sugBtn.setTextColor(i == 0 ? Color.parseColor("#c7d2fe") : Color.WHITE);
             sugBtn.setTextSize(12);
             sugBtn.setAllCaps(false);
             sugBtn.setSingleLine(true);
             sugBtn.setGravity(Gravity.CENTER);
 
-            // Highlight first suggestion
+            // Highlight primary suggestion
             if (i == 0 && !currentWord.isEmpty()) {
                 sugBtn.setBackground(createChipDrawable("#312e81", "#6366f1", 8));
             } else {
-                sugBtn.setBackground(createChipDrawable("#162032", "#23334d", 8));
+                sugBtn.setBackground(createChipDrawable("#141d2c", "#243247", 8));
             }
 
             LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dpToPx(32), 1.0f);
@@ -347,16 +406,13 @@ public class WisprKeyboardService extends InputMethodService {
         InputConnection ic = getCurrentInputConnection();
         if (ic == null) return;
 
-        // If user was typing a partial prefix, delete that prefix first
         int len = currentWordBuffer.length();
         if (len > 0) {
             ic.deleteSurroundingText(len, 0);
         }
 
-        // Commit the selected suggestion + trailing space
         ic.commitText(word + " ", 1);
 
-        // Learn user collocation
         suggestionEngine.recordWordPair(lastCommittedWord, word);
         lastCommittedWord = word;
         currentWordBuffer.setLength(0);
@@ -365,7 +421,7 @@ public class WisprKeyboardService extends InputMethodService {
         updateSuggestions();
     }
 
-    // --- PANEL NAVIGATION (KEYBOARD, EMOJI, GIF, CLIPBOARD, SHORTCUTS) ---
+    // --- PANEL NAVIGATION ---
 
     private void togglePanel(PanelMode mode) {
         if (currentPanel == mode) {
@@ -412,18 +468,13 @@ public class WisprKeyboardService extends InputMethodService {
         layout.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
 
-        // Category Tab Bar
         HorizontalScrollView tabScroll = new HorizontalScrollView(this);
         tabScroll.setHorizontalScrollBarEnabled(false);
-        tabScroll.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(38)));
-
         final LinearLayout tabs = new LinearLayout(this);
         tabs.setOrientation(LinearLayout.HORIZONTAL);
         tabScroll.addView(tabs);
         layout.addView(tabScroll);
 
-        // Emoji Grid Container inside ScrollView
         ScrollView emojiScroll = new ScrollView(this);
         emojiScroll.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.0f));
@@ -434,7 +485,6 @@ public class WisprKeyboardService extends InputMethodService {
         emojiScroll.addView(emojiContent);
         layout.addView(emojiScroll);
 
-        // Populate Category Tabs
         final String[] categories = EmojiData.getCategoryNames();
         for (int i = 0; i < categories.length; i++) {
             final String cat = categories[i];
@@ -456,10 +506,7 @@ public class WisprKeyboardService extends InputMethodService {
             tabs.addView(catBtn);
         }
 
-        // Render first category
         renderEmojis(emojiContent, categories[0]);
-
-        // Bottom Action Bar (ABC Return + Backspace)
         layout.addView(createPanelBottomBar());
         panelContainer.addView(layout);
     }
@@ -503,7 +550,6 @@ public class WisprKeyboardService extends InputMethodService {
         layout.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
 
-        // Category Tab Bar
         HorizontalScrollView tabScroll = new HorizontalScrollView(this);
         tabScroll.setHorizontalScrollBarEnabled(false);
         final LinearLayout tabs = new LinearLayout(this);
@@ -577,7 +623,6 @@ public class WisprKeyboardService extends InputMethodService {
             card.addView(tvTitle);
 
             card.setOnClickListener(v -> {
-                // If it has a direct GIF URL or fallback text, insert it
                 String toInsert = (!item.gifUrl.isEmpty()) ? item.gifUrl : item.fallbackText;
                 insertText(toInsert + " ");
                 triggerHaptic(18);
@@ -595,14 +640,13 @@ public class WisprKeyboardService extends InputMethodService {
         layout.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
 
-        // Header controls (Clear Unpinned History button)
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
         header.setPadding(dpToPx(8), dpToPx(4), dpToPx(8), dpToPx(4));
 
         TextView tvTitle = new TextView(this);
-        tvTitle.setText("📋 Clipboard & Pinned Snippets");
+        tvTitle.setText("📋 Clipboard History & Pinned Snippets");
         tvTitle.setTextColor(Color.parseColor("#818cf8"));
         tvTitle.setTextSize(12);
         tvTitle.setTypeface(null, Typeface.BOLD);
@@ -624,7 +668,6 @@ public class WisprKeyboardService extends InputMethodService {
         header.addView(btnClear);
         layout.addView(header);
 
-        // Clips List inside ScrollView
         ScrollView scroll = new ScrollView(this);
         scroll.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.0f));
@@ -659,7 +702,6 @@ public class WisprKeyboardService extends InputMethodService {
                 cp.bottomMargin = dpToPx(6);
                 card.setLayoutParams(cp);
 
-                // Clip text
                 TextView tv = new TextView(this);
                 tv.setText(clip.text);
                 tv.setTextColor(Color.WHITE);
@@ -669,7 +711,6 @@ public class WisprKeyboardService extends InputMethodService {
                 tv.setLayoutParams(txtParam);
                 card.addView(tv);
 
-                // Pin / Unpin Button
                 Button btnPin = new Button(this);
                 btnPin.setText(clip.isPinned ? "📌" : "☆");
                 btnPin.setTextSize(14);
@@ -680,7 +721,6 @@ public class WisprKeyboardService extends InputMethodService {
                 });
                 card.addView(btnPin);
 
-                // Delete Button
                 Button btnDel = new Button(this);
                 btnDel.setText("✕");
                 btnDel.setTextSize(12);
@@ -692,7 +732,6 @@ public class WisprKeyboardService extends InputMethodService {
                 });
                 card.addView(btnDel);
 
-                // 1-Tap Paste
                 card.setOnClickListener(v -> {
                     insertText(clip.text + " ");
                     triggerHaptic(18);
@@ -715,7 +754,6 @@ public class WisprKeyboardService extends InputMethodService {
         layout.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
 
-        // Header
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
@@ -731,7 +769,7 @@ public class WisprKeyboardService extends InputMethodService {
         header.addView(tvTitle);
 
         Button btnManage = new Button(this);
-        btnManage.setText("+ Add / Edit in Settings");
+        btnManage.setText("+ Add / Edit");
         btnManage.setTextSize(11);
         btnManage.setTextColor(Color.parseColor("#a5b4fc"));
         btnManage.setBackgroundColor(Color.TRANSPARENT);
@@ -740,7 +778,6 @@ public class WisprKeyboardService extends InputMethodService {
         header.addView(btnManage);
         layout.addView(header);
 
-        // List inside ScrollView
         ScrollView scroll = new ScrollView(this);
         scroll.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.0f));
@@ -802,7 +839,7 @@ public class WisprKeyboardService extends InputMethodService {
         bar.setGravity(Gravity.CENTER_VERTICAL);
         bar.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(42)));
-        bar.setBackgroundColor(Color.parseColor("#090d16"));
+        bar.setBackgroundColor(Color.parseColor("#080b11"));
         bar.setPadding(dpToPx(6), dpToPx(2), dpToPx(6), dpToPx(2));
 
         Button btnAbc = new Button(this);
@@ -827,16 +864,13 @@ public class WisprKeyboardService extends InputMethodService {
         btnBs.setBackground(createChipDrawable("#1e293b", "#334155", 8));
         LinearLayout.LayoutParams bsP = new LinearLayout.LayoutParams(dpToPx(70), dpToPx(36));
         btnBs.setLayoutParams(bsP);
-        btnBs.setOnClickListener(v -> {
-            handleBackspace();
-            triggerHaptic(12);
-        });
+        btnBs.setOnClickListener(v -> handleBackspace());
         bar.addView(btnBs);
 
         return bar;
     }
 
-    // --- MAIN QWERTY & KEY ROWS ---
+    // --- MAIN KEYBOARD ROWS WITH DEDICATED NUMBER ROW ---
 
     private void renderKeyRows() {
         if (keysContainer == null) return;
@@ -848,11 +882,37 @@ public class WisprKeyboardService extends InputMethodService {
             renderAlphabetRows();
         }
 
-        // Clean Bottom Spacebar Row (with Separate Normal Spacebar + Separate Mic Button)
         renderSpacebarRow();
     }
 
     private void renderAlphabetRows() {
+        // ROW 0: Dedicated Top Number Row (1 2 3 4 5 6 7 8 9 0)
+        String[] numbers = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"};
+        LinearLayout numRow = new LinearLayout(this);
+        numRow.setOrientation(LinearLayout.HORIZONTAL);
+        numRow.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        numRow.setPadding(0, dpToPx(1), 0, dpToPx(1));
+
+        for (final String num : numbers) {
+            Button numBtn = createButton(num, true);
+            numBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+            numBtn.setTextColor(Color.parseColor("#94a3b8"));
+            numBtn.setBackground(createChipDrawable("#101726", "#1c283d", 6));
+            LinearLayout.LayoutParams p = (LinearLayout.LayoutParams) numBtn.getLayoutParams();
+            p.height = dpToPx(35);
+            numBtn.setLayoutParams(p);
+
+            numBtn.setOnClickListener(v -> {
+                insertText(num);
+                currentWordBuffer.append(num);
+                updateSuggestions();
+            });
+            numRow.addView(numBtn);
+        }
+        keysContainer.addView(numRow);
+
+        // Standard QWERTY rows
         String[][] alphaRows = {
             {"q", "w", "e", "r", "t", "y", "u", "i", "o", "p"},
             {"a", "s", "d", "f", "g", "h", "j", "k", "l"},
@@ -868,7 +928,6 @@ public class WisprKeyboardService extends InputMethodService {
             rowLayout.setPadding(0, dpToPx(2), 0, dpToPx(2));
 
             if (r == 1) {
-                // Natural key stagger for middle row
                 rowLayout.setPadding(dpToPx(16), dpToPx(2), dpToPx(16), dpToPx(2));
             }
 
@@ -932,9 +991,9 @@ public class WisprKeyboardService extends InputMethodService {
         commaBtn.setOnClickListener(v -> handlePunctuation(","));
         bottomRow.addView(commaBtn);
 
-        // NORMAL CLEAN SPACEBAR (Inserts regular space when pressed)
-        Button spaceBtn = new Button(this);
-        spaceBtn.setText("Wispr Flow");
+        // NORMAL CLEAN SPACEBAR WITH CURSOR SCRUBBING
+        final Button spaceBtn = new Button(this);
+        spaceBtn.setText("English • Wispr Flow");
         spaceBtn.setTextColor(Color.parseColor("#94a3b8"));
         spaceBtn.setTextSize(13);
         spaceBtn.setAllCaps(false);
@@ -942,6 +1001,47 @@ public class WisprKeyboardService extends InputMethodService {
         LinearLayout.LayoutParams spaceParams = new LinearLayout.LayoutParams(0, dpToPx(42), 4.5f);
         spaceParams.setMargins(dpToPx(2), 0, dpToPx(2), 0);
         spaceBtn.setLayoutParams(spaceParams);
+
+        // Cursor scrubbing on spacebar swipe
+        spaceBtn.setOnTouchListener(new View.OnTouchListener() {
+            private float startX = 0;
+            private boolean isDragging = false;
+
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                switch (event.getAction()) {
+                    case MotionEvent.ACTION_DOWN:
+                        startX = event.getX();
+                        isDragging = false;
+                        return false; // let click listener fire if not dragging
+                    case MotionEvent.ACTION_MOVE:
+                        float deltaX = event.getX() - startX;
+                        if (Math.abs(deltaX) > dpToPx(16)) {
+                            isDragging = true;
+                            InputConnection ic = getCurrentInputConnection();
+                            if (ic != null) {
+                                if (deltaX > 0) {
+                                    ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT));
+                                    ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_RIGHT));
+                                } else {
+                                    ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_LEFT));
+                                    ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_LEFT));
+                                }
+                                triggerHaptic(8);
+                            }
+                            startX = event.getX();
+                            return true;
+                        }
+                        break;
+                    case MotionEvent.ACTION_UP:
+                        if (isDragging) {
+                            return true;
+                        }
+                        break;
+                }
+                return false;
+            }
+        });
 
         spaceBtn.setOnClickListener(v -> handleSpaceKey());
         bottomRow.addView(spaceBtn);
@@ -980,7 +1080,6 @@ public class WisprKeyboardService extends InputMethodService {
             String label = isCapsLocked ? "⇪" : (isShifted ? "⇧" : "⇧");
             btnShiftKey = createButton(label, true);
 
-            // Visual highlight when Shift or Caps Lock is active
             if (isCapsLocked) {
                 btnShiftKey.setBackground(createChipDrawable("#db2777", "#f472b6", 8));
                 btnShiftKey.setTextColor(Color.WHITE);
@@ -994,7 +1093,6 @@ public class WisprKeyboardService extends InputMethodService {
 
             btnShiftKey.setOnClickListener(v -> {
                 long now = System.currentTimeMillis();
-                // Double tap detects Caps Lock
                 if (now - lastShiftClickTime < 350) {
                     isCapsLocked = !isCapsLocked;
                     isShifted = isCapsLocked;
@@ -1027,7 +1125,7 @@ public class WisprKeyboardService extends InputMethodService {
                             @Override
                             public void run() {
                                 handleBackspace();
-                                backspaceHandler.postDelayed(this, 60);
+                                backspaceHandler.postDelayed(this, 50);
                             }
                         };
                         backspaceHandler.postDelayed(backspaceRunnable, 350);
@@ -1061,7 +1159,6 @@ public class WisprKeyboardService extends InputMethodService {
             insertText(displayChar);
             currentWordBuffer.append(displayChar);
 
-            // Revert shift if not caps locked
             if (isShifted && !isCapsLocked) {
                 isShifted = false;
                 renderKeyRows();
@@ -1097,7 +1194,7 @@ public class WisprKeyboardService extends InputMethodService {
         return gd;
     }
 
-    // --- TEXT INSERTION & SHORTCUT EXPANSION ---
+    // --- TEXT INSERTION & BACKSPACE (CRITICAL BUG FIX FOR SELECTED TEXT) ---
 
     private void insertText(String text) {
         InputConnection ic = getCurrentInputConnection();
@@ -1107,23 +1204,48 @@ public class WisprKeyboardService extends InputMethodService {
         }
     }
 
+    /**
+     * Handles backspace correctly for BOTH highlighted/selected text AND standard character deletion.
+     */
+    private void handleBackspace() {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) return;
+
+        // 1. Check if user has selected text to delete
+        CharSequence selected = ic.getSelectedText(0);
+        if (selected != null && selected.length() > 0) {
+            // Replacing selection with empty string immediately deletes highlighted text!
+            ic.commitText("", 1);
+            currentWordBuffer.setLength(0);
+        } else {
+            // 2. Standard single character deletion
+            ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL));
+            ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL));
+
+            if (currentWordBuffer.length() > 0) {
+                currentWordBuffer.deleteCharAt(currentWordBuffer.length() - 1);
+            }
+        }
+
+        updateSuggestions();
+        triggerHaptic(12);
+    }
+
     private void handleSpaceKey() {
         InputConnection ic = getCurrentInputConnection();
         if (ic == null) return;
 
         String currentWord = currentWordBuffer.toString().trim();
 
-        // 1. Check if the typed word is a shortcut trigger (e.g. "GM" -> "Good Morning")
+        // Check if the typed word is a shortcut trigger (e.g. "GM" -> "Good Morning")
         String expansion = shortcutsManager.getExpansion(currentWord);
         if (expansion != null) {
-            // Delete the trigger characters typed so far
             ic.deleteSurroundingText(currentWordBuffer.length(), 0);
             ic.commitText(expansion + " ", 1);
 
             suggestionEngine.recordWordPair(lastCommittedWord, expansion);
             lastCommittedWord = expansion;
         } else {
-            // Normal space insertion
             ic.commitText(" ", 1);
             if (!currentWord.isEmpty()) {
                 suggestionEngine.recordWordPair(lastCommittedWord, currentWord);
@@ -1160,17 +1282,6 @@ public class WisprKeyboardService extends InputMethodService {
         updateSuggestions();
     }
 
-    private void handleBackspace() {
-        InputConnection ic = getCurrentInputConnection();
-        if (ic != null) {
-            ic.deleteSurroundingText(1, 0);
-            if (currentWordBuffer.length() > 0) {
-                currentWordBuffer.deleteCharAt(currentWordBuffer.length() - 1);
-            }
-            updateSuggestions();
-        }
-    }
-
     private void handleEnterKey() {
         InputConnection ic = getCurrentInputConnection();
         if (ic == null) return;
@@ -1185,8 +1296,8 @@ public class WisprKeyboardService extends InputMethodService {
             action == EditorInfo.IME_ACTION_DONE) {
             ic.performEditorAction(action);
         } else {
-            ic.sendKeyEvent(new android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_ENTER));
-            ic.sendKeyEvent(new android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_ENTER));
+            ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER));
+            ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER));
         }
 
         currentWordBuffer.setLength(0);
@@ -1221,16 +1332,17 @@ public class WisprKeyboardService extends InputMethodService {
     }
 
     private void captureSystemClipboard() {
-        ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-        if (cm != null && cm.hasPrimaryClip() && cm.getPrimaryClip().getItemCount() > 0) {
-            CharSequence text = cm.getPrimaryClip().getItemAt(0).getText();
+        if (systemClipboard != null && systemClipboard.hasPrimaryClip() && systemClipboard.getPrimaryClip().getItemCount() > 0) {
+            CharSequence text = systemClipboard.getPrimaryClip().getItemAt(0).getText();
             if (text != null && text.length() > 0) {
-                clipboardManager.addClip(text.toString());
+                String str = text.toString();
+                clipboardManager.addClip(str);
+                lastCopiedSnippet = str;
             }
         }
     }
 
-    // --- SEPARATE DEDICATED VOICE DICTATION & GEMINI AI POLISHER ---
+    // --- SEPARATE DEDICATED VOICE DICTATION & DIGIT COLLAPSING ---
 
     private void initSpeechRecognizer() {
         if (SpeechRecognizer.isRecognitionAvailable(this)) {
@@ -1304,7 +1416,6 @@ public class WisprKeyboardService extends InputMethodService {
             return;
         }
 
-        // Verify microphone permission
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             Toast.makeText(this, "Microphone permission required! Opening Settings...", Toast.LENGTH_LONG).show();
             openSettingsActivity();
@@ -1328,7 +1439,6 @@ public class WisprKeyboardService extends InputMethodService {
         isListening = true;
         triggerHaptic(25);
 
-        // Show Voice Banner
         if (voiceStatusBanner != null) {
             voiceStatusBanner.setVisibility(View.VISIBLE);
             tvVoiceStatus.setText("🎙️ Initializing voice recognition...");
@@ -1369,18 +1479,22 @@ public class WisprKeyboardService extends InputMethodService {
         GeminiFlowClient.polishSpeech(rawText, apiKey, model, mode, new GeminiFlowClient.PolishCallback() {
             @Override
             public void onSuccess(String polishedText, long latencyMs) {
+                // Collapse any remaining spoken spaced digits (e.g. OTPs, phone numbers)
+                String formatted = GeminiFlowClient.collapseSpokenDigits(polishedText);
+
                 InputConnection ic = getCurrentInputConnection();
-                if (ic != null && !polishedText.isEmpty()) {
-                    ic.commitText(polishedText + " ", 1);
+                if (ic != null && !formatted.isEmpty()) {
+                    ic.commitText(formatted + " ", 1);
                     triggerHaptic(new long[]{20, 40});
                 }
             }
 
             @Override
             public void onError(String errorMessage, String fallbackText) {
+                String formatted = GeminiFlowClient.collapseSpokenDigits(fallbackText);
                 InputConnection ic = getCurrentInputConnection();
-                if (ic != null && !fallbackText.isEmpty()) {
-                    ic.commitText(fallbackText + " ", 1);
+                if (ic != null && !formatted.isEmpty()) {
+                    ic.commitText(formatted + " ", 1);
                 }
             }
         });
@@ -1433,6 +1547,11 @@ public class WisprKeyboardService extends InputMethodService {
 
     @Override
     public void onDestroy() {
+        if (systemClipboard != null && clipListener != null) {
+            try {
+                systemClipboard.removePrimaryClipChangedListener(clipListener);
+            } catch (Exception ignored) {}
+        }
         if (speechRecognizer != null) {
             try {
                 speechRecognizer.destroy();
