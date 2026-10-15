@@ -265,4 +265,125 @@ public class GeminiLiveWebSocketClient {
     public interface TestCallback {
         void onResult(boolean success, String message);
     }
+
+    /**
+     * Formats and structures raw OCR text via Gemini Live WebSocket with unlimited throughput.
+     */
+    public static void formatCardTextViaWebSocket(
+            final String rawOcrText,
+            final String apiKey,
+            final GeminiFlowClient.CardScanResultCallback callback) {
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            if (callback != null) callback.onError("No API Key available for Live WebSocket");
+            return;
+        }
+
+        final long start = System.currentTimeMillis();
+        final StringBuilder accumulated = new StringBuilder();
+        final Handler timeoutHandler = new Handler(Looper.getMainLooper());
+        final boolean[] finished = new boolean[]{false};
+        final Handler main = new Handler(Looper.getMainLooper());
+
+        final GeminiLiveWebSocketClient[] clientHolder = new GeminiLiveWebSocketClient[1];
+
+        clientHolder[0] = new GeminiLiveWebSocketClient(apiKey, "gemini-2.0-flash-exp", new LiveCallback() {
+            @Override
+            public void onConnected() {
+                String prompt = "You are an expert contact card parser.\n" +
+                        "Here is raw OCR text extracted from a business card:\n\"\"\"\n" +
+                        rawOcrText + "\n\"\"\"\n\n" +
+                        "Extract ONLY the following fields if present:\n" +
+                        "Name: [Full Name]\n" +
+                        "Designation: [Job Title or Role]\n" +
+                        "Organization: [Company Name]\n" +
+                        "Email: [Email Address]\n" +
+                        "Phone Number: [Phone Number]\n" +
+                        "City: [City Name]\n\n" +
+                        "CRITICAL: Output ONLY these 6 fields. Do NOT output any other field. If missing, omit line entirely. Plain text only, absolutely NO N/A.";
+                if (clientHolder[0] != null) {
+                    clientHolder[0].sendClientContent(prompt, true);
+                }
+            }
+
+            @Override
+            public void onTextReceived(String textChunk, boolean isDone) {
+                if (textChunk != null) {
+                    accumulated.append(textChunk);
+                }
+                if (isDone) {
+                    synchronized (finished) {
+                        if (finished[0]) return;
+                        finished[0] = true;
+                    }
+                    timeoutHandler.removeCallbacksAndMessages(null);
+                    if (clientHolder[0] != null) clientHolder[0].close();
+                    String cleaned = GeminiFlowClient.cleanCardOutput(accumulated.toString());
+                    long latency = System.currentTimeMillis() - start;
+                    main.post(() -> {
+                        if (callback != null) {
+                            if (!cleaned.isEmpty()) {
+                                callback.onSuccess(cleaned, latency, "Live WebSocket (Unlimited Requests)", false);
+                            } else {
+                                callback.onError("Empty structured result from WebSocket");
+                            }
+                        }
+                    });
+                }
+            }
+
+            @Override
+            public void onError(String errorMessage) {
+                synchronized (finished) {
+                    if (finished[0]) return;
+                    finished[0] = true;
+                }
+                timeoutHandler.removeCallbacksAndMessages(null);
+                if (clientHolder[0] != null) clientHolder[0].close();
+                main.post(() -> {
+                    if (callback != null) callback.onError(errorMessage);
+                });
+            }
+
+            @Override
+            public void onClosed(String reason) {
+                synchronized (finished) {
+                    if (finished[0]) return;
+                    finished[0] = true;
+                }
+                timeoutHandler.removeCallbacksAndMessages(null);
+                String cleaned = GeminiFlowClient.cleanCardOutput(accumulated.toString());
+                main.post(() -> {
+                    if (callback != null) {
+                        if (!cleaned.isEmpty()) {
+                            long latency = System.currentTimeMillis() - start;
+                            callback.onSuccess(cleaned, latency, "Live WebSocket (Unlimited Requests)", false);
+                        } else {
+                            callback.onError("WebSocket closed: " + reason);
+                        }
+                    }
+                });
+            }
+        });
+
+        timeoutHandler.postDelayed(() -> {
+            synchronized (finished) {
+                if (finished[0]) return;
+                finished[0] = true;
+            }
+            if (clientHolder[0] != null) clientHolder[0].close();
+            String cleaned = GeminiFlowClient.cleanCardOutput(accumulated.toString());
+            main.post(() -> {
+                if (callback != null) {
+                    if (!cleaned.isEmpty()) {
+                        long latency = System.currentTimeMillis() - start;
+                        callback.onSuccess(cleaned, latency, "Live WebSocket (Unlimited Requests)", false);
+                    } else {
+                        callback.onError("WebSocket timeout");
+                    }
+                }
+            });
+        }, 7500);
+
+        clientHolder[0].connect();
+    }
 }

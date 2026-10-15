@@ -491,40 +491,61 @@ public class CardScannerActivity extends AppCompatActivity {
 
     private void runAiCardExtraction(Bitmap bitmap) {
         progressContainer.setVisibility(View.VISIBLE);
-        tvStatusMessage.setText("⚡ Extracting Contact Info with Gemini AI...");
+        tvStatusMessage.setText("⚡ Step 1: Scanning with Original AI Model...");
         actionButtonsLayout.setVisibility(View.GONE);
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         bitmap.compress(Bitmap.CompressFormat.JPEG, 85, baos);
         byte[] jpegBytes = baos.toByteArray();
 
-        String apiKey = prefs.getApiKey();
-        String model = prefs.getSelectedModel();
+        final String apiKey = prefs.getApiKey();
+        String selected = prefs.getSelectedModel();
+        final String originalModel = (selected != null && !selected.isEmpty()) ? selected : "gemini-2.0-flash";
+        final String fallbackModel = originalModel.contains("flash") ? "gemini-1.5-flash" : "gemini-2.0-flash";
 
-        GeminiFlowClient.scanContactCard(jpegBytes, apiKey, model, new GeminiFlowClient.CardScanResultCallback() {
+        // TIER 1: Try Original AI Model directly
+        GeminiFlowClient.testPureAiVision(jpegBytes, apiKey, originalModel, new GeminiFlowClient.StrictAiCallback() {
             @Override
-            public void onSuccess(String formattedContactCard, long latencyMs, String modelUsed, boolean isFallback) {
+            public void onSuccess(String formattedContactCard, long latencyMs, String modelUsed) {
                 progressContainer.setVisibility(View.GONE);
                 etExtractedText.setText(formattedContactCard);
                 actionButtonsLayout.setVisibility(View.VISIBLE);
-                showEngineIndicator(modelUsed, isFallback, latencyMs);
+                showEngineIndicator("🟢 Original AI Model: " + modelUsed, false, latencyMs);
             }
 
             @Override
             public void onError(String errorMessage) {
-                // If Gemini Multimodal Vision API is busy/offline, fall back to on-device ML Kit OCR!
-                runLocalOcrFallback(bitmap);
+                Log.w("CardScanner", "Original AI model failed (" + errorMessage + "). Retrying with Fallback AI Model (" + fallbackModel + ")...");
+                tvStatusMessage.setText("🔄 Original AI busy. Trying Fallback AI Model (" + fallbackModel + ")...");
+
+                // TIER 2: Try Fallback Cloud AI Model
+                GeminiFlowClient.testPureAiVision(jpegBytes, apiKey, fallbackModel, new GeminiFlowClient.StrictAiCallback() {
+                    @Override
+                    public void onSuccess(String formattedContactCard, long latencyMs, String modelUsed) {
+                        progressContainer.setVisibility(View.GONE);
+                        etExtractedText.setText(formattedContactCard);
+                        actionButtonsLayout.setVisibility(View.VISIBLE);
+                        showEngineIndicator("🟡 Fallback AI Model: " + modelUsed, true, latencyMs);
+                    }
+
+                    @Override
+                    public void onError(String err) {
+                        Log.w("CardScanner", "Fallback AI model failed (" + err + "). Falling back to Local OCR + WebSocket relay...");
+                        // TIER 3: Local OCR + Extracted text shared over WebSocket with unlimited requests
+                        runLocalOcrThenWebSocket(bitmap, apiKey);
+                    }
+                });
             }
         });
     }
 
-    private void runLocalOcrFallback(Bitmap bitmap) {
+    private void runLocalOcrThenWebSocket(Bitmap bitmap, String apiKey) {
         if (bitmap == null) {
             fallbackToRuleBasedExtraction("No image");
             return;
         }
 
-        tvStatusMessage.setText("📷 AI busy/offline - Reading card with on-device local OCR...");
+        tvStatusMessage.setText("📷 Reading card with on-device Local OCR...");
         progressContainer.setVisibility(View.VISIBLE);
 
         try {
@@ -535,26 +556,40 @@ public class CardScannerActivity extends AppCompatActivity {
                     .addOnSuccessListener(visionText -> {
                         String rawOcrText = visionText.getText();
                         if (rawOcrText != null && !rawOcrText.trim().isEmpty()) {
-                            tvStatusMessage.setText("⚡ Structuring with Gemini AI (Unlimited Fast Tier)...");
-                            String apiKey = prefs.getApiKey();
-                            String model = prefs.getSelectedModel();
+                            tvStatusMessage.setText("⚡ Streaming extracted text via Live WebSocket (Unlimited Requests)...");
 
-                            GeminiFlowClient.formatExtractedCardText(rawOcrText, apiKey, model, new GeminiFlowClient.CardScanResultCallback() {
+                            // Share extracted OCR text over WebSocket (unlimited requests per day)
+                            GeminiLiveWebSocketClient.formatCardTextViaWebSocket(rawOcrText, apiKey, new GeminiFlowClient.CardScanResultCallback() {
                                 @Override
                                 public void onSuccess(String formattedCard, long latencyMs, String modelUsed, boolean isFallback) {
                                     progressContainer.setVisibility(View.GONE);
                                     etExtractedText.setText(formattedCard);
                                     actionButtonsLayout.setVisibility(View.VISIBLE);
-                                    showEngineIndicator(modelUsed, isFallback, latencyMs);
+                                    showEngineIndicator("⚡ Local OCR + Live WebSocket (Unlimited Requests)", false, latencyMs);
                                 }
 
                                 @Override
-                                public void onError(String error) {
-                                    progressContainer.setVisibility(View.GONE);
-                                    String localParsed = GeminiFlowClient.cleanCardOutput(GeminiFlowClient.parseRawOcrLocal(rawOcrText));
-                                    etExtractedText.setText(localParsed);
-                                    actionButtonsLayout.setVisibility(View.VISIBLE);
-                                    showEngineIndicator("Offline Local OCR", false, 0);
+                                public void onError(String wsError) {
+                                    // Try Fast REST structuring fallback, then local regex heuristics
+                                    GeminiFlowClient.formatExtractedCardText(rawOcrText, apiKey, prefs.getSelectedModel(), new GeminiFlowClient.CardScanResultCallback() {
+                                        @Override
+                                        public void onSuccess(String formattedCard, long latencyMs, String modelUsed, boolean isFallback) {
+                                            progressContainer.setVisibility(View.GONE);
+                                            etExtractedText.setText(formattedCard);
+                                            actionButtonsLayout.setVisibility(View.VISIBLE);
+                                            showEngineIndicator("⚡ Local OCR + Cloud Text (" + modelUsed + ")", isFallback, latencyMs);
+                                        }
+
+                                        @Override
+                                        public void onError(String error) {
+                                            // TIER 4: Pure offline local regex heuristics
+                                            progressContainer.setVisibility(View.GONE);
+                                            String localParsed = GeminiFlowClient.cleanCardOutput(GeminiFlowClient.parseRawOcrLocal(rawOcrText));
+                                            etExtractedText.setText(localParsed);
+                                            actionButtonsLayout.setVisibility(View.VISIBLE);
+                                            showEngineIndicator("⚪ Local OCR + Offline Regex", false, 0);
+                                        }
+                                    });
                                 }
                             });
                         } else {
@@ -574,24 +609,30 @@ public class CardScannerActivity extends AppCompatActivity {
         actionButtonsLayout.setVisibility(View.VISIBLE);
         String fallback = GeminiFlowClient.cleanCardOutput(GeminiFlowClient.parseRawOcrLocal(""));
         etExtractedText.setText(fallback);
-        showEngineIndicator("Offline Local Rules", false, 0);
+        showEngineIndicator("⚪ Local OCR + Offline Rules", false, 0);
     }
 
-    private void showEngineIndicator(String modelUsed, boolean isFallback, long latencyMs) {
+    private void showEngineIndicator(String label, boolean isFallback, long latencyMs) {
         if (tvEngineIndicator == null) return;
         tvEngineIndicator.setVisibility(View.VISIBLE);
-        if (modelUsed != null && (modelUsed.toLowerCase().contains("offline") || modelUsed.contains("Local"))) {
-            tvEngineIndicator.setText("⚪ Offline: Local Engine (" + latencyMs + "ms)");
-            tvEngineIndicator.setTextColor(Color.parseColor("#475569"));
-            tvEngineIndicator.setBackground(createBoxDrawable("#f1f5f9", "#cbd5e1", 6));
-        } else if (isFallback) {
-            tvEngineIndicator.setText("🟡 Fallback AI: " + modelUsed + " (" + latencyMs + "ms)");
-            tvEngineIndicator.setTextColor(Color.parseColor("#b45309"));
-            tvEngineIndicator.setBackground(createBoxDrawable("#fef3c7", "#f59e0b", 6));
-        } else {
-            tvEngineIndicator.setText("🟢 Pure AI: " + modelUsed + " (" + latencyMs + "ms)");
+        String text = label;
+        if (latencyMs > 0) {
+            text += " (" + latencyMs + "ms)";
+        }
+        tvEngineIndicator.setText(text);
+
+        if (label.contains("Original AI")) {
             tvEngineIndicator.setTextColor(Color.parseColor("#15803d"));
             tvEngineIndicator.setBackground(createBoxDrawable("#dcfce7", "#22c55e", 6));
+        } else if (label.contains("Fallback AI")) {
+            tvEngineIndicator.setTextColor(Color.parseColor("#b45309"));
+            tvEngineIndicator.setBackground(createBoxDrawable("#fef3c7", "#f59e0b", 6));
+        } else if (label.contains("WebSocket")) {
+            tvEngineIndicator.setTextColor(Color.parseColor("#0284c7"));
+            tvEngineIndicator.setBackground(createBoxDrawable("#e0f2fe", "#0284c7", 6));
+        } else {
+            tvEngineIndicator.setTextColor(Color.parseColor("#475569"));
+            tvEngineIndicator.setBackground(createBoxDrawable("#f1f5f9", "#cbd5e1", 6));
         }
     }
 

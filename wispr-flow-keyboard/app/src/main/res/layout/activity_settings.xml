@@ -22,6 +22,7 @@
             android:layout_marginBottom="24dp">
 
             <ImageView
+                android:id="@+id/ivHeaderLogo"
                 android:layout_width="56dp"
                 android:layout_height="56dp"
                 android:src="@drawable/smart_ai_logo"
@@ -349,6 +350,124 @@
                 android:textAllCaps="false"
                 android:textSize="13sp"
                 android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- CARD: MEETING ACTION ITEMS & SUMMARIES -->
+        <LinearLayout
+            android:id="@+id/cardActionItems"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="18dp"
+            android:layout_marginBottom="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="4dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="📋 Meeting Action Items &amp; Notes"
+                    android:textColor="@color/text_primary"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvActionItemsBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0 Pending"
+                    android:textColor="@color/accent_primary"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Action items extracted from meetings recorded on the keyboard are automatically captured here. Check off completed tasks or add new ones:"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:layout_marginBottom="12dp" />
+
+            <!-- Quick Add Action Item Row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="12dp">
+
+                <EditText
+                    android:id="@+id/etNewActionItem"
+                    android:layout_width="0dp"
+                    android:layout_height="40dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_key"
+                    android:hint="Add new action item or task..."
+                    android:textColorHint="@color/text_secondary"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:singleLine="true" />
+
+                <Button
+                    android:id="@+id/btnAddActionItem"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:text="+ Add"
+                    android:textColor="#ffffff"
+                    android:background="@drawable/bg_btn_primary"
+                    android:textAllCaps="false"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:layout_marginStart="8dp" />
+            </LinearLayout>
+
+            <!-- Action Items List Container -->
+            <LinearLayout
+                android:id="@+id/llActionItemsList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <!-- Utility Buttons: Clear Completed & View Past Meetings -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="8dp">
+
+                <Button
+                    android:id="@+id/btnClearCompletedActions"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_weight="1"
+                    android:text="🧹 Clear Completed"
+                    android:textColor="@color/text_secondary"
+                    android:background="@drawable/bg_btn_secondary"
+                    android:textAllCaps="false"
+                    android:textSize="11sp"
+                    android:layout_marginEnd="4dp" />
+
+                <Button
+                    android:id="@+id/btnViewMeetingSummaries"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_weight="1"
+                    android:text="📑 Past Meetings"
+                    android:textColor="@color/accent_primary"
+                    android:background="@drawable/bg_btn_secondary"
+                    android:textAllCaps="false"
+                    android:textSize="11sp"
+                    android:layout_marginStart="4dp" />
+            </LinearLayout>
         </LinearLayout>
 
         <!-- CARD 6: TEXT SHORTCUTS & CUSTOM EXPANSIONS -->

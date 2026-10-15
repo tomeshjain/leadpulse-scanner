@@ -1,13 +1,9 @@
 Add-Type -AssemblyName System.Drawing
 
-$src = 'C:\Users\Dell\.gemini\antigravity-ide\brain\2411c2a6-361e-4a47-afa6-50b50b501233\smart_ai_clean_logo_1792075821505.jpg'
-if (-not (Test-Path $src)) {
-    Write-Error "Source image not found at $src"
-    exit 1
-}
-
-$bmpSrc = [System.Drawing.Bitmap]::FromFile($src)
-Write-Host "Loaded source image: $($bmpSrc.Width)x$($bmpSrc.Height)"
+$srcSlate = 'C:\Users\Dell\.gemini\antigravity-ide\brain\2411c2a6-361e-4a47-afa6-50b50b501233\smart_ai_keyboard_app_icon_1792079875891.jpg'
+$srcLight = 'C:\Users\Dell\.gemini\antigravity-ide\brain\2411c2a6-361e-4a47-afa6-50b50b501233\smart_ai_keyboard_light_icon_1792079897507.jpg'
+$srcOled  = 'C:\Users\Dell\.gemini\antigravity-ide\brain\2411c2a6-361e-4a47-afa6-50b50b501233\smart_ai_keyboard_oled_icon_1792079920247.jpg'
+$srcCyber = 'C:\Users\Dell\.gemini\antigravity-ide\brain\2411c2a6-361e-4a47-afa6-50b50b501233\smart_ai_keyboard_cyberpunk_icon_1792079940040.jpg'
 
 function Save-Resized-Icon {
     param(
@@ -34,7 +30,11 @@ function Save-Resized-Icon {
     Write-Host "Saved: $destination ($size x $size)"
 }
 
-# 1. Update wispr-flow-keyboard launcher mipmaps
+$bmpSlate = [System.Drawing.Bitmap]::FromFile($srcSlate)
+$bmpLight = [System.Drawing.Bitmap]::FromFile($srcLight)
+$bmpOled  = [System.Drawing.Bitmap]::FromFile($srcOled)
+$bmpCyber = [System.Drawing.Bitmap]::FromFile($srcCyber)
+
 $kbRes = 'C:\Users\Dell\.gemini\antigravity-ide\scratch\sales-card-scanner-app\wispr-flow-keyboard\app\src\main\res'
 $densities = @{
     'mipmap-mdpi' = 48
@@ -44,40 +44,40 @@ $densities = @{
     'mipmap-xxxhdpi' = 192
 }
 
+# 1. Launcher icons (Slate primary)
 foreach ($d in $densities.Keys) {
     $size = $densities[$d]
     $dir = Join-Path $kbRes $d
-    Save-Resized-Icon -source $bmpSrc -size $size -destination (Join-Path $dir 'ic_launcher.png')
-    Save-Resized-Icon -source $bmpSrc -size $size -destination (Join-Path $dir 'ic_launcher_round.png')
+    Save-Resized-Icon -source $bmpSlate -size $size -destination (Join-Path $dir 'ic_launcher.png')
+    Save-Resized-Icon -source $bmpSlate -size $size -destination (Join-Path $dir 'ic_launcher_round.png')
 }
 
-# 2. Save high-res drawable for Settings & About screen
-$kbDrawable = Join-Path $kbRes 'drawable\smart_ai_logo.png'
-Save-Resized-Icon -source $bmpSrc -size 512 -destination $kbDrawable
+# 2. Save high-res drawables for all 4 theme variants
+Save-Resized-Icon -source $bmpSlate -size 512 -destination (Join-Path $kbRes 'drawable\smart_ai_logo.png')
+Save-Resized-Icon -source $bmpLight -size 512 -destination (Join-Path $kbRes 'drawable\smart_ai_logo_light.png')
+Save-Resized-Icon -source $bmpOled  -size 512 -destination (Join-Path $kbRes 'drawable\smart_ai_logo_oled.png')
+Save-Resized-Icon -source $bmpCyber -size 512 -destination (Join-Path $kbRes 'drawable\smart_ai_logo_cyberpunk.png')
 
-# 3. Update android app (hybrid/wrapper) if present
+# 3. Update android app wrapper if present
 $androidRes = 'C:\Users\Dell\.gemini\antigravity-ide\scratch\sales-card-scanner-app\android\app\src\main\res'
 if (Test-Path $androidRes) {
     foreach ($d in $densities.Keys) {
         $size = $densities[$d]
         $dir = Join-Path $androidRes $d
-        Save-Resized-Icon -source $bmpSrc -size $size -destination (Join-Path $dir 'ic_launcher.png')
-        Save-Resized-Icon -source $bmpSrc -size $size -destination (Join-Path $dir 'ic_launcher_round.png')
+        Save-Resized-Icon -source $bmpSlate -size $size -destination (Join-Path $dir 'ic_launcher.png')
+        Save-Resized-Icon -source $bmpSlate -size $size -destination (Join-Path $dir 'ic_launcher_round.png')
     }
 }
 
-# 4. Update web assets
-$webAssets = @(
-    'C:\Users\Dell\.gemini\antigravity-ide\scratch\sales-card-scanner-app\icons\icon-192.png',
-    'C:\Users\Dell\.gemini\antigravity-ide\scratch\sales-card-scanner-app\icons\icon-512.png',
-    'C:\Users\Dell\.gemini\antigravity-ide\scratch\sales-card-scanner-app\android\app\src\main\assets\icon-192.png',
-    'C:\Users\Dell\.gemini\antigravity-ide\scratch\sales-card-scanner-app\android\app\src\main\assets\icon-512.png'
-)
+# 4. Web assets
+Save-Resized-Icon -source $bmpSlate -size 192 -destination 'C:\Users\Dell\.gemini\antigravity-ide\scratch\sales-card-scanner-app\icons\icon-192.png'
+Save-Resized-Icon -source $bmpSlate -size 512 -destination 'C:\Users\Dell\.gemini\antigravity-ide\scratch\sales-card-scanner-app\icons\icon-512.png'
+Save-Resized-Icon -source $bmpSlate -size 192 -destination 'C:\Users\Dell\.gemini\antigravity-ide\scratch\sales-card-scanner-app\android\app\src\main\assets\icon-192.png'
+Save-Resized-Icon -source $bmpSlate -size 512 -destination 'C:\Users\Dell\.gemini\antigravity-ide\scratch\sales-card-scanner-app\android\app\src\main\assets\icon-512.png'
 
-Save-Resized-Icon -source $bmpSrc -size 192 -destination 'C:\Users\Dell\.gemini\antigravity-ide\scratch\sales-card-scanner-app\icons\icon-192.png'
-Save-Resized-Icon -source $bmpSrc -size 512 -destination 'C:\Users\Dell\.gemini\antigravity-ide\scratch\sales-card-scanner-app\icons\icon-512.png'
-Save-Resized-Icon -source $bmpSrc -size 192 -destination 'C:\Users\Dell\.gemini\antigravity-ide\scratch\sales-card-scanner-app\android\app\src\main\assets\icon-192.png'
-Save-Resized-Icon -source $bmpSrc -size 512 -destination 'C:\Users\Dell\.gemini\antigravity-ide\scratch\sales-card-scanner-app\android\app\src\main\assets\icon-512.png'
+$bmpSlate.Dispose()
+$bmpLight.Dispose()
+$bmpOled.Dispose()
+$bmpCyber.Dispose()
 
-$bmpSrc.Dispose()
-Write-Host "All icons generated successfully with high quality!"
+Write-Host "All theme-adaptive clean keyboard AI icons generated successfully!"

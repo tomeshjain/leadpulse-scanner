@@ -1606,6 +1606,17 @@ public class WisprKeyboardService extends InputMethodService {
         panelContainer.removeAllViews();
         KeyboardTheme theme = KeyboardTheme.resolveTheme(this, prefs != null ? prefs.getThemeId() : null);
 
+        // Automatically store meeting summary and action items in ActionItemsManager
+        final int addedTasks = ActionItemsManager.getInstance(this).addMeeting(
+                result.executiveSummary,
+                result.keyPoints,
+                result.actionItems,
+                conversationTranscript.toString()
+        );
+        if (addedTasks > 0) {
+            Toast.makeText(this, "📋 " + addedTasks + " Action Items saved to Settings!", Toast.LENGTH_SHORT).show();
+        }
+
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setLayoutParams(new LinearLayout.LayoutParams(
@@ -1738,6 +1749,22 @@ public class WisprKeyboardService extends InputMethodService {
             }
         });
         btnBar.addView(btnCopy);
+
+        Button btnViewItems = new Button(this);
+        btnViewItems.setText("📋 Tasks (" + addedTasks + ")");
+        btnViewItems.setTextSize(11);
+        btnViewItems.setTextColor(Color.parseColor("#38bdf8"));
+        btnViewItems.setBackground(createChipDrawable(theme.actionKeyColor, theme.dividerColor, 8));
+        btnViewItems.setAllCaps(false);
+        LinearLayout.LayoutParams vp = new LinearLayout.LayoutParams(0, dpToPx(36), 1.1f);
+        vp.setMargins(dpToPx(2), 0, dpToPx(2), 0);
+        btnViewItems.setLayoutParams(vp);
+        btnViewItems.setOnClickListener(v -> {
+            Intent intent = new Intent(this, SettingsActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+        });
+        btnBar.addView(btnViewItems);
 
         Button btnNew = new Button(this);
         btnNew.setText("🔄 New");
