@@ -1,74 +1,48 @@
-# 🎙️ Wispr Flow - Universal AI Voice Keyboard & Dictation
+# 🎙️ LeadPulse AI Keyboard & Smart Scanner
 
-> **Low-Latency AI Voice Recognition that replaces typing across your entire mobile phone.**
+> **The Executive Android AI Keyboard with PulseFlow Voice Dictation, Strict 6-Field Lead Scanner, and Zero-Touch Automated Contact Saving.**
 
-Wispr Flow is an AI-powered voice dictation and universal keyboard application. It transforms natural, rambling speech into clean, professionally formatted text in **sub-second latency** (<300ms) using **Google Gemini 2.0 Flash** and continuous streaming speech recognition.
-
----
-
-## 🚀 Key Innovations
-
-### 1. Dual-Engine Low-Latency Recognition
-* **Tier 1 (Instant Live Feedback, <20ms)**: Real-time continuous speech recognition with interim syllable streaming. Words light up on screen the millisecond you speak them.
-* **Tier 2 (Gemini 2.0 Flash Flow Engine, ~200ms)**: Sub-second AI polishing that strips filler words (*"um", "uh", "like", "you know", "basically"*), eliminates stuttering, and inlines perfect punctuation and capitalization.
-* **60 FPS Liquid Audio Waveform**: Built with the Web Audio API (`AudioContext` + `AnalyserNode`), rendering real-time responsive neon soundwaves reacting to your vocal pitch and volume.
+LeadPulse AI is a commercial-grade, multi-modal productivity suite for Android. It transforms natural, rambling speech into clean, professionally formatted text with **sub-second latency** (<300ms) using **Google Gemini 2.0 Flash**, multi-model fallback cascades, and Gemini Multimodal Live WebSocket streaming (`wss://`). It also features the **LeadPulse Smart Scanner** that extracts and saves business cards directly into your phone contacts with zero human clicks.
 
 ---
 
-## 📱 How Wispr Flow Replaces Mobile Typing System-Wide
+## 🚀 Key Innovations (v1.5.0)
 
-### A. Floating Voice Overlay HUD
-A draggable, compact microphone bubble that hovers on top of any active Android application (**WhatsApp, Chrome, Slack, Telegram, Gmail, Instagram, Notes**).
-1. Tap the floating mic.
-2. Speak your thoughts naturally.
-3. Release or pause — Wispr Flow automatically polishes the text and **copies it to your system clipboard** with a 1-tap instant paste button.
+### 1. 📇 Strict 6-Field Contact Card Scanner
+* **Strict Schema Compliance**: Extracts strictly `Name`, `Designation`, `Organization`, `Email`, `Phone Number`, and `City`.
+* **Zero Placeholders**: Any missing field is completely omitted—absolutely no `"N/A"`, `"None"`, `"null"`, or empty lines.
+* **⚡ 100% Automated Direct Contact Saving**: Programmatically inserts extracted details directly into Android's native contacts provider (`ContactsContract.RawContacts` and `ContactsContract.Data`) via batch operations. No manual confirmation dialog or contact editor screen needed.
 
-### B. Android Custom Keyboard (Input Method Service)
-Wispr Flow includes a native Android `InputMethodService` that registers as a full system keyboard:
-1. Enable **Wispr Flow AI Keyboard** in **Android Settings > System > Languages & Input > On-Screen Keyboard**.
-2. When typing in any app, tap the central **Flow AI Mic Spacebar**.
-3. Speech is captured, refined with AI, and **directly injected into the active text field** (`InputConnection.commitText()`).
+### 2. 🧠 Multi-Model Fallback Cascade & Transparent Engine Badges
+* **Intelligent AI Cascade**: Automatically waterfalls through models:
+  `gemini-2.0-flash` ➔ `gemini-1.5-flash` ➔ `gemini-1.5-pro` ➔ `Offline On-Device OCR / Rule Engine`.
+* **Transparent Badges**: Displays execution details in real time:
+  - `🟢 Pure AI: gemini-2.0-flash (320ms)`
+  - `🟡 Fallback AI: gemini-1.5-flash (480ms)`
+  - `⚪ Offline: Local Engine (210ms)`
 
----
+### 3. ⚡ Gemini Multimodal Live Streaming (WebSocket `wss://`)
+* High-performance bi-directional streaming client connecting to:
+  `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent`
+* Full duplex audio/text transmission with instant handshake verification.
 
-## 🎨 Multi-Flow Tone Presets
+### 4. 🧪 Dedicated Pure AI & Live Diagnostics Suite
+* Accessible in **Settings > Step 4**:
+  - **🎙️ Test Pure AI Voice**: Strictly tests voice dictation without fallback.
+  - **📇 Test Pure AI Contact Card**: Strictly tests card extraction and verifies 6-field formatting.
+  - **⚡ Test Gemini Multimodal Live**: Handshakes with the Live WebSocket server and logs real-time socket events in a dark monospace console.
 
-| Mode | Target Apps | Formatting Behavior |
-| :--- | :--- | :--- |
-| **✨ Smart Polish** | Universal | Strips filler words, corrects stutters, adds natural punctuation while preserving your authentic voice. |
-| **💬 Casual Chat** | WhatsApp, Telegram, Slack | Conversational, friendly, concise, with contextual emojis where appropriate. |
-| **✉️ Executive Email** | Gmail, Outlook, Clients | Formats into structured business emails with greetings, clean paragraphs, and sign-offs. |
-| **📝 Structured Notes** | Notion, Apple Notes, Obsidian | Converts rambling thoughts into Markdown `# Headings`, bullet points, and `[ ]` action checkboxes. |
-| **⚡ Raw Dictation** | Form Fields, Search | 1:1 exact transcription with high-accuracy punctuation. |
-| **💻 Code & Dev** | IDEs, GitHub, Terminal | Recognizes technical terms, formats `camelCase`, SQL queries, and terminal commands. |
-| **🪄 Voice Prompt** | AI Assistant, Drafting | Speaks an instruction (e.g. *"Draft a polite reply declining the meeting"*), and the AI executes the deliverable. |
-
----
-
-## 📖 Personal Vocabulary & Custom Dictionary
-Never suffer misspelled technical jargon again:
-* Add custom terms like `Kubernetes (K8s)`, `PostgreSQL`, `API Gateway`, or colleague names like `Tomesh`.
-* The AI engine prioritizes your personal dictionary when phonetically matching spoken words.
+### 5. ⌨️ Professional Extended System-Wide Keyboard
+* **Dynamic Tone Modes**: Smart Polish, Casual Chat, Executive Email, Structured Notes, Raw Dictation, Code & Dev, AI Voice Prompt.
+* **Real Animated GIF Insertion**: Rich content image delivery via `InputConnectionCompat.commitContent()` (WhatsApp, Telegram, Slack, Google Messages).
+* **Contextual Text-to-GIF Suggestions**: Glow chips suggest relevant reaction GIFs based on conversational keywords.
+* **Clipboard History & Quick Snippets**: Persistent clipboard manager with pin/star favorites.
+* **Clean Light & System Auto Themes**: Executive Royal Indigo (`#4f46e5`) accent palette matching Android 12+ Material You.
 
 ---
 
-## ⚡ Productivity Analytics
-* **Words Per Minute (WPM)**: Real-time speaking speed speedometer (typically 140–160 WPM vs. 38 WPM thumb typing).
-* **Time Saved Tracker**: Automatically calculates minutes and hours saved across your daily messaging and emailing.
+## 📦 Android APK Download
 
----
-
-## 📦 Android APK Build & GitHub Actions CI/CD
-
-Wispr Flow is automatically built into a native Android APK via GitHub Actions:
-* **Workflow**: `.github/workflows/build-apk.yml`
-* **Output**: `WisprFlow.apk`
-* **Releases**: Download the latest APK directly from the [GitHub Releases](https://github.com/tomeshjain/leadpulse-scanner/releases) tab.
-
----
-
-## 🛠️ Technology Stack
-* **Frontend**: HTML5, Vanilla CSS3 (Custom Dark Luxury Glassmorphism), Modern ES6+ JavaScript.
-* **Audio & Speech**: Web Speech API (`webkitSpeechRecognition`), Web Audio API (`AudioContext`, `AnalyserNode`).
-* **AI Model**: Google Gemini 2.0 Flash (`gemini-2.0-flash`) with instant offline rule-based fallback.
-* **Android Native**: Java, WebView, `InputMethodService` (Custom IME Keyboard), `Service` with `SYSTEM_ALERT_WINDOW` (Floating HUD).
+Download the ready-to-install Android APK from the official release:
+* **Release**: [LeadPulse v1.5.0 Release](https://github.com/tomeshjain/leadpulse-scanner/releases/tag/leadpulse-v1.5.0)
+* **Direct APK Download**: [LeadPulseAIKeyboard.apk](https://github.com/tomeshjain/leadpulse-scanner/releases/download/leadpulse-v1.5.0/LeadPulseAIKeyboard.apk)
