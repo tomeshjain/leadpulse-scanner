@@ -180,8 +180,9 @@ public class SuggestionEngine {
         COMMON_TYPOS.put("correctoons", "corrections");
     }
 
-    // Default base vocabulary
+    // Comprehensive base vocabulary (1,500+ essential, business, technical, and conversational words)
     private static final String[] BASE_WORDS = {
+        // High frequency core words
         "the", "be", "to", "of", "and", "a", "in", "that", "have", "I", "it", "for", "not", "on", "with",
         "he", "as", "you", "do", "at", "this", "but", "his", "by", "from", "they", "we", "say", "her",
         "she", "or", "an", "will", "my", "one", "all", "would", "there", "their", "what", "so", "up",
@@ -190,19 +191,139 @@ public class SuggestionEngine {
         "them", "see", "other", "than", "then", "now", "look", "only", "come", "its", "over", "think",
         "also", "back", "after", "use", "two", "how", "our", "work", "first", "well", "way", "even",
         "new", "want", "because", "any", "these", "give", "day", "most", "us", "great", "thanks", "thank",
-        "morning", "evening", "afternoon", "night", "tomorrow", "today", "yesterday", "meeting", "please",
-        "help", "send", "call", "email", "check", "update", "project", "ready", "done", "fine", "sure",
-        "happy", "welcome", "best", "regards", "wishes", "hello", "hi", "hey", "awesome", "perfect",
-        "sounds", "looking", "forward", "urgent", "client", "sales", "status", "team", "review", "schedule",
-        "business", "address", "company", "customer", "invoice", "payment", "received", "separate",
-        "definitely", "believe", "opportunity", "contact", "phone", "number", "message", "service",
-        "support", "contract", "proposal", "agreement", "account", "manager", "product", "price",
-        "discount", "order", "delivery", "confirm", "available", "discuss", "connect", "question",
-        "answer", "details", "information", "attachment", "feedback", "solution", "issue", "problem",
-        "resolved", "experience", "different", "always", "coming", "again", "truly", "basically",
-        "capital", "correction", "capitalization", "keyboard", "smart", "quick", "voice", "scan",
-        "appreciate", "assistance", "follow", "notes", "action", "items", "summary", "convenient",
-        "presentation", "document", "contract", "partnership", "collaboration", "reminder", "agenda"
+        // Common verbs & actions
+        "find", "tell", "ask", "seem", "feel", "try", "leave", "call", "need", "keep", "help", "talk",
+        "turn", "start", "show", "hear", "play", "run", "move", "live", "believe", "bring", "happen",
+        "write", "provide", "sit", "stand", "lose", "pay", "meet", "include", "continue", "set", "learn",
+        "change", "lead", "understand", "watch", "follow", "stop", "create", "speak", "read", "allow",
+        "add", "spend", "grow", "open", "walk", "win", "offer", "remember", "love", "consider", "appear",
+        "buy", "wait", "serve", "send", "expect", "build", "stay", "fall", "cut", "reach", "kill", "remain",
+        "suggest", "raise", "pass", "sell", "require", "report", "decide", "pull", "return", "explain",
+        "hope", "develop", "carry", "break", "receive", "agree", "support", "hit", "produce", "eat",
+        "cover", "catch", "draw", "choose", "share", "handle", "manage", "organize", "prepare", "finish",
+        "complete", "cancel", "confirm", "reschedule", "review", "approve", "reject", "submit", "request",
+        "forward", "reply", "compose", "draft", "verify", "check", "test", "fix", "resolve", "deliver",
+        // Adjectives & descriptions
+        "able", "active", "actual", "additional", "afraid", "alive", "alone", "angry", "annual", "another",
+        "anxious", "appropriate", "automatic", "available", "aware", "bad", "basic", "beautiful", "best",
+        "better", "big", "black", "blue", "boring", "brief", "bright", "broad", "busy", "calm", "capable",
+        "careful", "central", "certain", "cheap", "clean", "clear", "close", "cold", "comfortable", "common",
+        "complex", "conscious", "constant", "convenient", "cool", "correct", "critical", "current", "daily",
+        "dangerous", "dark", "dead", "dear", "deep", "definite", "different", "difficult", "direct", "dirty",
+        "distinct", "double", "dry", "due", "early", "easy", "economic", "effective", "efficient", "empty",
+        "entire", "equal", "essential", "exact", "excellent", "exciting", "expensive", "extra", "fair",
+        "familiar", "famous", "fantastic", "fast", "fat", "favorite", "federal", "final", "financial", "fine",
+        "firm", "fit", "fixed", "flat", "foreign", "formal", "former", "forward", "free", "frequent", "fresh",
+        "friendly", "full", "fun", "funny", "general", "glad", "global", "good", "great", "green", "guilty",
+        "happy", "hard", "healthy", "heavy", "helpful", "high", "historic", "honest", "hot", "huge", "human",
+        "ideal", "immediate", "important", "impossible", "impressive", "independent", "individual", "initial",
+        "instant", "intelligent", "internal", "international", "joint", "keen", "key", "kind", "large", "last",
+        "late", "later", "leading", "least", "legal", "light", "likely", "limited", "little", "live", "local",
+        "logical", "long", "loud", "lovely", "low", "lucky", "mad", "main", "major", "manual", "massive",
+        "maximum", "mental", "middle", "minimum", "minor", "modern", "modest", "monthly", "moral", "mutual",
+        "narrow", "national", "native", "natural", "neat", "necessary", "negative", "nervous", "new", "next",
+        "nice", "noble", "normal", "notable", "novel", "obvious", "odd", "official", "old", "open", "optimal",
+        "ordinary", "original", "other", "outdoor", "overall", "own", "particular", "patient", "perfect",
+        "permanent", "personal", "physical", "plain", "pleasant", "plenty", "polite", "poor", "popular",
+        "positive", "possible", "potential", "powerful", "practical", "precious", "precise", "premier", "premium",
+        "present", "pretty", "previous", "primary", "prime", "prior", "private", "probable", "productive",
+        "professional", "proper", "proud", "public", "pure", "quick", "quiet", "rapid", "rare", "raw", "ready",
+        "real", "realistic", "reasonable", "recent", "red", "regular", "relevant", "reliable", "remarkable",
+        "remote", "responsible", "rich", "right", "rough", "round", "routine", "safe", "same", "satisfied",
+        "secure", "senior", "separate", "serious", "severe", "sharp", "short", "significant", "silent",
+        "similar", "simple", "single", "slight", "slow", "small", "smart", "smooth", "soft", "solid", "sorry",
+        "special", "specific", "stable", "standard", "steady", "still", "straight", "strange", "strict",
+        "strong", "structural", "stupid", "successful", "sudden", "sufficient", "suitable", "super", "sure",
+        "surprised", "sweet", "swift", "tall", "technical", "temporary", "terrible", "thick", "thin", "tight",
+        "tiny", "tough", "traditional", "true", "typical", "unable", "uncomfortable", "unique", "united",
+        "universal", "unknown", "unlikely", "unnecessary", "unusual", "upper", "urgent", "useful", "useless",
+        "usual", "valuable", "various", "vast", "vital", "warm", "weak", "wealthy", "welcome", "white", "whole",
+        "wide", "wild", "willing", "wise", "wonderful", "wooden", "worth", "wrong", "yellow", "young",
+        // Adverbs & connectives
+        "absolutely", "actually", "again", "ahead", "almost", "already", "alright", "also", "always",
+        "anyway", "apart", "apparently", "approximately", "around", "aside", "basically", "before", "besides",
+        "certainly", "clearly", "closely", "completely", "constantly", "currently", "daily", "definitely",
+        "directly", "easily", "effectively", "entirely", "especially", "essentially", "eventually", "ever",
+        "everywhere", "exactly", "extremely", "fairly", "finally", "frequently", "fully", "generally", "greatly",
+        "hardly", "highly", "honestly", "hopefully", "immediately", "indeed", "initially", "instead", "just",
+        "largely", "lately", "literally", "mainly", "maybe", "merely", "mostly", "naturally", "nearly",
+        "necessarily", "never", "normally", "nowhere", "obviously", "occasionally", "often", "once", "only",
+        "originally", "otherwise", "overall", "partially", "particularly", "perfectly", "perhaps", "personally",
+        "possibly", "potentially", "precisely", "previously", "primarily", "probably", "promptly", "properly",
+        "quickly", "quietly", "quite", "rapidly", "rarely", "readily", "really", "reasonably", "recently",
+        "regularly", "relatively", "repeatedly", "safely", "scarcely", "seemingly", "seldom", "seriously",
+        "shortly", "significantly", "simply", "sincerely", "slightly", "slowly", "smoothly", "somehow", "somewhere",
+        "soon", "specifically", "still", "strongly", "subsequently", "successfully", "suddenly", "surely",
+        "surprisingly", "temporarily", "thoroughly", "together", "totally", "truly", "typically", "ultimately",
+        "undoubtedly", "unfortunately", "usually", "virtually", "widely", "willingly",
+        // Business, Sales & Executive Terms
+        "account", "acquisition", "agenda", "agreement", "analytics", "annual", "application", "appointment",
+        "appraisal", "approval", "asset", "assistance", "assurance", "attachment", "audience", "audit",
+        "benchmark", "board", "brand", "briefing", "brochure", "budget", "business", "buyer", "calendar",
+        "campaign", "candidate", "capacity", "capital", "cash", "catalog", "category", "certificate", "chairman",
+        "charter", "client", "collaboration", "colleague", "commission", "commitment", "commodity", "company",
+        "compensation", "competition", "compliance", "component", "conference", "confirmation", "consultant",
+        "consumer", "contact", "contract", "contribution", "convention", "cooperation", "corporation", "cost",
+        "coupon", "coverage", "credential", "credit", "criteria", "currency", "customer", "database", "deadline",
+        "deal", "debt", "decision", "defect", "delegate", "deliverable", "delivery", "demand", "department",
+        "deposit", "deputy", "description", "design", "detail", "development", "diagram", "director", "discount",
+        "distribution", "document", "documentation", "domain", "earnings", "economy", "efficiency", "effort",
+        "employee", "employer", "employment", "enterprise", "equipment", "estimate", "evaluation", "event",
+        "exchange", "executive", "expansion", "expenditure", "expense", "expert", "expertise", "export",
+        "facility", "factor", "factory", "feasibility", "feedback", "figure", "file", "finance", "firm",
+        "forecast", "format", "framework", "franchise", "freight", "fund", "guideline", "headquarters", "hire",
+        "incentive", "income", "incorporation", "index", "industry", "inflation", "infrastructure", "initiative",
+        "innovation", "input", "inspection", "insurance", "interest", "interface", "interview", "inventory",
+        "investigation", "investment", "investor", "invoice", "issue", "item", "itinerary", "job", "joint",
+        "journal", "journey", "knowledge", "labor", "launch", "leadership", "lease", "ledger", "liability",
+        "license", "limit", "liquidity", "logistics", "loss", "management", "manager", "manual", "manufacturer",
+        "margin", "market", "marketing", "material", "meeting", "memo", "memorandum", "merchandise", "merger",
+        "milestone", "minutes", "mission", "model", "monitoring", "monopoly", "monthly", "mortgage", "negotiation",
+        "net", "network", "newsletter", "objective", "obligation", "occupation", "offer", "office", "officer",
+        "operation", "opportunity", "order", "organization", "orientation", "outcome", "outlay", "output",
+        "outsourcing", "overhead", "overview", "package", "panel", "paper", "participant", "partnership",
+        "patent", "payment", "payroll", "penalty", "percentage", "performance", "period", "permission",
+        "personnel", "phase", "pipeline", "placement", "policy", "portfolio", "position", "potential",
+        "practice", "presentation", "price", "priority", "procedure", "proceedings", "process", "procurement",
+        "producer", "product", "production", "productivity", "profession", "professional", "profit", "profitability",
+        "program", "progress", "project", "projection", "promotion", "property", "proposal", "prospect",
+        "protocol", "provider", "provision", "purchase", "purchaser", "qualification", "quality", "quantity",
+        "quarter", "quarterly", "questionnaire", "quotation", "quote", "rate", "ratio", "receipt", "reception",
+        "recommendation", "record", "recruitment", "reduction", "redundancy", "referee", "reference", "refund",
+        "region", "regulation", "reimbursement", "relationship", "release", "remedy", "reminder", "remuneration",
+        "renewal", "rent", "reorganization", "report", "representative", "reputation", "requirement", "research",
+        "resignation", "resolution", "resource", "response", "responsibility", "restriction", "restructuring",
+        "result", "retail", "retailer", "revenue", "review", "reward", "risk", "role", "roster", "salary",
+        "sale", "sales", "sample", "saving", "scale", "scenario", "schedule", "scheme", "scope", "screen",
+        "section", "sector", "security", "segment", "seminar", "seniority", "sequence", "service", "settlement",
+        "share", "shareholder", "shipment", "shortage", "signature", "skill", "software", "solution",
+        "specification", "sponsor", "sponsorship", "staff", "stakeholder", "standard", "statement", "status",
+        "statute", "stock", "stockholder", "storage", "strategy", "structure", "subcontractor", "submission",
+        "subsidiary", "subsidy", "success", "suggestion", "suitability", "summary", "supervision", "supervisor",
+        "supplier", "supply", "support", "surcharge", "survey", "synergy", "system", "target", "tariff",
+        "task", "tax", "taxation", "team", "teleconference", "template", "tender", "term", "terminal",
+        "territory", "test", "testimonial", "timeline", "title", "total", "trade", "trademark", "trainee",
+        "training", "transaction", "transfer", "transition", "transportation", "trend", "trial", "turnover",
+        "undertaking", "underwriting", "union", "unit", "update", "upgrade", "urgency", "usage", "utility",
+        "valuation", "value", "variable", "variance", "variety", "vault", "vehicle", "vendor", "venture",
+        "venue", "verdict", "version", "viable", "visa", "volume", "vote", "voucher", "wage", "warehouse",
+        "warranty", "waste", "wealth", "welfare", "wholesale", "wholesaler", "window", "withdrawal", "workforce",
+        "workload", "workplace", "workshop", "yield",
+        // Calendar, scheduling & time
+        "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+        "January", "February", "March", "April", "May", "June", "July", "August", "September",
+        "October", "November", "December", "morning", "afternoon", "evening", "night", "noon", "midnight",
+        "today", "tomorrow", "yesterday", "tonight", "weekend", "weekday", "fortnight", "semester",
+        // Conversational expressions & courtesies
+        "hello", "hi", "hey", "goodbye", "bye", "welcome", "please", "cheers", "congratulations",
+        "appreciate", "sincerely", "regards", "respectfully", "cordially", "cheers", "apologies",
+        "pardon", "excuse", "greetings", "awesome", "wonderful", "brilliant", "delighted", "thrilled",
+        // Technology, AI & mobile devices
+        "Android", "keyboard", "device", "screen", "display", "voice", "audio", "microphone", "camera",
+        "network", "connection", "Bluetooth", "wireless", "settings", "profile", "password", "security",
+        "storage", "memory", "battery", "processor", "download", "upload", "install", "version", "update",
+        "notification", "message", "chat", "email", "browser", "internet", "website", "online", "offline",
+        "server", "cloud", "Google", "Samsung", "smart", "typing", "speech", "scanner", "card", "contacts"
     };
 
     /**
@@ -388,11 +509,20 @@ public class SuggestionEngine {
         }
     }
 
+    private final android.os.Handler saveHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable saveRunnable = this::saveLearnedPatterns;
+
+    public void scheduleSave() {
+        saveHandler.removeCallbacks(saveRunnable);
+        saveHandler.postDelayed(saveRunnable, 1200);
+    }
+
     public synchronized void saveLearnedPatterns() {
         try {
             JSONObject wordsObj = new JSONObject();
             for (Map.Entry<String, Integer> e : wordFrequency.entrySet()) {
-                if (e.getValue() > 5) {
+                // Ensure newly learned words (weight >= 6) are saved immediately
+                if (e.getValue() >= 6) {
                     wordsObj.put(e.getKey(), e.getValue());
                 }
             }
@@ -411,10 +541,24 @@ public class SuggestionEngine {
     }
 
     public synchronized void recordWord(String word) {
-        if (word == null || word.trim().length() < 2) return;
+        if (word == null) return;
         String clean = word.trim().toLowerCase(Locale.US);
+        if (clean.length() < 2) return;
+
+        // Ensure word contains at least one letter
+        boolean hasLetter = false;
+        for (int i = 0; i < clean.length(); i++) {
+            if (Character.isLetter(clean.charAt(i))) {
+                hasLetter = true;
+                break;
+            }
+        }
+        if (!hasLetter) return;
+
         int current = wordFrequency.getOrDefault(clean, 0);
-        wordFrequency.put(clean, current + 2);
+        // Promote new words immediately with minimum frequency of 8 so they surface in suggestions
+        wordFrequency.put(clean, Math.max(current + 3, 8));
+        scheduleSave();
     }
 
     public synchronized void recordWordPair(String prevWord, String currentWord) {
@@ -427,7 +571,8 @@ public class SuggestionEngine {
 
         Map<String, Integer> map = collocations.computeIfAbsent(w1, k -> new HashMap<>());
         int count = map.getOrDefault(w2, 0);
-        map.put(w2, count + 3);
+        map.put(w2, count + 4);
+        scheduleSave();
     }
 
     /**

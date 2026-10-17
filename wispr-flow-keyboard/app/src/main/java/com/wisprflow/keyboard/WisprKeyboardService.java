@@ -154,7 +154,25 @@ public class WisprKeyboardService extends InputMethodService {
     private Button modeChipButton;
 
     private final Handler backspaceHandler = new Handler(Looper.getMainLooper());
-    private Runnable backspaceRunnable;
+    private boolean isBackspaceActive = false;
+    private final Runnable backspaceRepeatRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (!isBackspaceActive) return;
+            handleBackspace();
+            if (isBackspaceActive) {
+                backspaceHandler.postDelayed(this, 55);
+            }
+        }
+    };
+
+    private void stopBackspaceRepeat() {
+        isBackspaceActive = false;
+        backspaceHandler.removeCallbacksAndMessages(null);
+    }
+
+    private final List<TextView> alphaKeyPrimaryLabels = new ArrayList<>();
+    private final List<String> alphaKeyOriginalLetters = new ArrayList<>();
 
     @Override
     public void onCreate() {
@@ -286,6 +304,7 @@ public class WisprKeyboardService extends InputMethodService {
     @Override
     public void onFinishInput() {
         super.onFinishInput();
+        stopBackspaceRepeat();
         if (isListening) {
             stopVoiceDictation();
         }
@@ -503,10 +522,79 @@ public class WisprKeyboardService extends InputMethodService {
 
     // --- SMART SUGGESTIONS & COLLOCATIONS ---
 
+    private static class CursorWordContext {
+        final String currentPrefix;
+        final String previousWord;
+
+        CursorWordContext(String currentPrefix, String previousWord) {
+            this.currentPrefix = currentPrefix != null ? currentPrefix : "";
+            this.previousWord = previousWord != null ? previousWord : "";
+        }
+    }
+
+    private CursorWordContext getCursorWordContext() {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) {
+            return new CursorWordContext(currentWordBuffer.toString().trim(), lastCommittedWord);
+        }
+
+        CharSequence before = ic.getTextBeforeCursor(60, 0);
+        if (before == null || before.length() == 0) {
+            currentWordBuffer.setLength(0);
+            return new CursorWordContext("", "");
+        }
+
+        int len = before.length();
+        char lastChar = before.charAt(len - 1);
+
+        // If cursor is immediately after whitespace or delimiter, user is between words
+        if (Character.isWhitespace(lastChar) || lastChar == '.' || lastChar == '?' || lastChar == '!' || lastChar == ',') {
+            currentWordBuffer.setLength(0);
+            int end = len - 1;
+            while (end >= 0 && (Character.isWhitespace(before.charAt(end)) || before.charAt(end) == '.' || before.charAt(end) == '?' || before.charAt(end) == '!' || before.charAt(end) == ',')) {
+                end--;
+            }
+            int start = end;
+            while (start >= 0 && !Character.isWhitespace(before.charAt(start)) && before.charAt(start) != '.' && before.charAt(start) != '?' && before.charAt(start) != '!') {
+                start--;
+            }
+            String prev = (start < end) ? before.subSequence(start + 1, end + 1).toString().trim() : "";
+            lastCommittedWord = prev;
+            return new CursorWordContext("", prev);
+        }
+
+        // User is currently typing or backspacing within an active word token
+        int start = len - 1;
+        while (start >= 0 && !Character.isWhitespace(before.charAt(start)) && before.charAt(start) != '\n') {
+            start--;
+        }
+        String activeToken = before.subSequence(start + 1, len).toString().trim();
+
+        int prevEnd = start;
+        while (prevEnd >= 0 && Character.isWhitespace(before.charAt(prevEnd))) {
+            prevEnd--;
+        }
+        int prevStart = prevEnd;
+        while (prevStart >= 0 && !Character.isWhitespace(before.charAt(prevStart))) {
+            prevStart--;
+        }
+        String prev = (prevStart < prevEnd) ? before.subSequence(prevStart + 1, prevEnd + 1).toString().trim() : "";
+
+        currentWordBuffer.setLength(0);
+        currentWordBuffer.append(activeToken);
+        lastCommittedWord = prev;
+
+        return new CursorWordContext(activeToken, prev);
+    }
+
     private void updateSuggestions() {
         if (suggestionsBar == null) return;
         suggestionsBar.removeAllViews();
         KeyboardTheme theme = KeyboardTheme.resolveTheme(this, prefs != null ? prefs.getThemeId() : null);
+
+        CursorWordContext ctx = getCursorWordContext();
+        String currentWord = ctx.currentPrefix;
+        String prevWord = ctx.previousWord;
 
         // 1. Quick Clipboard Paste Chip (if user has copied text)
         if (lastCopiedSnippet != null && !lastCopiedSnippet.trim().isEmpty()) {
@@ -541,10 +629,8 @@ public class WisprKeyboardService extends InputMethodService {
             suggestionsBar.addView(clipBtn);
         }
 
-        String currentWord = currentWordBuffer.toString().trim();
-
         // 2. Contextual Inline Emoji Suggestion Chip
-        final String contextualEmoji = SuggestionEngine.getEmojiForWord(currentWord.isEmpty() ? lastCommittedWord : currentWord);
+        final String contextualEmoji = SuggestionEngine.getEmojiForWord(currentWord.isEmpty() ? prevWord : currentWord);
         if (contextualEmoji != null) {
             Button emojiChip = new Button(this);
             emojiChip.setText(contextualEmoji);
@@ -562,7 +648,7 @@ public class WisprKeyboardService extends InputMethodService {
         }
 
         // 3. Contextual GIF Suggestion Chip (based on current/last typed word)
-        final GifReactionsData.GifItem contextualGif = GifReactionsData.findContextualGif(lastCommittedWord, currentWord);
+        final GifReactionsData.GifItem contextualGif = GifReactionsData.findContextualGif(prevWord, currentWord);
         if (contextualGif != null) {
             Button gifChip = new Button(this);
             gifChip.setText(contextualGif.emojiPreview + " GIF: " + contextualGif.title);
@@ -582,8 +668,8 @@ public class WisprKeyboardService extends InputMethodService {
             suggestionsBar.addView(gifChip);
         }
 
-        // 4. Next-Word Prediction / Typing Pattern Suggestions
-        List<String> suggestions = suggestionEngine.getSuggestions(lastCommittedWord, currentWord, 4);
+        // 4. Next-Word Prediction / Typing Pattern Suggestions (NEVER wiped out on backspace!)
+        List<String> suggestions = suggestionEngine.getSuggestions(prevWord, currentWord, 4);
 
         for (int i = 0; i < suggestions.size(); i++) {
             final String suggestion = suggestions.get(i);
@@ -618,21 +704,24 @@ public class WisprKeyboardService extends InputMethodService {
         InputConnection ic = getCurrentInputConnection();
         if (ic == null) return;
 
-        int len = currentWordBuffer.length();
+        CursorWordContext ctx = getCursorWordContext();
+        int len = ctx.currentPrefix.length();
         if (len > 0) {
             ic.deleteSurroundingText(len, 0);
         }
 
         ic.commitText(word + " ", 1);
 
-        suggestionEngine.recordWordPair(lastCommittedWord, word);
+        suggestionEngine.recordWord(word);
+        if (!ctx.previousWord.isEmpty()) {
+            suggestionEngine.recordWordPair(ctx.previousWord, word);
+        }
         lastCommittedWord = word;
         currentWordBuffer.setLength(0);
 
         triggerHaptic(12);
         playKeyClick();
         evaluateAutoCaps();
-        updateSuggestions();
     }
 
     // --- PANEL NAVIGATION ---
@@ -2027,6 +2116,7 @@ public class WisprKeyboardService extends InputMethodService {
     // --- MAIN KEYBOARD ROWS WITH CLEAN TEXT / NUMERIC SEPARATION ---
 
     private void renderKeyRows() {
+        stopBackspaceRepeat();
         if (keysContainer == null) return;
         keysContainer.removeAllViews();
 
@@ -2041,7 +2131,36 @@ public class WisprKeyboardService extends InputMethodService {
         }
     }
 
+    private void updateKeyCapsDisplay() {
+        boolean upper = isShifted || isCapsLocked;
+        for (int i = 0; i < alphaKeyPrimaryLabels.size() && i < alphaKeyOriginalLetters.size(); i++) {
+            TextView tv = alphaKeyPrimaryLabels.get(i);
+            String orig = alphaKeyOriginalLetters.get(i);
+            if (tv != null && orig != null) {
+                tv.setText(upper ? orig.toUpperCase(Locale.US) : orig.toLowerCase(Locale.US));
+            }
+        }
+        if (btnShiftKey != null) {
+            KeyboardTheme theme = KeyboardTheme.resolveTheme(this, prefs != null ? prefs.getThemeId() : null);
+            if (isCapsLocked) {
+                btnShiftKey.setText("⇪");
+                btnShiftKey.setTextColor(Color.WHITE);
+                btnShiftKey.setBackground(createChipDrawable(theme.accentColor, Color.TRANSPARENT, 8));
+            } else if (isShifted) {
+                btnShiftKey.setText("⇧");
+                btnShiftKey.setTextColor(Color.WHITE);
+                btnShiftKey.setBackground(createChipDrawable(theme.accentColor, Color.TRANSPARENT, 8));
+            } else {
+                btnShiftKey.setText("⇧");
+                btnShiftKey.setTextColor(theme.textColor);
+                btnShiftKey.setBackground(createChipDrawable(theme.actionKeyColor, theme.dividerColor, 8));
+            }
+        }
+    }
+
     private void renderAlphabetRows() {
+        alphaKeyPrimaryLabels.clear();
+        alphaKeyOriginalLetters.clear();
         // Optional Dedicated Top Number Row (only if user explicitly turned it ON in settings or toolbar)
         if (prefs != null && prefs.isShowNumberRow()) {
             String[] numbers = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"};
@@ -2385,7 +2504,7 @@ public class WisprKeyboardService extends InputMethodService {
                     }
                 }
                 lastShiftClickTime = now;
-                renderKeyRows();
+                updateKeyCapsDisplay();
                 triggerHaptic(15);
                 playKeyClick();
             });
@@ -2398,22 +2517,17 @@ public class WisprKeyboardService extends InputMethodService {
             p.weight = 1.4f;
 
             bsBtn.setOnTouchListener((v, event) -> {
-                switch (event.getAction()) {
+                switch (event.getActionMasked()) {
                     case MotionEvent.ACTION_DOWN:
+                        isBackspaceActive = true;
                         triggerHaptic(15);
                         handleBackspace();
-                        backspaceRunnable = new Runnable() {
-                            @Override
-                            public void run() {
-                                handleBackspace();
-                                backspaceHandler.postDelayed(this, 50);
-                            }
-                        };
-                        backspaceHandler.postDelayed(backspaceRunnable, 350);
+                        backspaceHandler.removeCallbacks(backspaceRepeatRunnable);
+                        backspaceHandler.postDelayed(backspaceRepeatRunnable, 400);
                         return true;
                     case MotionEvent.ACTION_UP:
                     case MotionEvent.ACTION_CANCEL:
-                        backspaceHandler.removeCallbacks(backspaceRunnable);
+                        stopBackspaceRepeat();
                         return true;
                 }
                 return false;
@@ -2443,7 +2557,7 @@ public class WisprKeyboardService extends InputMethodService {
 
             if (isShifted && !isCapsLocked) {
                 isShifted = false;
-                renderKeyRows();
+                updateKeyCapsDisplay();
             }
 
             updateSuggestions();
@@ -2452,12 +2566,12 @@ public class WisprKeyboardService extends InputMethodService {
     }
 
     /**
-     * Samsung-Style Alphabet Key View with visible secondary symbol subscript and long-press input.
+     * Samsung-Style Alphabet Key View with visible secondary symbol subscript and animated visual long-press indicator.
      */
     private View createAlphaKeyView(final String key, final String secondaryChar) {
         KeyboardTheme theme = KeyboardTheme.resolveTheme(this, prefs != null ? prefs.getThemeId() : null);
 
-        LinearLayout keyLayout = new LinearLayout(this);
+        final LinearLayout keyLayout = new LinearLayout(this);
         keyLayout.setOrientation(LinearLayout.VERTICAL);
         keyLayout.setGravity(Gravity.CENTER);
         keyLayout.setClickable(true);
@@ -2466,22 +2580,27 @@ public class WisprKeyboardService extends InputMethodService {
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dpToPx(46), 1.0f);
         params.setMargins(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2));
         keyLayout.setLayoutParams(params);
-        keyLayout.setBackground(createChipDrawable(theme.keyColor, theme.dividerColor, 8));
+        final GradientDrawable normalBg = createChipDrawable(theme.keyColor, theme.dividerColor, 8);
+        final GradientDrawable activeSecondaryBg = createChipDrawable(theme.accentColor, Color.WHITE, 8);
+        keyLayout.setBackground(normalBg);
 
-        // Secondary Symbol Label (Subtle, top-right)
+        // Secondary Symbol Label (Subtle top-right in idle, visibly highlighted on hold)
         boolean showSecondary = prefs == null || prefs.isShowSecondarySymbols();
+        final TextView tvSecondary;
         if (showSecondary && secondaryChar != null && !secondaryChar.isEmpty()) {
-            TextView tvSecondary = new TextView(this);
+            tvSecondary = new TextView(this);
             tvSecondary.setText(secondaryChar);
-            tvSecondary.setTextSize(TypedValue.COMPLEX_UNIT_SP, 9);
+            tvSecondary.setTextSize(TypedValue.COMPLEX_UNIT_SP, 9.5f);
             tvSecondary.setTextColor(theme.subTextColor);
+            tvSecondary.setTypeface(Typeface.DEFAULT_BOLD);
             tvSecondary.setGravity(Gravity.END | Gravity.TOP);
             tvSecondary.setPadding(0, dpToPx(1), dpToPx(4), 0);
             LinearLayout.LayoutParams secParams = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(12));
+                    LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(13));
             tvSecondary.setLayoutParams(secParams);
             keyLayout.addView(tvSecondary);
         } else {
+            tvSecondary = null;
             View spacer = new View(this);
             LinearLayout.LayoutParams spParams = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(showSecondary ? 10 : 4));
@@ -2490,9 +2609,9 @@ public class WisprKeyboardService extends InputMethodService {
         }
 
         // Primary Letter Label
-        final String displayChar = (isShifted || isCapsLocked) ? key.toUpperCase(Locale.US) : key.toLowerCase(Locale.US);
-        TextView tvPrimary = new TextView(this);
-        tvPrimary.setText(displayChar);
+        final TextView tvPrimary = new TextView(this);
+        String initialDisplay = (isShifted || isCapsLocked) ? key.toUpperCase(Locale.US) : key.toLowerCase(Locale.US);
+        tvPrimary.setText(initialDisplay);
         tvPrimary.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
         tvPrimary.setTextColor(theme.textColor);
         tvPrimary.setTypeface(Typeface.DEFAULT_BOLD);
@@ -2503,21 +2622,38 @@ public class WisprKeyboardService extends InputMethodService {
         tvPrimary.setLayoutParams(primParams);
         keyLayout.addView(tvPrimary);
 
+        alphaKeyPrimaryLabels.add(tvPrimary);
+        alphaKeyOriginalLetters.add(key);
+
+        final Handler visualHandler = new Handler(Looper.getMainLooper());
+        final boolean hasSecondary = secondaryChar != null && !secondaryChar.isEmpty();
+
         keyLayout.setOnClickListener(v -> {
-            insertText(displayChar);
-            currentWordBuffer.append(displayChar);
+            String charToInsert = (isShifted || isCapsLocked) ? key.toUpperCase(Locale.US) : key.toLowerCase(Locale.US);
+            insertText(charToInsert);
+            currentWordBuffer.append(charToInsert);
 
             // Auto-capitalization: single-shift is consumed after one letter
             if (isShifted && !isCapsLocked) {
                 isShifted = false;
-                renderKeyRows();
+                updateKeyCapsDisplay();
             }
 
             updateSuggestions();
         });
 
-        if (secondaryChar != null && !secondaryChar.isEmpty()) {
+        if (hasSecondary) {
             keyLayout.setOnLongClickListener(v -> {
+                // 1. VISUAL INDICATION: Key illuminates in vibrant accent color with bold bright white secondary character!
+                keyLayout.setBackground(activeSecondaryBg);
+                if (tvSecondary != null) {
+                    tvSecondary.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+                    tvSecondary.setTextColor(Color.WHITE);
+                    tvSecondary.setTypeface(Typeface.DEFAULT_BOLD);
+                }
+                tvPrimary.setAlpha(0.2f);
+
+                // 2. Insert secondary character
                 insertText(secondaryChar);
                 if (Character.isDigit(secondaryChar.charAt(0))) {
                     currentWordBuffer.append(secondaryChar);
@@ -2525,7 +2661,18 @@ public class WisprKeyboardService extends InputMethodService {
                 } else {
                     handlePunctuation(secondaryChar);
                 }
-                triggerHaptic(25);
+                triggerHaptic(30);
+
+                // 3. Smoothly restore idle appearance
+                visualHandler.postDelayed(() -> {
+                    keyLayout.setBackground(normalBg);
+                    if (tvSecondary != null) {
+                        tvSecondary.setTextSize(TypedValue.COMPLEX_UNIT_SP, 9.5f);
+                        tvSecondary.setTextColor(theme.subTextColor);
+                    }
+                    tvPrimary.setAlpha(1.0f);
+                }, 220);
+
                 return true;
             });
         }
@@ -2645,7 +2792,7 @@ public class WisprKeyboardService extends InputMethodService {
                 if (prefs == null || prefs.isAutoCapsEnabled()) {
                     if (!isCapsLocked) {
                         isShifted = true;
-                        renderKeyRows();
+                        updateKeyCapsDisplay();
                     }
                 }
 
@@ -2733,7 +2880,7 @@ public class WisprKeyboardService extends InputMethodService {
         if (punc.equals(".") || punc.equals("?") || punc.equals("!")) {
             if ((prefs == null || prefs.isAutoCapsEnabled()) && !isCapsLocked) {
                 isShifted = true;
-                renderKeyRows();
+                updateKeyCapsDisplay();
             }
         }
     }
@@ -2757,7 +2904,7 @@ public class WisprKeyboardService extends InputMethodService {
             ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER));
             if ((prefs == null || prefs.isAutoCapsEnabled()) && !isCapsLocked) {
                 isShifted = true;
-                renderKeyRows();
+                updateKeyCapsDisplay();
             }
         }
 
@@ -2791,7 +2938,7 @@ public class WisprKeyboardService extends InputMethodService {
                 variation == EditorInfo.TYPE_TEXT_VARIATION_FILTER) {
                 if (isShifted) {
                     isShifted = false;
-                    renderKeyRows();
+                    updateKeyCapsDisplay();
                 }
                 return;
             }
@@ -2799,13 +2946,13 @@ public class WisprKeyboardService extends InputMethodService {
             if ((inputType & EditorInfo.TYPE_TEXT_FLAG_CAP_CHARACTERS) != 0) {
                 isCapsLocked = true;
                 isShifted = true;
-                renderKeyRows();
+                updateKeyCapsDisplay();
                 return;
             }
 
             if ((inputType & EditorInfo.TYPE_TEXT_FLAG_CAP_WORDS) != 0) {
                 isShifted = true;
-                renderKeyRows();
+                updateKeyCapsDisplay();
                 return;
             }
         }
@@ -2814,7 +2961,7 @@ public class WisprKeyboardService extends InputMethodService {
         if (ic == null) {
             if (!isShifted) {
                 isShifted = true;
-                renderKeyRows();
+                updateKeyCapsDisplay();
             }
             return;
         }
@@ -2842,7 +2989,7 @@ public class WisprKeyboardService extends InputMethodService {
 
         if (isShifted != shouldCap) {
             isShifted = shouldCap;
-            renderKeyRows();
+            updateKeyCapsDisplay();
         }
     }
 
@@ -3674,6 +3821,7 @@ public class WisprKeyboardService extends InputMethodService {
 
     @Override
     public void onDestroy() {
+        stopBackspaceRepeat();
         if (systemClipboard != null && clipListener != null) {
             try {
                 systemClipboard.removePrimaryClipChangedListener(clipListener);
