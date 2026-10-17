@@ -348,6 +348,7 @@ public class SuggestionEngine {
         seedCollocation("contact", "card", 22);
         seedCollocation("business", "card", 22);
         seedCollocation("action", "items", 24);
+    }
 
     private void seedCollocation(String w1, String w2, int weight) {
         String key1 = w1.toLowerCase(Locale.US);
