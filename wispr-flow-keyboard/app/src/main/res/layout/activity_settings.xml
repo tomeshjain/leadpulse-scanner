@@ -308,7 +308,57 @@
                 android:id="@+id/cbShowNumberRow"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Show permanent Number Row on Text Keyboard (Uncheck to keep Text &amp; Numbers separated)"
+                android:text="Show permanent Number Row on Text Keyboard"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp"
+                android:layout_marginBottom="8dp" />
+
+            <!-- Auto-Capitalization Checkbox -->
+            <CheckBox
+                android:id="@+id/cbAutoCaps"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Auto-capitalization (Capitalize sentences &amp; always capitalize 'I')"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp"
+                android:layout_marginBottom="8dp" />
+
+            <!-- Auto-Correction Checkbox -->
+            <CheckBox
+                android:id="@+id/cbAutoCorrect"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Auto-correction (Automatically fix common typos &amp; contractions like don't, I'm)"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp"
+                android:layout_marginBottom="8dp" />
+
+            <!-- Double-Space Period Checkbox -->
+            <CheckBox
+                android:id="@+id/cbDoubleSpacePeriod"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Double-space period (Two spaces replaced as a . and a space)"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp"
+                android:layout_marginBottom="8dp" />
+
+            <!-- Secondary Symbols Checkbox -->
+            <CheckBox
+                android:id="@+id/cbSecondarySymbols"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Show secondary symbols on keys (Long-press to type numbers &amp; symbols)"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp"
+                android:layout_marginBottom="8dp" />
+
+            <!-- Keypress Sound Clicks Checkbox -->
+            <CheckBox
+                android:id="@+id/cbKeySounds"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Keypress sound effects (Audible click feedback)"
                 android:textColor="@color/text_primary"
                 android:textSize="13sp" />
         </LinearLayout>

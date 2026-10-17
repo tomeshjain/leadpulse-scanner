@@ -80,7 +80,8 @@ public class WisprKeyboardService extends InputMethodService {
         CLIPBOARD,
         SHORTCUTS,
         THEMES,
-        CONVERSATION
+        CONVERSATION,
+        TEXT_EDITING
     }
 
     private enum ClipboardTab {
@@ -104,11 +105,15 @@ public class WisprKeyboardService extends InputMethodService {
     // GIF Typing & Search State
     private boolean isGifTypingActive = false;
 
+    // Samsung Text Editing Selection State
+    private boolean isTextEditingSelecting = false;
+
     private KeyboardPreferences prefs;
     private ShortcutsManager shortcutsManager;
     private SuggestionEngine suggestionEngine;
     private ClipboardHistoryManager clipboardManager;
     private Vibrator vibrator;
+    private android.media.AudioManager audioManager;
     private SpeechRecognizer speechRecognizer;
     private ClipboardManager systemClipboard;
     private ClipboardManager.OnPrimaryClipChangedListener clipListener;
@@ -120,6 +125,7 @@ public class WisprKeyboardService extends InputMethodService {
     private boolean isSymbolMode = false;
     private boolean isNumpadMode = false;
     private long lastShiftClickTime = 0;
+    private long lastSpacePressTime = 0;
 
     // Typing tracking for Suggestions & Collocations
     private final StringBuilder currentWordBuffer = new StringBuilder();
@@ -133,6 +139,13 @@ public class WisprKeyboardService extends InputMethodService {
     private LinearLayout actionToolbarRow;
     private LinearLayout voiceStatusBanner;
     private TextView tvVoiceStatus;
+
+    // One-Handed Mode Container & Docks
+    private LinearLayout keyboardBodyContainer;
+    private LinearLayout leftDockPanel;
+    private LinearLayout rightDockPanel;
+    private LinearLayout mainInputContainer;
+
     private LinearLayout keysContainer;
     private LinearLayout panelContainer;
 
@@ -151,6 +164,7 @@ public class WisprKeyboardService extends InputMethodService {
         suggestionEngine = new SuggestionEngine(this, shortcutsManager);
         clipboardManager = new ClipboardHistoryManager(this);
         vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+        audioManager = (android.media.AudioManager) getSystemService(Context.AUDIO_SERVICE);
 
         // System clipboard monitoring
         systemClipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
@@ -176,20 +190,44 @@ public class WisprKeyboardService extends InputMethodService {
         // 1. Two-Tier Header: Tier 1 (Suggestions) + Tier 2 (Action Toolbar)
         buildTwoTierToolbar();
 
-        // 2. Main Key Rows Container
+        // 2. Horizontal Body Container for One-Handed Mode Support
+        keyboardBodyContainer = new LinearLayout(this);
+        keyboardBodyContainer.setOrientation(LinearLayout.HORIZONTAL);
+        keyboardBodyContainer.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        keyboardRoot.addView(keyboardBodyContainer);
+
+        // Left Dock Panel (shown in Right-Handed Mode)
+        leftDockPanel = createDockPanel(true);
+        keyboardBodyContainer.addView(leftDockPanel);
+
+        // Main Input Container (Keys & Panels)
+        mainInputContainer = new LinearLayout(this);
+        mainInputContainer.setOrientation(LinearLayout.VERTICAL);
+        mainInputContainer.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f));
+        keyboardBodyContainer.addView(mainInputContainer);
+
+        // Right Dock Panel (shown in Left-Handed Mode)
+        rightDockPanel = createDockPanel(false);
+        keyboardBodyContainer.addView(rightDockPanel);
+
+        // Keys Container
         keysContainer = new LinearLayout(this);
         keysContainer.setOrientation(LinearLayout.VERTICAL);
         keysContainer.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        keyboardRoot.addView(keysContainer);
+        mainInputContainer.addView(keysContainer);
 
-        // 3. Panel Container for Emojis, GIFs, Clipboard, Shortcuts, Themes
+        // Panel Container for Emojis, GIFs, Clipboard, Shortcuts, Themes, Text Editing
         panelContainer = new LinearLayout(this);
         panelContainer.setOrientation(LinearLayout.VERTICAL);
         panelContainer.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(260)));
         panelContainer.setVisibility(View.GONE);
-        keyboardRoot.addView(panelContainer);
+        mainInputContainer.addView(panelContainer);
+
+        applyOneHandedMode();
 
         // Render Keyboard
         showPanel(PanelMode.KEYBOARD);
@@ -214,9 +252,11 @@ public class WisprKeyboardService extends InputMethodService {
         checkPendingContactCard();
 
         applyCurrentTheme();
+        applyOneHandedMode();
         showPanel(PanelMode.KEYBOARD);
         captureSystemClipboard();
         updateEnterKeyAction(info);
+        evaluateAutoCaps();
         updateSuggestions();
     }
 
@@ -356,10 +396,31 @@ public class WisprKeyboardService extends InputMethodService {
         btnMeeting.setOnClickListener(v -> togglePanel(PanelMode.CONVERSATION));
         iconRow.addView(btnMeeting);
 
+        // ✂️ Samsung Text Editing & Selection Mode Toggle
+        Button btnTextEdit = createToolbarIconButton("✂️", Color.TRANSPARENT);
+        btnTextEdit.setOnClickListener(v -> togglePanel(PanelMode.TEXT_EDITING));
+        iconRow.addView(btnTextEdit);
+
         // 📋 Clipboard & Pinned Favorites Toggle
         Button btnClip = createToolbarIconButton("📋", Color.TRANSPARENT);
         btnClip.setOnClickListener(v -> togglePanel(PanelMode.CLIPBOARD));
         iconRow.addView(btnClip);
+
+        // 🔢 Number Row Quick Toggle
+        Button btnNumRow = createToolbarIconButton("🔢", Color.TRANSPARENT);
+        btnNumRow.setOnClickListener(v -> {
+            boolean current = prefs != null && prefs.isShowNumberRow();
+            if (prefs != null) prefs.setShowNumberRow(!current);
+            renderKeyRows();
+            triggerHaptic(15);
+            Toast.makeText(this, !current ? "Number Row Shown" : "Number Row Hidden", Toast.LENGTH_SHORT).show();
+        });
+        iconRow.addView(btnNumRow);
+
+        // 📱 One-Handed Mode Quick Toggle
+        Button btnOneHand = createToolbarIconButton("📱", Color.TRANSPARENT);
+        btnOneHand.setOnClickListener(v -> cycleOneHandedMode());
+        iconRow.addView(btnOneHand);
 
         // 🎞️ GIFs & Reactions Toggle
         Button btnGifs = createToolbarIconButton("🎞️", Color.TRANSPARENT);
@@ -445,6 +506,7 @@ public class WisprKeyboardService extends InputMethodService {
     private void updateSuggestions() {
         if (suggestionsBar == null) return;
         suggestionsBar.removeAllViews();
+        KeyboardTheme theme = KeyboardTheme.resolveTheme(this, prefs != null ? prefs.getThemeId() : null);
 
         // 1. Quick Clipboard Paste Chip (if user has copied text)
         if (lastCopiedSnippet != null && !lastCopiedSnippet.trim().isEmpty()) {
@@ -470,15 +532,36 @@ public class WisprKeyboardService extends InputMethodService {
                 if (ic != null) {
                     ic.commitText(clipToPaste + " ", 1);
                     triggerHaptic(15);
+                    playKeyClick();
                     lastCopiedSnippet = null;
+                    evaluateAutoCaps();
                     updateSuggestions();
                 }
             });
             suggestionsBar.addView(clipBtn);
         }
 
-        // 2. Contextual GIF Suggestion Chip (based on current/last typed word)
-        String currentWord = currentWordBuffer.toString();
+        String currentWord = currentWordBuffer.toString().trim();
+
+        // 2. Contextual Inline Emoji Suggestion Chip
+        final String contextualEmoji = SuggestionEngine.getEmojiForWord(currentWord.isEmpty() ? lastCommittedWord : currentWord);
+        if (contextualEmoji != null) {
+            Button emojiChip = new Button(this);
+            emojiChip.setText(contextualEmoji);
+            emojiChip.setTextSize(16);
+            emojiChip.setPadding(0, 0, 0, 0);
+            emojiChip.setBackground(createChipDrawable(theme.keyColor, theme.dividerColor, 8));
+            LinearLayout.LayoutParams ep = new LinearLayout.LayoutParams(dpToPx(38), dpToPx(32));
+            ep.setMargins(dpToPx(2), 0, dpToPx(4), 0);
+            emojiChip.setLayoutParams(ep);
+            emojiChip.setOnClickListener(v -> {
+                insertText(contextualEmoji + " ");
+                triggerHaptic(12);
+            });
+            suggestionsBar.addView(emojiChip);
+        }
+
+        // 3. Contextual GIF Suggestion Chip (based on current/last typed word)
         final GifReactionsData.GifItem contextualGif = GifReactionsData.findContextualGif(lastCommittedWord, currentWord);
         if (contextualGif != null) {
             Button gifChip = new Button(this);
@@ -499,24 +582,27 @@ public class WisprKeyboardService extends InputMethodService {
             suggestionsBar.addView(gifChip);
         }
 
-        // 3. Next-Word Prediction / Typing Pattern Suggestions
+        // 4. Next-Word Prediction / Typing Pattern Suggestions
         List<String> suggestions = suggestionEngine.getSuggestions(lastCommittedWord, currentWord, 4);
 
         for (int i = 0; i < suggestions.size(); i++) {
             final String suggestion = suggestions.get(i);
             Button sugBtn = new Button(this);
             sugBtn.setText(suggestion);
-            sugBtn.setTextColor(i == 0 ? Color.parseColor("#c7d2fe") : Color.WHITE);
-            sugBtn.setTextSize(12);
             sugBtn.setAllCaps(false);
             sugBtn.setSingleLine(true);
             sugBtn.setGravity(Gravity.CENTER);
 
-            // Highlight primary suggestion
+            // Highlight primary / autocorrect suggestion (Center / Index 0 when typing)
             if (i == 0 && !currentWord.isEmpty()) {
-                sugBtn.setBackground(createChipDrawable("#312e81", "#6366f1", 8));
+                sugBtn.setTextColor(Color.WHITE);
+                sugBtn.setTextSize(13);
+                sugBtn.setTypeface(Typeface.DEFAULT_BOLD);
+                sugBtn.setBackground(createChipDrawable(theme.accentColor, Color.TRANSPARENT, 8));
             } else {
-                sugBtn.setBackground(createChipDrawable("#141d2c", "#243247", 8));
+                sugBtn.setTextColor(theme.textColor);
+                sugBtn.setTextSize(12);
+                sugBtn.setBackground(createChipDrawable(theme.keyColor, theme.dividerColor, 8));
             }
 
             LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dpToPx(32), 1.0f);
@@ -543,7 +629,9 @@ public class WisprKeyboardService extends InputMethodService {
         lastCommittedWord = word;
         currentWordBuffer.setLength(0);
 
-        triggerHaptic(15);
+        triggerHaptic(12);
+        playKeyClick();
+        evaluateAutoCaps();
         updateSuggestions();
     }
 
@@ -592,6 +680,9 @@ public class WisprKeyboardService extends InputMethodService {
                     break;
                 case CONVERSATION:
                     buildConversationPanel();
+                    break;
+                case TEXT_EDITING:
+                    buildTextEditingPanel();
                     break;
             }
         }
@@ -1951,7 +2042,7 @@ public class WisprKeyboardService extends InputMethodService {
     }
 
     private void renderAlphabetRows() {
-        // Optional Dedicated Top Number Row (only if user explicitly turned it ON in settings)
+        // Optional Dedicated Top Number Row (only if user explicitly turned it ON in settings or toolbar)
         if (prefs != null && prefs.isShowNumberRow()) {
             String[] numbers = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"};
             LinearLayout numRow = new LinearLayout(this);
@@ -1962,9 +2053,9 @@ public class WisprKeyboardService extends InputMethodService {
 
             for (final String num : numbers) {
                 Button numBtn = createButton(num, true);
-                numBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+                numBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
                 LinearLayout.LayoutParams p = (LinearLayout.LayoutParams) numBtn.getLayoutParams();
-                p.height = dpToPx(34);
+                p.height = dpToPx(36);
                 numBtn.setLayoutParams(p);
 
                 numBtn.setOnClickListener(v -> {
@@ -1977,15 +2068,22 @@ public class WisprKeyboardService extends InputMethodService {
             keysContainer.addView(numRow);
         }
 
-        // Standard QWERTY rows
+        // Standard QWERTY rows with secondary symbols
         String[][] alphaRows = {
             {"q", "w", "e", "r", "t", "y", "u", "i", "o", "p"},
             {"a", "s", "d", "f", "g", "h", "j", "k", "l"},
             {"shift", "z", "x", "c", "v", "b", "n", "m", "backspace"}
         };
 
+        String[][] secondarySymbols = {
+            {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"},
+            {"@", "#", "$", "_", "&", "-", "+", "(", ")"},
+            {null, "*", "\"", "'", ":", ";", "!", "?", null}
+        };
+
         for (int r = 0; r < alphaRows.length; r++) {
             String[] rowKeys = alphaRows[r];
+            String[] secKeys = secondarySymbols[r];
             LinearLayout rowLayout = new LinearLayout(this);
             rowLayout.setOrientation(LinearLayout.HORIZONTAL);
             rowLayout.setLayoutParams(new LinearLayout.LayoutParams(
@@ -1996,8 +2094,14 @@ public class WisprKeyboardService extends InputMethodService {
                 rowLayout.setPadding(dpToPx(16), dpToPx(2), dpToPx(16), dpToPx(2));
             }
 
-            for (String key : rowKeys) {
-                rowLayout.addView(createKeyView(key));
+            for (int c = 0; c < rowKeys.length; c++) {
+                String key = rowKeys[c];
+                String sec = (c < secKeys.length) ? secKeys[c] : null;
+                if ("shift".equals(key) || "backspace".equals(key)) {
+                    rowLayout.addView(createKeyView(key));
+                } else {
+                    rowLayout.addView(createAlphaKeyView(key, sec));
+                }
             }
             keysContainer.addView(rowLayout);
         }
@@ -2247,16 +2351,21 @@ public class WisprKeyboardService extends InputMethodService {
     }
 
     private View createKeyView(final String key) {
+        KeyboardTheme theme = KeyboardTheme.resolveTheme(this, prefs != null ? prefs.getThemeId() : null);
+
         if ("shift".equals(key)) {
-            String label = isCapsLocked ? "⇪" : (isShifted ? "⇧" : "⇧");
+            String label = isCapsLocked ? "⇪" : "⇧";
             btnShiftKey = createButton(label, true);
 
             if (isCapsLocked) {
                 btnShiftKey.setBackground(createChipDrawable("#db2777", "#f472b6", 8));
                 btnShiftKey.setTextColor(Color.WHITE);
             } else if (isShifted) {
-                btnShiftKey.setBackground(createChipDrawable("#4338ca", "#818cf8", 8));
+                btnShiftKey.setBackground(createChipDrawable(theme.accentColor, Color.TRANSPARENT, 8));
                 btnShiftKey.setTextColor(Color.WHITE);
+            } else {
+                btnShiftKey.setBackground(createChipDrawable(theme.actionKeyColor, theme.dividerColor, 8));
+                btnShiftKey.setTextColor(theme.textColor);
             }
 
             LinearLayout.LayoutParams p = (LinearLayout.LayoutParams) btnShiftKey.getLayoutParams();
@@ -2278,6 +2387,7 @@ public class WisprKeyboardService extends InputMethodService {
                 lastShiftClickTime = now;
                 renderKeyRows();
                 triggerHaptic(15);
+                playKeyClick();
             });
             return btnShiftKey;
         }
@@ -2319,11 +2429,12 @@ public class WisprKeyboardService extends InputMethodService {
                 isSymbolMode = false;
                 renderKeyRows();
                 triggerHaptic(15);
+                playKeyClick();
             });
             return abcBtn;
         }
 
-        // Standard Character Key
+        // Fallback single-character button
         final String displayChar = (isShifted || isCapsLocked) ? key.toUpperCase(Locale.US) : key.toLowerCase(Locale.US);
         Button charBtn = createButton(displayChar, false);
         charBtn.setOnClickListener(v -> {
@@ -2340,8 +2451,90 @@ public class WisprKeyboardService extends InputMethodService {
         return charBtn;
     }
 
+    /**
+     * Samsung-Style Alphabet Key View with visible secondary symbol subscript and long-press input.
+     */
+    private View createAlphaKeyView(final String key, final String secondaryChar) {
+        KeyboardTheme theme = KeyboardTheme.resolveTheme(this, prefs != null ? prefs.getThemeId() : null);
+
+        LinearLayout keyLayout = new LinearLayout(this);
+        keyLayout.setOrientation(LinearLayout.VERTICAL);
+        keyLayout.setGravity(Gravity.CENTER);
+        keyLayout.setClickable(true);
+        keyLayout.setFocusable(true);
+
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dpToPx(46), 1.0f);
+        params.setMargins(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2));
+        keyLayout.setLayoutParams(params);
+        keyLayout.setBackground(createChipDrawable(theme.keyColor, theme.dividerColor, 8));
+
+        // Secondary Symbol Label (Subtle, top-right)
+        boolean showSecondary = prefs == null || prefs.isShowSecondarySymbols();
+        if (showSecondary && secondaryChar != null && !secondaryChar.isEmpty()) {
+            TextView tvSecondary = new TextView(this);
+            tvSecondary.setText(secondaryChar);
+            tvSecondary.setTextSize(TypedValue.COMPLEX_UNIT_SP, 9);
+            tvSecondary.setTextColor(theme.subTextColor);
+            tvSecondary.setGravity(Gravity.END | Gravity.TOP);
+            tvSecondary.setPadding(0, dpToPx(1), dpToPx(4), 0);
+            LinearLayout.LayoutParams secParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(12));
+            tvSecondary.setLayoutParams(secParams);
+            keyLayout.addView(tvSecondary);
+        } else {
+            View spacer = new View(this);
+            LinearLayout.LayoutParams spParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(showSecondary ? 10 : 4));
+            spacer.setLayoutParams(spParams);
+            keyLayout.addView(spacer);
+        }
+
+        // Primary Letter Label
+        final String displayChar = (isShifted || isCapsLocked) ? key.toUpperCase(Locale.US) : key.toLowerCase(Locale.US);
+        TextView tvPrimary = new TextView(this);
+        tvPrimary.setText(displayChar);
+        tvPrimary.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
+        tvPrimary.setTextColor(theme.textColor);
+        tvPrimary.setTypeface(Typeface.DEFAULT_BOLD);
+        tvPrimary.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams primParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        primParams.bottomMargin = dpToPx(2);
+        tvPrimary.setLayoutParams(primParams);
+        keyLayout.addView(tvPrimary);
+
+        keyLayout.setOnClickListener(v -> {
+            insertText(displayChar);
+            currentWordBuffer.append(displayChar);
+
+            // Auto-capitalization: single-shift is consumed after one letter
+            if (isShifted && !isCapsLocked) {
+                isShifted = false;
+                renderKeyRows();
+            }
+
+            updateSuggestions();
+        });
+
+        if (secondaryChar != null && !secondaryChar.isEmpty()) {
+            keyLayout.setOnLongClickListener(v -> {
+                insertText(secondaryChar);
+                if (Character.isDigit(secondaryChar.charAt(0))) {
+                    currentWordBuffer.append(secondaryChar);
+                    updateSuggestions();
+                } else {
+                    handlePunctuation(secondaryChar);
+                }
+                triggerHaptic(25);
+                return true;
+            });
+        }
+
+        return keyLayout;
+    }
+
     private Button createButton(String text, boolean isFunctionKey) {
-        KeyboardTheme theme = KeyboardTheme.getTheme(prefs != null ? prefs.getThemeId() : null);
+        KeyboardTheme theme = KeyboardTheme.resolveTheme(this, prefs != null ? prefs.getThemeId() : null);
         Button btn = new Button(this);
         btn.setText(text);
         btn.setTextColor(theme.textColor);
@@ -2373,13 +2566,20 @@ public class WisprKeyboardService extends InputMethodService {
         return createChipDrawable(fill, stroke, radiusDp);
     }
 
+    private void playKeyClick() {
+        if (prefs != null && prefs.isSoundEnabled() && audioManager != null) {
+            audioManager.playSoundEffect(android.media.AudioManager.FX_KEYPRESS_STANDARD);
+        }
+    }
+
     // --- TEXT INSERTION & BACKSPACE (CRITICAL BUG FIX FOR SELECTED TEXT) ---
 
     private void insertText(String text) {
         InputConnection ic = getCurrentInputConnection();
         if (ic != null) {
             ic.commitText(text, 1);
-            triggerHaptic(12);
+            triggerHaptic(10);
+            playKeyClick();
         }
     }
 
@@ -2389,6 +2589,8 @@ public class WisprKeyboardService extends InputMethodService {
     private void handleBackspace() {
         InputConnection ic = getCurrentInputConnection();
         if (ic == null) return;
+
+        playKeyClick();
 
         // 1. Check if user has selected text to delete
         CharSequence selected = ic.getSelectedText(0);
@@ -2406,24 +2608,77 @@ public class WisprKeyboardService extends InputMethodService {
             }
         }
 
+        evaluateAutoCaps();
         updateSuggestions();
-        triggerHaptic(12);
+        triggerHaptic(10);
     }
 
     private void handleSpaceKey() {
         InputConnection ic = getCurrentInputConnection();
         if (ic == null) return;
 
+        playKeyClick();
+        long now = System.currentTimeMillis();
+
+        // 1. Two spaces replaced as a . and a space (Double-space period)
+        if (prefs == null || prefs.isDoubleSpacePeriodEnabled()) {
+            CharSequence before = ic.getTextBeforeCursor(2, 0);
+            boolean isDoubleSpace = false;
+            if (before != null && before.length() > 0 && before.charAt(before.length() - 1) == ' ') {
+                if (before.length() >= 2) {
+                    char prevChar = before.charAt(before.length() - 2);
+                    if (Character.isLetterOrDigit(prevChar) || prevChar == ')' || prevChar == '"' || prevChar == '\'') {
+                        isDoubleSpace = true;
+                    }
+                } else if (now - lastSpacePressTime < 600) {
+                    isDoubleSpace = true;
+                }
+            }
+
+            if (isDoubleSpace) {
+                ic.deleteSurroundingText(1, 0);
+                ic.commitText(". ", 1);
+                currentWordBuffer.setLength(0);
+                lastCommittedWord = ".";
+                lastSpacePressTime = 0;
+
+                if (prefs == null || prefs.isAutoCapsEnabled()) {
+                    if (!isCapsLocked) {
+                        isShifted = true;
+                        renderKeyRows();
+                    }
+                }
+
+                triggerHaptic(12);
+                updateSuggestions();
+                return;
+            }
+        }
+
+        lastSpacePressTime = now;
         String currentWord = currentWordBuffer.toString().trim();
 
-        // Check if the typed word is a shortcut trigger (e.g. "GM" -> "Good Morning")
-        String expansion = shortcutsManager.getExpansion(currentWord);
+        // 2. Check Shortcuts Manager first
+        String expansion = shortcutsManager != null ? shortcutsManager.getExpansion(currentWord) : null;
         if (expansion != null) {
             ic.deleteSurroundingText(currentWordBuffer.length(), 0);
             ic.commitText(expansion + " ", 1);
-
             suggestionEngine.recordWordPair(lastCommittedWord, expansion);
             lastCommittedWord = expansion;
+        }
+        // 3. Error Corrections (Standalone "i" -> "I", "dont" -> "don't", "teh" -> "the", contractions, etc.)
+        else if (!currentWord.isEmpty() && (prefs == null || prefs.isAutoCorrectEnabled())) {
+            String autocorrect = suggestionEngine.getAutocorrect(currentWord);
+            if (autocorrect != null) {
+                ic.deleteSurroundingText(currentWordBuffer.length(), 0);
+                ic.commitText(autocorrect + " ", 1);
+                suggestionEngine.recordWordPair(lastCommittedWord, autocorrect);
+                lastCommittedWord = autocorrect;
+            } else {
+                ic.commitText(" ", 1);
+                suggestionEngine.recordWordPair(lastCommittedWord, currentWord);
+                lastCommittedWord = currentWord;
+            }
         } else {
             ic.commitText(" ", 1);
             if (!currentWord.isEmpty()) {
@@ -2433,21 +2688,36 @@ public class WisprKeyboardService extends InputMethodService {
         }
 
         currentWordBuffer.setLength(0);
-        triggerHaptic(12);
+        triggerHaptic(10);
         updateSuggestions();
+        evaluateAutoCaps();
     }
 
     private void handlePunctuation(String punc) {
         InputConnection ic = getCurrentInputConnection();
         if (ic == null) return;
 
+        playKeyClick();
         String currentWord = currentWordBuffer.toString().trim();
-        String expansion = shortcutsManager.getExpansion(currentWord);
+        String expansion = shortcutsManager != null ? shortcutsManager.getExpansion(currentWord) : null;
+
         if (expansion != null) {
             ic.deleteSurroundingText(currentWordBuffer.length(), 0);
             ic.commitText(expansion + punc + " ", 1);
             suggestionEngine.recordWordPair(lastCommittedWord, expansion);
             lastCommittedWord = expansion;
+        } else if (!currentWord.isEmpty() && (prefs == null || prefs.isAutoCorrectEnabled())) {
+            String autocorrect = suggestionEngine.getAutocorrect(currentWord);
+            if (autocorrect != null) {
+                ic.deleteSurroundingText(currentWordBuffer.length(), 0);
+                ic.commitText(autocorrect + punc + " ", 1);
+                suggestionEngine.recordWordPair(lastCommittedWord, autocorrect);
+                lastCommittedWord = autocorrect;
+            } else {
+                ic.commitText(punc + " ", 1);
+                suggestionEngine.recordWordPair(lastCommittedWord, currentWord);
+                lastCommittedWord = currentWord;
+            }
         } else {
             ic.commitText(punc + " ", 1);
             if (!currentWord.isEmpty()) {
@@ -2457,14 +2727,22 @@ public class WisprKeyboardService extends InputMethodService {
         }
 
         currentWordBuffer.setLength(0);
-        triggerHaptic(12);
+        triggerHaptic(10);
         updateSuggestions();
+
+        if (punc.equals(".") || punc.equals("?") || punc.equals("!")) {
+            if ((prefs == null || prefs.isAutoCapsEnabled()) && !isCapsLocked) {
+                isShifted = true;
+                renderKeyRows();
+            }
+        }
     }
 
     private void handleEnterKey() {
         InputConnection ic = getCurrentInputConnection();
         if (ic == null) return;
 
+        playKeyClick();
         EditorInfo ei = getCurrentInputEditorInfo();
         int action = (ei != null) ? (ei.imeOptions & (EditorInfo.IME_MASK_ACTION | EditorInfo.IME_FLAG_NO_ENTER_ACTION)) : 0;
 
@@ -2477,11 +2755,379 @@ public class WisprKeyboardService extends InputMethodService {
         } else {
             ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER));
             ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER));
+            if ((prefs == null || prefs.isAutoCapsEnabled()) && !isCapsLocked) {
+                isShifted = true;
+                renderKeyRows();
+            }
         }
 
         currentWordBuffer.setLength(0);
         triggerHaptic(20);
         updateSuggestions();
+    }
+
+    /**
+     * Automatic Capitalization Evaluator:
+     * Capitalizes first letter of sentence, after sentence-ending punctuation (. ? !) or newline,
+     * while respecting passwords, emails, URLs, and numbers.
+     */
+    private void evaluateAutoCaps() {
+        if (prefs == null || !prefs.isAutoCapsEnabled() || isCapsLocked) return;
+
+        EditorInfo ei = getCurrentInputEditorInfo();
+        if (ei != null) {
+            int inputType = ei.inputType;
+            int cls = inputType & EditorInfo.TYPE_MASK_CLASS;
+            int variation = inputType & EditorInfo.TYPE_MASK_VARIATION;
+
+            // Skip auto-capitalization for password, email, URL, and number fields
+            if (cls == EditorInfo.TYPE_CLASS_NUMBER ||
+                cls == EditorInfo.TYPE_CLASS_PHONE ||
+                variation == EditorInfo.TYPE_TEXT_VARIATION_PASSWORD ||
+                variation == EditorInfo.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD ||
+                variation == EditorInfo.TYPE_TEXT_VARIATION_WEB_PASSWORD ||
+                variation == EditorInfo.TYPE_TEXT_VARIATION_EMAIL_ADDRESS ||
+                variation == EditorInfo.TYPE_TEXT_VARIATION_URI ||
+                variation == EditorInfo.TYPE_TEXT_VARIATION_FILTER) {
+                if (isShifted) {
+                    isShifted = false;
+                    renderKeyRows();
+                }
+                return;
+            }
+
+            if ((inputType & EditorInfo.TYPE_TEXT_FLAG_CAP_CHARACTERS) != 0) {
+                isCapsLocked = true;
+                isShifted = true;
+                renderKeyRows();
+                return;
+            }
+
+            if ((inputType & EditorInfo.TYPE_TEXT_FLAG_CAP_WORDS) != 0) {
+                isShifted = true;
+                renderKeyRows();
+                return;
+            }
+        }
+
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) {
+            if (!isShifted) {
+                isShifted = true;
+                renderKeyRows();
+            }
+            return;
+        }
+
+        CharSequence before = ic.getTextBeforeCursor(40, 0);
+        boolean shouldCap = false;
+
+        if (before == null || before.length() == 0) {
+            shouldCap = true;
+        } else {
+            String str = before.toString();
+            int i = str.length() - 1;
+            while (i >= 0 && (str.charAt(i) == ' ' || str.charAt(i) == '\t')) {
+                i--;
+            }
+            if (i < 0) {
+                shouldCap = true;
+            } else {
+                char lastChar = str.charAt(i);
+                if (lastChar == '.' || lastChar == '?' || lastChar == '!' || lastChar == '\n') {
+                    shouldCap = true;
+                }
+            }
+        }
+
+        if (isShifted != shouldCap) {
+            isShifted = shouldCap;
+            renderKeyRows();
+        }
+    }
+
+    // --- SAMSUNG ONE-HANDED KEYBOARD DOCKS & MODES ---
+
+    private LinearLayout createDockPanel(final boolean isLeftPanel) {
+        KeyboardTheme theme = KeyboardTheme.resolveTheme(this, prefs != null ? prefs.getThemeId() : null);
+        LinearLayout dock = new LinearLayout(this);
+        dock.setOrientation(LinearLayout.VERTICAL);
+        dock.setGravity(Gravity.CENTER);
+        dock.setLayoutParams(new LinearLayout.LayoutParams(dpToPx(48), LinearLayout.LayoutParams.MATCH_PARENT));
+        dock.setBackgroundColor(Color.TRANSPARENT);
+        dock.setVisibility(View.GONE);
+
+        // Switch direction button
+        Button btnSwitch = new Button(this);
+        btnSwitch.setText(isLeftPanel ? "◀" : "▶");
+        btnSwitch.setTextSize(14);
+        btnSwitch.setTextColor(theme.textColor);
+        btnSwitch.setBackground(createChipDrawable(theme.actionKeyColor, theme.dividerColor, 8));
+        LinearLayout.LayoutParams p1 = new LinearLayout.LayoutParams(dpToPx(38), dpToPx(42));
+        p1.setMargins(0, dpToPx(4), 0, dpToPx(4));
+        btnSwitch.setLayoutParams(p1);
+        btnSwitch.setOnClickListener(v -> {
+            String newMode = isLeftPanel ? "left" : "right";
+            if (prefs != null) prefs.setOneHandedMode(newMode);
+            applyOneHandedMode();
+            triggerHaptic(15);
+        });
+        dock.addView(btnSwitch);
+
+        // Expand to Full Width button
+        Button btnExpand = new Button(this);
+        btnExpand.setText("⤢");
+        btnExpand.setTextSize(16);
+        btnExpand.setTextColor(theme.textColor);
+        btnExpand.setBackground(createChipDrawable(theme.actionKeyColor, theme.dividerColor, 8));
+        LinearLayout.LayoutParams p2 = new LinearLayout.LayoutParams(dpToPx(38), dpToPx(42));
+        p2.setMargins(0, dpToPx(4), 0, dpToPx(4));
+        btnExpand.setLayoutParams(p2);
+        btnExpand.setOnClickListener(v -> {
+            if (prefs != null) prefs.setOneHandedMode("full");
+            applyOneHandedMode();
+            triggerHaptic(15);
+        });
+        dock.addView(btnExpand);
+
+        return dock;
+    }
+
+    private void applyOneHandedMode() {
+        if (keyboardBodyContainer == null || leftDockPanel == null || rightDockPanel == null || mainInputContainer == null) return;
+        String mode = prefs != null ? prefs.getOneHandedMode() : "full";
+
+        if ("right".equalsIgnoreCase(mode)) {
+            leftDockPanel.setVisibility(View.VISIBLE);
+            rightDockPanel.setVisibility(View.GONE);
+            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 4.2f);
+            mainInputContainer.setLayoutParams(p);
+        } else if ("left".equalsIgnoreCase(mode)) {
+            leftDockPanel.setVisibility(View.GONE);
+            rightDockPanel.setVisibility(View.VISIBLE);
+            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 4.2f);
+            mainInputContainer.setLayoutParams(p);
+        } else {
+            leftDockPanel.setVisibility(View.GONE);
+            rightDockPanel.setVisibility(View.GONE);
+            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            mainInputContainer.setLayoutParams(p);
+        }
+    }
+
+    private void cycleOneHandedMode() {
+        String current = prefs != null ? prefs.getOneHandedMode() : "full";
+        String next;
+        if ("full".equalsIgnoreCase(current)) {
+            next = "right";
+        } else if ("right".equalsIgnoreCase(current)) {
+            next = "left";
+        } else {
+            next = "full";
+        }
+        if (prefs != null) prefs.setOneHandedMode(next);
+        applyOneHandedMode();
+        triggerHaptic(15);
+        Toast.makeText(this, "One-Handed Mode: " + next.toUpperCase(Locale.US), Toast.LENGTH_SHORT).show();
+    }
+
+    // --- SAMSUNG TEXT EDITING TOOL (D-PAD & SELECTION MODE) ---
+
+    private void buildTextEditingPanel() {
+        panelContainer.removeAllViews();
+        KeyboardTheme theme = KeyboardTheme.resolveTheme(this, prefs != null ? prefs.getThemeId() : null);
+
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
+        layout.setBackgroundColor(theme.backgroundColor);
+        layout.setPadding(dpToPx(6), dpToPx(4), dpToPx(6), dpToPx(4));
+
+        // 1. Top Operations Bar: [Select] [Select All] [Cut] [Copy] [Paste] [⌫]
+        LinearLayout opRow = new LinearLayout(this);
+        opRow.setOrientation(LinearLayout.HORIZONTAL);
+        opRow.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(38)));
+
+        final Button btnSelectMode = new Button(this);
+        btnSelectMode.setText(isTextEditingSelecting ? "✓ Selecting" : "Select");
+        btnSelectMode.setTextSize(11);
+        btnSelectMode.setAllCaps(false);
+        btnSelectMode.setTextColor(Color.WHITE);
+        btnSelectMode.setBackground(createChipDrawable(
+                isTextEditingSelecting ? theme.accentColor : theme.actionKeyColor,
+                theme.dividerColor, 8));
+        LinearLayout.LayoutParams selP = new LinearLayout.LayoutParams(0, dpToPx(34), 1.3f);
+        selP.setMargins(dpToPx(2), 0, dpToPx(2), 0);
+        btnSelectMode.setLayoutParams(selP);
+        btnSelectMode.setOnClickListener(v -> {
+            isTextEditingSelecting = !isTextEditingSelecting;
+            btnSelectMode.setText(isTextEditingSelecting ? "✓ Selecting" : "Select");
+            btnSelectMode.setBackground(createChipDrawable(
+                    isTextEditingSelecting ? theme.accentColor : theme.actionKeyColor,
+                    theme.dividerColor, 8));
+            triggerHaptic(15);
+        });
+        opRow.addView(btnSelectMode);
+
+        Button btnSelectAll = createTextEditBtn("Select All", 1.2f, theme, () -> {
+            InputConnection ic = getCurrentInputConnection();
+            if (ic != null) ic.performContextMenuAction(android.R.id.selectAll);
+            triggerHaptic(15);
+        });
+        opRow.addView(btnSelectAll);
+
+        Button btnCut = createTextEditBtn("Cut", 0.9f, theme, () -> {
+            InputConnection ic = getCurrentInputConnection();
+            if (ic != null) ic.performContextMenuAction(android.R.id.cut);
+            triggerHaptic(15);
+        });
+        opRow.addView(btnCut);
+
+        Button btnCopy = createTextEditBtn("Copy", 0.9f, theme, () -> {
+            InputConnection ic = getCurrentInputConnection();
+            if (ic != null) ic.performContextMenuAction(android.R.id.copy);
+            triggerHaptic(15);
+        });
+        opRow.addView(btnCopy);
+
+        Button btnPaste = createTextEditBtn("Paste", 0.9f, theme, () -> {
+            InputConnection ic = getCurrentInputConnection();
+            if (ic != null) ic.performContextMenuAction(android.R.id.paste);
+            triggerHaptic(15);
+        });
+        opRow.addView(btnPaste);
+
+        Button btnDel = createTextEditBtn("⌫", 0.8f, theme, this::handleBackspace);
+        opRow.addView(btnDel);
+
+        layout.addView(opRow);
+
+        // 2. Center Precision 4-Way D-Pad
+        LinearLayout dpadContainer = new LinearLayout(this);
+        dpadContainer.setOrientation(LinearLayout.VERTICAL);
+        dpadContainer.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams dpadParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.0f);
+        dpadContainer.setLayoutParams(dpadParams);
+
+        // D-Pad Up
+        LinearLayout dpadRow1 = new LinearLayout(this);
+        dpadRow1.setOrientation(LinearLayout.HORIZONTAL);
+        dpadRow1.setGravity(Gravity.CENTER);
+        Button btnUp = createDpadArrowBtn("▲", KeyEvent.KEYCODE_DPAD_UP, theme);
+        dpadRow1.addView(btnUp);
+        dpadContainer.addView(dpadRow1);
+
+        // D-Pad Left | Enter | Right
+        LinearLayout dpadRow2 = new LinearLayout(this);
+        dpadRow2.setOrientation(LinearLayout.HORIZONTAL);
+        dpadRow2.setGravity(Gravity.CENTER);
+        Button btnLeft = createDpadArrowBtn("◀", KeyEvent.KEYCODE_DPAD_LEFT, theme);
+        dpadRow2.addView(btnLeft);
+
+        Button btnEnter = new Button(this);
+        btnEnter.setText("⏎");
+        btnEnter.setTextSize(16);
+        btnEnter.setTextColor(Color.WHITE);
+        btnEnter.setBackground(createChipDrawable(theme.accentColor, Color.TRANSPARENT, 8));
+        LinearLayout.LayoutParams enterP = new LinearLayout.LayoutParams(dpToPx(56), dpToPx(42));
+        enterP.setMargins(dpToPx(12), 0, dpToPx(12), 0);
+        btnEnter.setLayoutParams(enterP);
+        btnEnter.setOnClickListener(v -> handleEnterKey());
+        dpadRow2.addView(btnEnter);
+
+        Button btnRight = createDpadArrowBtn("▶", KeyEvent.KEYCODE_DPAD_RIGHT, theme);
+        dpadRow2.addView(btnRight);
+        dpadContainer.addView(dpadRow2);
+
+        // D-Pad Down
+        LinearLayout dpadRow3 = new LinearLayout(this);
+        dpadRow3.setOrientation(LinearLayout.HORIZONTAL);
+        dpadRow3.setGravity(Gravity.CENTER);
+        Button btnDown = createDpadArrowBtn("▼", KeyEvent.KEYCODE_DPAD_DOWN, theme);
+        dpadRow3.addView(btnDown);
+        dpadContainer.addView(dpadRow3);
+
+        layout.addView(dpadContainer);
+
+        // 3. Bottom Row: [⇤ Start] [⇥ End] [⌨️ Keyboard]
+        LinearLayout bottomRow = new LinearLayout(this);
+        bottomRow.setOrientation(LinearLayout.HORIZONTAL);
+        bottomRow.setGravity(Gravity.CENTER_VERTICAL);
+        bottomRow.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(40)));
+
+        Button btnHome = createTextEditBtn("⇤ Line Start", 1.0f, theme, () -> {
+            sendDpadKey(KeyEvent.KEYCODE_MOVE_HOME, isTextEditingSelecting);
+        });
+        bottomRow.addView(btnHome);
+
+        Button btnEnd = createTextEditBtn("⇥ Line End", 1.0f, theme, () -> {
+            sendDpadKey(KeyEvent.KEYCODE_MOVE_END, isTextEditingSelecting);
+        });
+        bottomRow.addView(btnEnd);
+
+        Button btnReturn = new Button(this);
+        btnReturn.setText("⌨️ Return to Keyboard");
+        btnReturn.setTextSize(12);
+        btnReturn.setTextColor(Color.WHITE);
+        btnReturn.setAllCaps(false);
+        btnReturn.setBackground(createChipDrawable(theme.accentColor, Color.TRANSPARENT, 8));
+        LinearLayout.LayoutParams retP = new LinearLayout.LayoutParams(0, dpToPx(36), 1.5f);
+        retP.setMargins(dpToPx(4), 0, dpToPx(2), 0);
+        btnReturn.setLayoutParams(retP);
+        btnReturn.setOnClickListener(v -> showPanel(PanelMode.KEYBOARD));
+        bottomRow.addView(btnReturn);
+
+        layout.addView(bottomRow);
+
+        panelContainer.addView(layout);
+    }
+
+    private Button createTextEditBtn(String text, float weight, KeyboardTheme theme, Runnable action) {
+        Button btn = new Button(this);
+        btn.setText(text);
+        btn.setTextSize(11);
+        btn.setAllCaps(false);
+        btn.setTextColor(theme.textColor);
+        btn.setBackground(createChipDrawable(theme.actionKeyColor, theme.dividerColor, 8));
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dpToPx(34), weight);
+        p.setMargins(dpToPx(2), 0, dpToPx(2), 0);
+        btn.setLayoutParams(p);
+        btn.setOnClickListener(v -> {
+            if (action != null) action.run();
+        });
+        return btn;
+    }
+
+    private Button createDpadArrowBtn(String arrow, final int keyCode, KeyboardTheme theme) {
+        Button btn = new Button(this);
+        btn.setText(arrow);
+        btn.setTextSize(18);
+        btn.setTextColor(theme.textColor);
+        btn.setBackground(createChipDrawable(theme.keyColor, theme.dividerColor, 10));
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(dpToPx(56), dpToPx(42));
+        p.setMargins(dpToPx(4), dpToPx(2), dpToPx(4), dpToPx(2));
+        btn.setLayoutParams(p);
+        btn.setOnClickListener(v -> sendDpadKey(keyCode, isTextEditingSelecting));
+        return btn;
+    }
+
+    private void sendDpadKey(int keyCode, boolean selecting) {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) return;
+        long now = System.currentTimeMillis();
+        if (selecting) {
+            ic.sendKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0, KeyEvent.META_SHIFT_ON));
+            ic.sendKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0, KeyEvent.META_SHIFT_ON));
+        } else {
+            ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, keyCode));
+            ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, keyCode));
+        }
+        triggerHaptic(10);
+        playKeyClick();
     }
 
     private void updateEnterKeyAction(EditorInfo ei) {

@@ -21,6 +21,13 @@ public class KeyboardPreferences {
     private static final String KEY_THEME_ID = "keyboard_theme_id";
     private static final String KEY_SHOW_NUMBER_ROW = "show_permanent_number_row";
 
+    private static final String KEY_AUTO_CAPS = "auto_capitalization";
+    private static final String KEY_AUTO_CORRECT = "auto_correction";
+    private static final String KEY_DOUBLE_SPACE_PERIOD = "double_space_period";
+    private static final String KEY_SOUND_CLICKS = "key_sound_clicks";
+    private static final String KEY_SHOW_SECONDARY_SYMBOLS = "show_secondary_symbols";
+    private static final String KEY_ONE_HANDED_MODE = "one_handed_mode"; // "full", "left", "right"
+
     public static final String DEFAULT_MODEL = "gemini-2.0-flash";
     public static final String DEFAULT_MODE = "polish";
     public static final String DEFAULT_THEME = "clean_light";
@@ -65,6 +72,54 @@ public class KeyboardPreferences {
 
     public void setHapticEnabled(boolean enabled) {
         prefs.edit().putBoolean(KEY_HAPTIC, enabled).apply();
+    }
+
+    public boolean isAutoCapsEnabled() {
+        return prefs.getBoolean(KEY_AUTO_CAPS, true);
+    }
+
+    public void setAutoCapsEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_AUTO_CAPS, enabled).apply();
+    }
+
+    public boolean isAutoCorrectEnabled() {
+        return prefs.getBoolean(KEY_AUTO_CORRECT, true);
+    }
+
+    public void setAutoCorrectEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_AUTO_CORRECT, enabled).apply();
+    }
+
+    public boolean isDoubleSpacePeriodEnabled() {
+        return prefs.getBoolean(KEY_DOUBLE_SPACE_PERIOD, true);
+    }
+
+    public void setDoubleSpacePeriodEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_DOUBLE_SPACE_PERIOD, enabled).apply();
+    }
+
+    public boolean isSoundEnabled() {
+        return prefs.getBoolean(KEY_SOUND_CLICKS, false);
+    }
+
+    public void setSoundEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_SOUND_CLICKS, enabled).apply();
+    }
+
+    public boolean isShowSecondarySymbols() {
+        return prefs.getBoolean(KEY_SHOW_SECONDARY_SYMBOLS, true);
+    }
+
+    public void setShowSecondarySymbols(boolean show) {
+        prefs.edit().putBoolean(KEY_SHOW_SECONDARY_SYMBOLS, show).apply();
+    }
+
+    public String getOneHandedMode() {
+        return prefs.getString(KEY_ONE_HANDED_MODE, "full");
+    }
+
+    public void setOneHandedMode(String mode) {
+        prefs.edit().putString(KEY_ONE_HANDED_MODE, mode != null ? mode.trim() : "full").apply();
     }
 
     public String getThemeId() {

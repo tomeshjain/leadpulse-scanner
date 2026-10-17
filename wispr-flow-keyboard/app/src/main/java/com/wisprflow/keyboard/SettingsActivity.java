@@ -92,6 +92,11 @@ public class SettingsActivity extends AppCompatActivity {
     private Spinner spinnerMode;
     private Spinner spinnerTheme;
     private CheckBox cbShowNumberRow;
+    private CheckBox cbAutoCaps;
+    private CheckBox cbAutoCorrect;
+    private CheckBox cbDoubleSpacePeriod;
+    private CheckBox cbSecondarySymbols;
+    private CheckBox cbKeySounds;
 
     private Button btnLaunchScanner;
     private TextView tvActionItemsBadge;
@@ -184,6 +189,11 @@ public class SettingsActivity extends AppCompatActivity {
         spinnerMode = findViewById(R.id.spinnerMode);
         spinnerTheme = findViewById(R.id.spinnerTheme);
         cbShowNumberRow = findViewById(R.id.cbShowNumberRow);
+        cbAutoCaps = findViewById(R.id.cbAutoCaps);
+        cbAutoCorrect = findViewById(R.id.cbAutoCorrect);
+        cbDoubleSpacePeriod = findViewById(R.id.cbDoubleSpacePeriod);
+        cbSecondarySymbols = findViewById(R.id.cbSecondarySymbols);
+        cbKeySounds = findViewById(R.id.cbKeySounds);
 
         btnLaunchScanner = findViewById(R.id.btnLaunchScanner);
         tvActionItemsBadge = findViewById(R.id.tvActionItemsBadge);
@@ -243,6 +253,46 @@ public class SettingsActivity extends AppCompatActivity {
             cbShowNumberRow.setOnCheckedChangeListener((buttonView, isChecked) -> {
                 prefs.setShowNumberRow(isChecked);
                 Toast.makeText(this, isChecked ? "Permanent Number Row enabled" : "Text & Numbers separated (Default)", Toast.LENGTH_SHORT).show();
+            });
+        }
+
+        // Auto-Capitalization Toggle
+        if (cbAutoCaps != null) {
+            cbAutoCaps.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                prefs.setAutoCapsEnabled(isChecked);
+                Toast.makeText(this, isChecked ? "Auto-capitalization enabled" : "Auto-capitalization disabled", Toast.LENGTH_SHORT).show();
+            });
+        }
+
+        // Auto-Correction Toggle
+        if (cbAutoCorrect != null) {
+            cbAutoCorrect.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                prefs.setAutoCorrectEnabled(isChecked);
+                Toast.makeText(this, isChecked ? "Auto-correction enabled" : "Auto-correction disabled", Toast.LENGTH_SHORT).show();
+            });
+        }
+
+        // Double-Space Period Toggle
+        if (cbDoubleSpacePeriod != null) {
+            cbDoubleSpacePeriod.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                prefs.setDoubleSpacePeriodEnabled(isChecked);
+                Toast.makeText(this, isChecked ? "Double-space period enabled" : "Double-space period disabled", Toast.LENGTH_SHORT).show();
+            });
+        }
+
+        // Secondary Symbols Toggle
+        if (cbSecondarySymbols != null) {
+            cbSecondarySymbols.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                prefs.setShowSecondarySymbols(isChecked);
+                Toast.makeText(this, isChecked ? "Secondary symbols visible on keys" : "Secondary symbols hidden", Toast.LENGTH_SHORT).show();
+            });
+        }
+
+        // Key Sounds Toggle
+        if (cbKeySounds != null) {
+            cbKeySounds.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                prefs.setSoundEnabled(isChecked);
+                Toast.makeText(this, isChecked ? "Key click sound enabled" : "Key click sound muted", Toast.LENGTH_SHORT).show();
             });
         }
 
@@ -547,9 +597,24 @@ public class SettingsActivity extends AppCompatActivity {
             public void onNothingSelected(AdapterView<?> parent) {}
         });
 
-        // Permanent Number Row CheckBox
+        // Appearance & Typing CheckBoxes
         if (cbShowNumberRow != null) {
             cbShowNumberRow.setChecked(prefs.isShowNumberRow());
+        }
+        if (cbAutoCaps != null) {
+            cbAutoCaps.setChecked(prefs.isAutoCapsEnabled());
+        }
+        if (cbAutoCorrect != null) {
+            cbAutoCorrect.setChecked(prefs.isAutoCorrectEnabled());
+        }
+        if (cbDoubleSpacePeriod != null) {
+            cbDoubleSpacePeriod.setChecked(prefs.isDoubleSpacePeriodEnabled());
+        }
+        if (cbSecondarySymbols != null) {
+            cbSecondarySymbols.setChecked(prefs.isShowSecondarySymbols());
+        }
+        if (cbKeySounds != null) {
+            cbKeySounds.setChecked(prefs.isSoundEnabled());
         }
     }
 
